@@ -1,20 +1,33 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createRequest } from "../api/requestApi";
 import { fileToBase64 } from "../utils/toBase64";
 import { isValidVNMobile, normalizeVNPhone, validateMovingTime } from "../utils/validation";
 import { fmtDateTime24, nowForDatetimeLocal } from "../utils/datetime";
+import AddressPicker from "../components/AddressPicker";
+import MapPicker from "../components/MapPicker";
 
 const MAX_IMAGES = 4;
 const MAX_FILE_MB = 1.5;
 
+function isAddressComplete(a) {
+  return !!(
+    a?.province?.code &&
+    a?.district?.code &&
+    a?.ward?.code &&
+    String(a?.street || "").trim()
+  );
+}
+
 export default function CreateRequestPage() {
   const nav = useNavigate();
+  const fileRef = useRef(null);
 
   const [form, setForm] = useState({
     customerName: "",
     customerPhone: "",
-    address: "",
+    address: { province: null, district: null, ward: null, street: "" },
+    location: { lat: 21.0278, lng: 105.8342 }, // default Hà Nội
     movingTime: "",
     serviceType: "STANDARD",
     notes: "",
@@ -32,14 +45,13 @@ export default function CreateRequestPage() {
     const files = Array.from(filesList || []);
     if (!files.length) return;
 
-    // chặn quá 4 ảnh
     const remain = MAX_IMAGES - form.images.length;
     if (remain <= 0) {
       setMsg(`Bạn chỉ được thêm tối đa ${MAX_IMAGES} ảnh.`);
+      if (fileRef.current) fileRef.current.value = "";
       return;
     }
 
-    // kiểm tra dung lượng
     const valid = [];
     for (const f of files.slice(0, remain)) {
       const mb = f.size / (1024 * 1024);
@@ -49,27 +61,38 @@ export default function CreateRequestPage() {
       }
       valid.push(f);
     }
-    if (!valid.length) return;
+    if (!valid.length) {
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
 
     const arr = await Promise.all(valid.map(fileToBase64));
     setForm((s) => ({ ...s, images: [...s.images, ...arr] }));
+    if (fileRef.current) fileRef.current.value = ""; // reset để chọn lại cùng file tên cũ
   };
 
   const removeImageAt = (idx) => {
     setForm((s) => ({ ...s, images: s.images.filter((_, i) => i !== idx) }));
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   const submit = async (e) => {
     e.preventDefault();
     setMsg("");
 
-    // phone
+    // Validate phone
     if (!isValidVNMobile(form.customerPhone)) {
-      setMsg("❌ Số điện thoại không đúng định dạng VN.");
+      setMsg("❌ Số điện thoại không đúng định dạng VN (0(3/5/7/8/9) + 8 số).");
       return;
     }
 
-    // moving time
+    // Validate address
+    if (!isAddressComplete(form.address)) {
+      setMsg("❌ Vui lòng chọn đủ Tỉnh/TP, Quận/Huyện, Phường/Xã và nhập Số nhà/Đường.");
+      return;
+    }
+
+    // Validate moving time (tương lai + quy tắc 12h)
     const vt = validateMovingTime(form.movingTime);
     if (!vt.ok) {
       setMsg("❌ " + vt.msg);
@@ -79,15 +102,20 @@ export default function CreateRequestPage() {
     try {
       setLoading(true);
       const payload = {
-        ...form,
+        customerName: form.customerName,
         customerPhone: normalizeVNPhone(form.customerPhone),
+        address: form.address,
+        location: { type: "Point", coordinates: [form.location.lng, form.location.lat] },
         movingTime: new Date(form.movingTime),
+        serviceType: form.serviceType,
+        notes: form.notes,
+        images: form.images, // base64 (demo)
       };
+
       await createRequest(payload);
 
-      // chỉ lưu phone để lọc ở màn Manage — KHÔNG làm thay đổi dữ liệu cũ
+      // lưu phone để lọc ở màn Manage
       localStorage.setItem("my_phone", normalizeVNPhone(form.customerPhone));
-
       setMsg("✅ Tạo request thành công. Đang chuyển tới trang quản lý…");
       setTimeout(() => nav("/my-requests"), 700);
     } catch (err) {
@@ -98,36 +126,48 @@ export default function CreateRequestPage() {
   };
 
   return (
-    <div style={{ padding: 24, display: "grid", gap: 18, maxWidth: 720 }}>
+    <div style={{ padding: 24, display: "grid", gap: 18, maxWidth: 820 }}>
       <h1>Tạo Request</h1>
 
-      <form onSubmit={submit} style={{ display: "grid", gap: 12 }}>
-        <label>Họ tên
+      <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
+        <label>Họ và tên
           <input name="customerName" value={form.customerName} onChange={onChange} required style={ipt}/>
         </label>
 
-        <label>Số điện thoại (VN)
-          <input name="customerPhone" value={form.customerPhone} onChange={onChange} required style={ipt} placeholder="09xxxxxxxx / +849xxxxxxxx"/>
+        <label>Số điện thoại
+          <input name="customerPhone" value={form.customerPhone} onChange={onChange} required style={ipt} placeholder="+84"/>
         </label>
 
-        <label>Địa chỉ
-          <input name="address" value={form.address} onChange={onChange} required style={ipt}/>
-        </label>
+        <div>
+          <h3 style={{ margin: "8px 0" }}>Địa chỉ</h3>
+          <AddressPicker
+            value={form.address}
+            onChange={(addr) => setForm((s) => ({ ...s, address: addr }))}
+          />
+        </div>
+
+        <div>
+          <h3 style={{ margin: "8px 0" }}>Vị trí trên bản đồ</h3>
+          <MapPicker
+            value={form.location}
+            onChange={(loc) => setForm((s) => ({ ...s, location: loc }))}
+          />
+        </div>
 
         <label>Thời gian chuyển nhà
-  <input
-    type="datetime-local"
-    name="movingTime"
-    value={form.movingTime}
-    onChange={onChange}
-    required
-    min={nowForDatetimeLocal()}          // ⬅ chặn chọn quá khứ (mức input)
-    style={ipt}
-  />
-    <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-    {form.movingTime ? `Hiển thị: ${fmtDateTime24(form.movingTime)}` : "định dạng: dd/MM/yyyy, HH:mm"}
-  </div>
-</label>
+          <input
+            type="datetime-local"
+            name="movingTime"
+            value={form.movingTime}
+            onChange={onChange}
+            required
+            min={nowForDatetimeLocal()}
+            style={ipt}
+          />
+          <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+            {form.movingTime ? `Hiển thị: ${fmtDateTime24(form.movingTime)}` : ""}
+          </div>
+        </label>
 
         <label>Dịch vụ
           <select name="serviceType" value={form.serviceType} onChange={onChange} style={ipt}>
@@ -137,7 +177,7 @@ export default function CreateRequestPage() {
         </label>
 
         <label>Ảnh (tối đa 4, ≤ {MAX_FILE_MB}MB/ảnh)
-          <input type="file" accept="image/*" multiple onChange={(e) => addFiles(e.target.files)} />
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={(e) => addFiles(e.target.files)} />
         </label>
 
         {form.images.length > 0 && (
