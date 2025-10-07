@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Star, Users, TrendingUp, Filter, Search } from "lucide-react";
 import ReviewCard from "../components/ReviewCard";
+import { Link } from "react-router-dom";
 
 export default function Homepage() {
   const [reviews, setReviews] = useState([]);
@@ -100,6 +101,11 @@ export default function Homepage() {
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
           Khám phá những trải nghiệm thực tế từ khách hàng về dịch vụ chuyển nhà của chúng tôi
         </p>
+        <div className="mt-6">
+          <Link to="/customer-review" className="inline-block bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700">
+            Viết review / Xem review
+          </Link>
+        </div>
       </motion.div>
 
       {/* Stats Cards */}

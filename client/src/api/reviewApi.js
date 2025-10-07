@@ -3,7 +3,7 @@ import axios from "axios";
 const API_URL = "http://localhost:5000/reviews";
 
 // Lấy toàn bộ reviews
-export const getReviews = () => axios.get(`${API_URL}/all`);
+export const getReviews = () => axios.get(`${API_URL}`);
 
 // Lấy review theo id
 export const getReview = (id) => axios.get(`${API_URL}/${id}`);

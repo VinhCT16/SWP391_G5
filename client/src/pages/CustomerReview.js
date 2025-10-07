@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getReviews, createReview, updateReview, deleteReview } from "../api/reviewApi";
 import ReviewCard from "../components/ReviewCard";
+import { Link } from "react-router-dom";
 
 export default function CustomerReview() {
   const [reviews, setReviews] = useState([]);
@@ -44,10 +45,10 @@ export default function CustomerReview() {
         <div className="text-2xl font-bold text-blue-600">MyReviewApp</div>
         <ul className="flex space-x-6">
           <li>
-            <a href="/" className="text-gray-700 hover:text-blue-500 font-medium">Trang chủ</a>
+            <Link to="/" className="text-gray-700 hover:text-blue-500 font-medium">Trang chủ</Link>
           </li>
           <li>
-            <a href="/reviews" className="text-gray-700 hover:text-blue-500 font-medium">Review</a>
+            <Link to="/customer-review" className="text-gray-700 hover:text-blue-500 font-medium">Review</Link>
           </li>
           <li>
             <a href="/about" className="text-gray-700 hover:text-blue-500 font-medium">Giới thiệu</a>

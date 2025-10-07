@@ -122,7 +122,7 @@ export default function Layout({ children }) {
               </p>
               <div className="flex items-center text-gray-400">
                 <MapPin className="h-4 w-4 mr-2" />
-                <span>FPT University, HL Tech,Ha noi</span>
+                <span>123 Đường ABC, Quận XYZ, TP.HCM</span>
               </div>
             </div>
             
@@ -152,7 +152,7 @@ export default function Layout({ children }) {
           </div>
           
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2025 Moving Service. Tất cả quyền được bảo lưu.</p>
+            <p>&copy; 2024 Moving Service. Tất cả quyền được bảo lưu.</p>
           </div>
         </div>
       </footer>
