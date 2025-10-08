@@ -6,6 +6,10 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Home from './pages/Home';
+import Layout from "./components/Layout";
+import CustomerReview from "./pages/CustomerReview";
+import ManagerReview from "./pages/ManagerReview";
+import About from "./pages/About";
 import './App.css';
 
 function App() {
@@ -17,6 +21,9 @@ function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/customer-review" element={<CustomerReview />} />
+            <Route path="/manager-review" element={<ManagerReview />} />
+            <Route path="/about" element={<About />} />
             <Route element={<ProtectedRoute />}> 
               <Route path="/home" element={<Home />} />
             </Route>

@@ -1,8 +1,10 @@
+import reviewRoutes from "./routes/reviewRoutes.js";
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const dotenv = require("dotenv");
 const { connectDB } = require("./config/db");
+
 
 dotenv.config();
 
@@ -27,6 +29,7 @@ app.get("/api/health", (req, res) => {
 
 // Routes
 app.use("/api/auth", require("./routes/auth"));
+app.use("/reviews", reviewRoutes);
 
 // Start server after DB connect
 const port = process.env.PORT || 5000;
