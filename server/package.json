@@ -1,7 +1,6 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -14,6 +13,7 @@
   "dependencies": {
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
@@ -22,6 +22,6 @@
     "mongoose": "^8.18.2",
     "nodemon": "^3.1.10",
     "openai": "^5.23.1",
-    "cookie-parser": "^1.4.7"
+    "uuid": "^13.0.0"
   }
 }

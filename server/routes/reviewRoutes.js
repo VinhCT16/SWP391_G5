@@ -1,11 +1,11 @@
-import express from "express";
-import {
+const express = require("express");
+const {
   getReviews,
   getReviewById,
   createReview,
   updateReview,
   deleteReview,
-} from "../controllers/reviewController.js";
+} = require("../controllers/reviewController");
 
 const router = express.Router();
 
@@ -16,4 +16,4 @@ router.post("/", createReview);       // POST /reviews
 router.put("/:id", updateReview);     // PUT /reviews/:id
 router.delete("/:id", deleteReview);  // DELETE /reviews/:id
 
-export default router;
+module.exports = router;

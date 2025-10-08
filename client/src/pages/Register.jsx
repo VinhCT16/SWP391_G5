@@ -4,14 +4,25 @@ import { useAuth } from '../context/AuthContext';
 import './Auth.css';
 
 export default function Register() {
-  const { register } = useAuth();
+  const { register, user, logout } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [phone, setPhone] = useState('');
+  const [role, setRole] = useState('customer');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -26,13 +37,47 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await register(name, email, password);
+      await register(name, email, password, phone, role);
       navigate('/login');
     } catch (err) {
       setError(err?.response?.data?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
+  }
+
+  // If user is already logged in, show a different message
+  if (user) {
+    return (
+      <div className="auth-container">
+        <div className="auth-background">
+          <div className="auth-overlay"></div>
+          <div className="auth-content">
+            <div className="auth-card">
+              <div className="auth-header">
+                <div className="logo">
+                  <h1>MoveEase</h1>
+                  <span>Professional Moving Services</span>
+                </div>
+                <h2>Already Logged In</h2>
+                <p>You are currently logged in as {user.name}</p>
+              </div>
+              <div className="auth-actions" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '2rem' }}>
+                <button onClick={() => navigate('/dashboard')} className="btn btn-primary">
+                  Go to Dashboard
+                </button>
+                <button onClick={handleLogout} className="btn btn-outline">
+                  Logout
+                </button>
+              </div>
+              <div className="auth-footer">
+                <Link to="/">← Back to Home</Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -73,6 +118,31 @@ export default function Register() {
                   placeholder="Enter your email"
                   required
                 />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="phone">Phone Number</label>
+                <input
+                  id="phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Enter your phone number"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="role">Account Type</label>
+                <select
+                  id="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  required
+                >
+                  <option value="customer">Customer</option>
+                  <option value="manager">Manager</option>
+                  <option value="staff">Staff</option>
+                </select>
               </div>
 
               <div className="form-group">

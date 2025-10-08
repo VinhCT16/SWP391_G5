@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import ReviewCard from "../components/ReviewCard";
 import { getReviews } from "../api/reviewApi";
+import BackButton from "../components/BackButton";
 
 export default function About() {
   const [reviews, setReviews] = useState([]);
@@ -14,6 +15,7 @@ export default function About() {
 
   return (
     <div className="space-y-10">
+      <BackButton fallbackPath="/" />
       <section className="bg-white rounded-xl p-8 shadow border border-gray-100">
         <motion.h1
           initial={{ opacity: 0, y: -10 }}

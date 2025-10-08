@@ -1,7 +1,7 @@
-import Review from "../models/Review.js";
+const Review = require("../models/Review");
 
 // 📌 Lấy tất cả review
-export const getReviews = async (req, res) => {
+const getReviews = async (req, res) => {
   try {
     const reviews = await Review.find().sort({ createdAt: -1 });
     res.json(reviews);
@@ -11,7 +11,7 @@ export const getReviews = async (req, res) => {
 };
 
 // 📌 Lấy review theo ID
-export const getReviewById = async (req, res) => {
+const getReviewById = async (req, res) => {
   try {
     const review = await Review.findById(req.params.id);
     if (!review) return res.status(404).json({ message: "Review not found" });
@@ -22,7 +22,7 @@ export const getReviewById = async (req, res) => {
 };
 
 // 📌 Tạo review mới
-export const createReview = async (req, res) => {
+const createReview = async (req, res) => {
   const { user, rating, comment } = req.body;
   try {
     const review = new Review({ user, rating, comment });
@@ -34,7 +34,7 @@ export const createReview = async (req, res) => {
 };
 
 // 📌 Update review
-export const updateReview = async (req, res) => {
+const updateReview = async (req, res) => {
   try {
     const review = await Review.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
@@ -47,7 +47,7 @@ export const updateReview = async (req, res) => {
 };
 
 // 📌 Delete review
-export const deleteReview = async (req, res) => {
+const deleteReview = async (req, res) => {
   try {
     const review = await Review.findByIdAndDelete(req.params.id);
     if (!review) return res.status(404).json({ message: "Review not found" });
@@ -55,4 +55,12 @@ export const deleteReview = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+};
+
+module.exports = {
+  getReviews,
+  getReviewById,
+  createReview,
+  updateReview,
+  deleteReview
 };

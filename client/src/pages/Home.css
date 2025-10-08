@@ -49,6 +49,40 @@
   gap: 1rem;
 }
 
+.manager-link {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.manager-link:hover {
+  background: rgba(255,255,255,0.3);
+  color: white;
+  text-decoration: none;
+}
+
+.staff-link {
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  font-size: 0.9rem;
+}
+
+.staff-link:hover {
+  background: rgba(255,255,255,0.3);
+  color: white;
+  text-decoration: none;
+}
+
 .user-info span {
   color: #2c3e50;
   font-weight: 500;
@@ -210,6 +244,18 @@
 
 .action-btn.secondary:hover {
   background: #e9ecef;
+  transform: translateY(-1px);
+}
+
+.action-btn.tertiary {
+  background: #17a2b8;
+  color: white;
+  border: 2px solid #17a2b8;
+}
+
+.action-btn.tertiary:hover {
+  background: #138496;
+  border-color: #138496;
   transform: translateY(-1px);
 }
 

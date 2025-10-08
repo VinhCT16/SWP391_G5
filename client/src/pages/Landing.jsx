@@ -1,8 +1,21 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import './Landing.css';
 
 export default function Landing() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
+
   return (
     <div className="landing-container">
       <header className="landing-header">
@@ -12,8 +25,24 @@ export default function Landing() {
             <span>Professional Moving Services</span>
           </div>
           <nav className="header-nav">
-            <Link to="/login" className="nav-link">Sign In</Link>
-            <Link to="/register" className="nav-link btn-primary">Get Started</Link>
+            {user ? (
+              <>
+                <span className="welcome-text">Welcome, {user.name}</span>
+                <Link to="/dashboard" className="nav-link">Dashboard</Link>
+                {user.role === 'manager' && (
+                  <Link to="/manager-dashboard" className="nav-link">Manager Panel</Link>
+                )}
+                {user.role === 'staff' && (
+                  <Link to="/staff-dashboard" className="nav-link">Staff Panel</Link>
+                )}
+                <button onClick={handleLogout} className="nav-link logout-btn">Logout</button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="nav-link">Sign In</Link>
+                <Link to="/register" className="nav-link btn-primary">Get Started</Link>
+              </>
+            )}
           </nav>
         </div>
       </header>
@@ -24,8 +53,25 @@ export default function Landing() {
             <h1>Moving Made Simple</h1>
             <p>Professional, reliable, and affordable moving services. Let us handle your next move with care and precision.</p>
             <div className="hero-buttons">
-              <Link to="/register" className="btn btn-primary btn-large">Book Your Move</Link>
-              <Link to="/login" className="btn btn-outline btn-large">Sign In</Link>
+              {user ? (
+                <>
+                  <Link to="/dashboard" className="btn btn-primary btn-large">Go to Dashboard</Link>
+                  {user.role === 'customer' && (
+                    <Link to="/customer-dashboard" className="btn btn-outline btn-large">Book Your Move</Link>
+                  )}
+                  {user.role === 'manager' && (
+                    <Link to="/manager-dashboard" className="btn btn-outline btn-large">Manager Panel</Link>
+                  )}
+                  {user.role === 'staff' && (
+                    <Link to="/staff-dashboard" className="btn btn-outline btn-large">Staff Panel</Link>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Link to="/register" className="btn btn-primary btn-large">Book Your Move</Link>
+                  <Link to="/login" className="btn btn-outline btn-large">Sign In</Link>
+                </>
+              )}
             </div>
           </div>
           <div className="hero-image">

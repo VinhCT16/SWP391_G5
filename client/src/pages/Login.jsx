@@ -4,12 +4,21 @@ import { useAuth } from '../context/AuthContext';
 import './Auth.css';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, user, logout } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
+  };
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -17,12 +26,46 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/home');
+      navigate('/dashboard');
     } catch (err) {
       setError(err?.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
+  }
+
+  // If user is already logged in, show a different message
+  if (user) {
+    return (
+      <div className="auth-container">
+        <div className="auth-background">
+          <div className="auth-overlay"></div>
+          <div className="auth-content">
+            <div className="auth-card">
+              <div className="auth-header">
+                <div className="logo">
+                  <h1>MoveEase</h1>
+                  <span>Professional Moving Services</span>
+                </div>
+                <h2>Already Logged In</h2>
+                <p>You are currently logged in as {user.name}</p>
+              </div>
+              <div className="auth-actions" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '2rem' }}>
+                <button onClick={() => navigate('/dashboard')} className="btn btn-primary">
+                  Go to Dashboard
+                </button>
+                <button onClick={handleLogout} className="btn btn-outline">
+                  Logout
+                </button>
+              </div>
+              <div className="auth-footer">
+                <Link to="/">← Back to Home</Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

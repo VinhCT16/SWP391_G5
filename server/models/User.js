@@ -19,6 +19,19 @@ const userSchema = new mongoose.Schema(
       required: true,
       minlength: 6,
     },
+    role: {
+      type: String,
+      enum: ["customer", "manager", "staff"],
+      default: "customer"
+    },
+    phone: {
+      type: String,
+      trim: true
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    }
   },
   { timestamps: true }
 );
