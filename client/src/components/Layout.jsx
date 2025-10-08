@@ -1,17 +1,5 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { motion } from "framer-motion";
-import { 
-  Home, 
-  Star, 
-  Users, 
-  Menu, 
-  X,
-  Truck,
-  Phone,
-  Mail,
-  MapPin
-} from "lucide-react";
 import { useState } from "react";
 
 export default function Layout({ children }) {
@@ -19,10 +7,10 @@ export default function Layout({ children }) {
   const location = useLocation();
 
   const navigation = [
-    { name: "Trang chủ", href: "/", icon: Home },
-    { name: "Đánh giá khách hàng", href: "/homepage", icon: Star },
-    { name: "Quản lý đánh giá", href: "/manager-review", icon: Users },
-    { name: "Đánh giá khách hàng", href: "/customer-review", icon: Star },
+    { name: "Trang chủ", href: "/", icon: "🏠" },
+    { name: "Đánh giá khách hàng", href: "/homepage", icon: "⭐" },
+    { name: "Quản lý đánh giá", href: "/manager-review", icon: "👥" },
+    { name: "Đánh giá khách hàng", href: "/customer-review", icon: "⭐" },
   ];
 
   return (
@@ -36,10 +24,10 @@ export default function Layout({ children }) {
                 className="md:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
               >
-                {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+                {sidebarOpen ? <span className="text-xl">✕</span> : <span className="text-xl">☰</span>}
               </button>
               <div className="flex items-center ml-4 md:ml-0">
-                <Truck className="h-8 w-8 text-blue-600" />
+                <span className="text-blue-600 text-2xl">🚚</span>
                 <h1 className="ml-2 text-xl font-bold text-gray-900">
                   Moving Service
                 </h1>
@@ -48,11 +36,11 @@ export default function Layout({ children }) {
             
             <div className="hidden md:flex items-center space-x-4">
               <div className="flex items-center text-sm text-gray-600">
-                <Phone className="h-4 w-4 mr-1" />
+                <span className="mr-1">📞</span>
                 <span>1900-1234</span>
               </div>
               <div className="flex items-center text-sm text-gray-600">
-                <Mail className="h-4 w-4 mr-1" />
+                <span className="mr-1">✉️</span>
                 <span>support@movingservice.com</span>
               </div>
             </div>
@@ -62,9 +50,7 @@ export default function Layout({ children }) {
 
       <div className="flex">
         {/* Sidebar */}
-        <motion.aside
-          initial={false}
-          animate={{ width: sidebarOpen ? 280 : 0 }}
+        <aside
           className={`bg-white shadow-xl border-r border-gray-200 overflow-hidden ${
             sidebarOpen ? "w-70" : "w-0"
           } md:w-70 transition-all duration-300`}
@@ -84,25 +70,21 @@ export default function Layout({ children }) {
                     }`}
                     onClick={() => setSidebarOpen(false)}
                   >
-                    <item.icon className="h-5 w-5 mr-3" />
+                    <span className="mr-3">{item.icon}</span>
                     {item.name}
                   </Link>
                 );
               })}
             </nav>
           </div>
-        </motion.aside>
+        </aside>
 
         {/* Main Content */}
         <main className="flex-1 min-h-screen">
           <div className="p-6 md:p-8">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
+            <div>
               {children}
-            </motion.div>
+            </div>
           </div>
         </main>
       </div>
@@ -113,7 +95,7 @@ export default function Layout({ children }) {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="col-span-1 md:col-span-2">
               <div className="flex items-center mb-4">
-                <Truck className="h-8 w-8 text-blue-400" />
+                <span className="text-blue-400 text-2xl">🚚</span>
                 <h3 className="ml-2 text-xl font-bold">Moving Service</h3>
               </div>
               <p className="text-gray-400 mb-4 max-w-md">
@@ -121,7 +103,7 @@ export default function Layout({ children }) {
                 giàu kinh nghiệm và trang thiết bị hiện đại.
               </p>
               <div className="flex items-center text-gray-400">
-                <MapPin className="h-4 w-4 mr-2" />
+                <span className="mr-2">📍</span>
                 <span>123 Đường ABC, Quận XYZ, TP.HCM</span>
               </div>
             </div>
@@ -130,11 +112,11 @@ export default function Layout({ children }) {
               <h4 className="text-lg font-semibold mb-4">Liên hệ</h4>
               <div className="space-y-2 text-gray-400">
                 <div className="flex items-center">
-                  <Phone className="h-4 w-4 mr-2" />
+                  <span className="mr-2">📞</span>
                   <span>1900-1234</span>
                 </div>
                 <div className="flex items-center">
-                  <Mail className="h-4 w-4 mr-2" />
+                  <span className="mr-2">✉️</span>
                   <span>support@movingservice.com</span>
                 </div>
               </div>

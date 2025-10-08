@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Star, Users, TrendingUp, Filter, Search } from "lucide-react";
 import ReviewCard from "../components/ReviewCard";
 import { Link } from "react-router-dom";
 
@@ -76,11 +74,7 @@ export default function Homepage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full"
-        />
+        <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
         <span className="ml-3 text-gray-600">Đang tải đánh giá...</span>
       </div>
     );
@@ -90,11 +84,7 @@ export default function Homepage() {
   return (
     <div className="space-y-8">
       {/* Header Section */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center"
-      >
+      <div className="text-center">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
           📌 Đánh giá của khách hàng
         </h1>
@@ -106,19 +96,14 @@ export default function Homepage() {
             Viết review / Xem review
           </Link>
         </div>
-      </motion.div>
+      </div>
 
       {/* Stats Cards */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="grid grid-cols-1 md:grid-cols-3 gap-6"
-      >
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
           <div className="flex items-center">
             <div className="p-3 bg-blue-100 rounded-lg">
-              <Star className="h-6 w-6 text-blue-600" />
+              <span className="text-blue-600 text-xl">⭐</span>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Đánh giá trung bình</p>
@@ -130,7 +115,7 @@ export default function Homepage() {
         <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
           <div className="flex items-center">
             <div className="p-3 bg-green-100 rounded-lg">
-              <Users className="h-6 w-6 text-green-600" />
+              <span className="text-green-600 text-xl">👥</span>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Tổng số đánh giá</p>
@@ -142,7 +127,7 @@ export default function Homepage() {
         <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
           <div className="flex items-center">
             <div className="p-3 bg-purple-100 rounded-lg">
-              <TrendingUp className="h-6 w-6 text-purple-600" />
+              <span className="text-purple-600 text-xl">📈</span>
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Đánh giá tích cực</p>
@@ -152,15 +137,10 @@ export default function Homepage() {
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Rating Distribution */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
-      >
+      <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Phân bố đánh giá</h3>
         <div className="space-y-3">
           {ratingDistribution.map(({ rating, count, percentage }) => (
@@ -170,11 +150,9 @@ export default function Homepage() {
               </div>
               <div className="flex-1 mx-4">
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${percentage}%` }}
-                    transition={{ duration: 1, delay: 0.5 }}
-                    className="bg-gradient-to-r from-yellow-400 to-yellow-500 h-2 rounded-full"
+                  <div
+                    className="bg-gradient-to-r from-yellow-400 to-yellow-500 h-2 rounded-full transition-all duration-1000"
+                    style={{ width: `${percentage}%` }}
                   />
                 </div>
               </div>
@@ -184,19 +162,14 @@ export default function Homepage() {
             </div>
           ))}
         </div>
-      </motion.div>
+      </div>
 
       {/* Filters */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6 }}
-        className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
-      >
+      <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
               <input
                 type="text"
                 placeholder="Tìm kiếm theo email hoặc nội dung..."
@@ -207,7 +180,7 @@ export default function Homepage() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-400" />
+            <span className="text-gray-400">🔽</span>
             <select
               value={ratingFilter}
               onChange={(e) => setRatingFilter(e.target.value)}
@@ -222,15 +195,10 @@ export default function Homepage() {
             </select>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Reviews List */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
-        className="space-y-6"
-      >
+      <div className="space-y-6">
         {filteredReviews.length === 0 ? (
           <div className="text-center py-12">
             <div className="text-gray-500 text-lg mb-4">
@@ -249,18 +217,13 @@ export default function Homepage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {filteredReviews.map((review, index) => (
-              <motion.div
-                key={review._id || index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
+              <div key={review._id || index}>
                 <ReviewCard review={review} />
-              </motion.div>
+              </div>
             ))}
           </div>
         )}
-      </motion.div>
+      </div>
     </div>
   );
 }
