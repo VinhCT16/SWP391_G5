@@ -3,7 +3,7 @@ import { listRequestsByPhone, cancelRequest } from "../api/requestApi";
 import { useNavigate } from "react-router-dom";
 import { normalizeVNPhone } from "../utils/validation";
 import { fmtDateTime24 } from "../utils/datetime";
-
+import { fmtAddress } from "../utils/address";
 
 const VN_STATUS = {
   PENDING_REVIEW: "Đang chờ duyệt",
@@ -26,11 +26,13 @@ export default function ManageRequestsPage() {
     setLoading(true);
     try {
       const data = await listRequestsByPhone(p);
-      setRows(data);
-    } finally { setLoading(false); }
+      setRows(Array.isArray(data) ? data : []);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { load(); /* auto load theo localStorage */ }, []);
+  useEffect(() => { load(); }, []); // auto load theo localStorage
   useEffect(() => { localStorage.setItem("my_phone", phone); }, [phone]);
 
   const onCancel = async (id) => {
@@ -72,7 +74,7 @@ export default function ManageRequestsPage() {
               <tr key={r._id}>
                 <td style={td}>{r.customerName}</td>
                 <td style={td}>{r.customerPhone}</td>
-                <td style={td}>{r.address}</td>
+                <td style={td}>{fmtAddress(r.address)}</td> {/* ✅ KHÔNG render object */}
                 <td style={td}>{fmtDateTime24(r.movingTime)}</td>
                 <td style={td}>{r.serviceType === "EXPRESS" ? "Hỏa tốc" : "Thường"}</td>
                 <td style={td}>{VN_STATUS[r.status] || r.status}</td>
