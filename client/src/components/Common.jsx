@@ -1,6 +1,4 @@
 import React from "react";
-import { motion } from "framer-motion";
-import { Search, Filter, X } from "lucide-react";
 
 export function SearchBar({ 
   value, 
@@ -10,7 +8,7 @@ export function SearchBar({
 }) {
   return (
     <div className={`relative ${className}`}>
-      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
       <input
         type="text"
         placeholder={placeholder}
@@ -19,15 +17,12 @@ export function SearchBar({
         className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
       />
       {value && (
-        <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          whileHover={{ scale: 1.1 }}
+        <button
           onClick={() => onChange("")}
           className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
         >
-          <X className="h-4 w-4" />
-        </motion.button>
+          <span className="text-lg">✕</span>
+        </button>
       )}
     </div>
   );
@@ -42,7 +37,7 @@ export function FilterSelect({
 }) {
   return (
     <div className={`relative ${className}`}>
-      <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔽</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -62,7 +57,7 @@ export function FilterSelect({
 export function StatsCard({ 
   title, 
   value, 
-  icon: Icon, 
+  icon, 
   color = "blue", 
   trend,
   className = "" 
@@ -76,13 +71,10 @@ export function StatsCard({
   };
 
   return (
-    <motion.div
-      whileHover={{ y: -2 }}
-      className={`bg-white rounded-xl p-6 shadow-lg border border-gray-100 ${className}`}
-    >
+    <div className={`bg-white rounded-xl p-6 shadow-lg border border-gray-100 ${className}`}>
       <div className="flex items-center">
         <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
-          <Icon className="h-6 w-6" />
+          <span className="text-xl">{icon}</span>
         </div>
         <div className="ml-4 flex-1">
           <p className="text-sm font-medium text-gray-600">{title}</p>
@@ -98,7 +90,7 @@ export function StatsCard({
           </div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -129,11 +121,9 @@ export function ProgressBar({
         </div>
       )}
       <div className="w-full bg-gray-200 rounded-full h-2">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${percentage}%` }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className={`h-2 rounded-full ${colorClasses[color]}`}
+        <div
+          className={`h-2 rounded-full transition-all duration-1000 ${colorClasses[color]}`}
+          style={{ width: `${percentage}%` }}
         />
       </div>
     </div>

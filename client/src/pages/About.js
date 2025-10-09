@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import ReviewCard from "../components/ReviewCard";
 import { getReviews } from "../api/reviewApi";
 import BackButton from "../components/BackButton";
@@ -17,13 +16,9 @@ export default function About() {
     <div className="space-y-10">
       <BackButton fallbackPath="/" />
       <section className="bg-white rounded-xl p-8 shadow border border-gray-100">
-        <motion.h1
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-3xl font-bold text-gray-900 mb-4"
-        >
+        <h1 className="text-3xl font-bold text-gray-900 mb-4">
           Dịch vụ chuyển nhà chuyên nghiệp
-        </motion.h1>
+        </h1>
         <p className="text-gray-700 leading-7">
           Chúng tôi cung cấp dịch vụ chuyển nhà trọn gói, an toàn và đúng hẹn. Đội ngũ nhân viên
           giàu kinh nghiệm, quy trình chuẩn hoá và cam kết bảo quản tài sản của bạn một cách tốt nhất.

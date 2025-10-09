@@ -1,13 +1,4 @@
 import React from "react";
-import { motion } from "framer-motion";
-import { 
-  Star, 
-  TrendingUp, 
-  MessageCircle,
-  Calendar,
-  Award,
-  Target
-} from "lucide-react";
 import { StatsCard, ProgressBar } from "./Common";
 
 export default function Dashboard({ reviews = [] }) {
@@ -39,64 +30,50 @@ export default function Dashboard({ reviews = [] }) {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center"
-      >
+      <div className="text-center">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
           📊 Bảng điều khiển
         </h1>
         <p className="text-xl text-gray-600">
           Tổng quan về đánh giá và phản hồi của khách hàng
         </p>
-      </motion.div>
+      </div>
 
       {/* Main Stats */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
-      >
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Tổng đánh giá"
           value={stats.totalReviews}
-          icon={MessageCircle}
+          icon="💬"
           color="blue"
         />
         <StatsCard
           title="Đánh giá trung bình"
           value={`${stats.averageRating}/5`}
-          icon={Star}
+          icon="⭐"
           color="yellow"
         />
         <StatsCard
           title="Đánh giá tích cực"
           value={stats.positiveReviews}
-          icon={TrendingUp}
+          icon="📈"
           color="green"
         />
         <StatsCard
           title="Tỷ lệ hài lòng"
           value={`${satisfactionRate}%`}
-          icon={Award}
+          icon="🏆"
           color="purple"
         />
-      </motion.div>
+      </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Rating Distribution */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
-        >
+        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">Phân bố đánh giá</h3>
-            <Target className="h-5 w-5 text-gray-400" />
+            <span className="text-gray-400">🎯</span>
           </div>
           <div className="space-y-4">
             {ratingDistribution.map(({ rating, count, percentage }) => (
@@ -106,7 +83,7 @@ export default function Dashboard({ reviews = [] }) {
                     <span className="text-sm font-medium text-gray-600">{rating} sao</span>
                     <div className="flex">
                       {Array.from({ length: rating }, (_, i) => (
-                        <Star key={i} className="h-3 w-3 text-yellow-400 fill-current" />
+                        <span key={i} className="text-yellow-400 text-sm">⭐</span>
                       ))}
                     </div>
                   </div>
@@ -121,18 +98,13 @@ export default function Dashboard({ reviews = [] }) {
               </div>
             ))}
           </div>
-        </motion.div>
+        </div>
 
         {/* Monthly Stats */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.6 }}
-          className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
-        >
+        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">Thống kê tháng</h3>
-            <Calendar className="h-5 w-5 text-gray-400" />
+            <span className="text-gray-400">📅</span>
           </div>
           <div className="space-y-6">
             <div className="text-center">
@@ -157,67 +129,50 @@ export default function Dashboard({ reviews = [] }) {
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
 
       {/* Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.8 }}
-        className="bg-white rounded-xl p-6 shadow-lg border border-gray-100"
-      >
+      <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Hành động nhanh</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-left"
-          >
+          <button className="p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-left">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-blue-100 rounded-lg">
-                <MessageCircle className="h-5 w-5 text-blue-600" />
+                <span className="text-blue-600 text-lg">💬</span>
               </div>
               <div>
                 <div className="font-medium text-gray-900">Xem tất cả đánh giá</div>
                 <div className="text-sm text-gray-600">{stats.totalReviews} đánh giá</div>
               </div>
             </div>
-          </motion.button>
+          </button>
 
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-left"
-          >
+          <button className="p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-left">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-green-100 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-green-600" />
+                <span className="text-green-600 text-lg">📈</span>
               </div>
               <div>
                 <div className="font-medium text-gray-900">Đánh giá tích cực</div>
                 <div className="text-sm text-gray-600">{stats.positiveReviews} đánh giá</div>
               </div>
             </div>
-          </motion.button>
+          </button>
 
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors text-left"
-          >
+          <button className="p-4 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors text-left">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-yellow-100 rounded-lg">
-                <Star className="h-5 w-5 text-yellow-600" />
+                <span className="text-yellow-600 text-lg">⭐</span>
               </div>
               <div>
                 <div className="font-medium text-gray-900">Đánh giá trung bình</div>
                 <div className="text-sm text-gray-600">{stats.averageRating}/5 sao</div>
               </div>
             </div>
-          </motion.button>
+          </button>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }
