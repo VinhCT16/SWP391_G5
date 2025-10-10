@@ -2,14 +2,19 @@ import logo from './logo.svg';
 import './App.css';
 import CheckoutPage from './pages/CheckoutPage';
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { Routes, Route, Navigate } from "react-router-dom";
+import CreateRequestPage from "./pages/CreateRequestPage";
+import ManageRequestsPage from "./pages/ManageRequestsPage";
+import EditRequestPage from "./pages/EditRequestPage";
 
-
-function App() {
+export default function App() {
   return (
-    <div className="App">
-        <CheckoutPage/>
-    </div>
+    <Routes>
+      <Route path="/" element={<Navigate to="/requests/new" />} />
+      <Route path="/requests/new" element={<CreateRequestPage />} />
+      <Route path="/my-requests" element={<ManageRequestsPage />} />
+      <Route path="/requests/:id/edit" element={<EditRequestPage />} />
+      <Route path="*" element={<div style={{ padding: 16 }}>404 Not Found</div>} />
+    </Routes>
   );
 }
-
-export default App;
