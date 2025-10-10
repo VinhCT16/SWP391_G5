@@ -60,11 +60,25 @@ const requestSchema = new mongoose.Schema({
       transporter: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
       status: { 
         type: String, 
-        enum: ["pending", "assigned", "in-progress", "completed", "cancelled"], 
+        enum: ["pending", "assigned", "in-progress", "blocked", "overdue", "completed", "cancelled"], 
         default: "pending" 
       },
       estimatedDuration: Number, // in hours
       actualDuration: Number,
+      priority: { 
+        type: String, 
+        enum: ["low", "medium", "high"], 
+        default: "medium" 
+      },
+      description: String,
+      deadline: Date,
+      managerNotes: String,
+      customerNotes: String,
+      attachments: [{
+        name: String,
+        url: String,
+        uploadedAt: { type: Date, default: Date.now }
+      }],
       taskHistory: [
         {
           historyId: { type: mongoose.Schema.Types.ObjectId, default: new mongoose.Types.ObjectId() },

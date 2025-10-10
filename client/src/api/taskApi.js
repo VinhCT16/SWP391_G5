@@ -24,3 +24,8 @@ export const getAllStaff = () => {
 export const assignStaffToTask = (requestId, taskId, assignmentData) => {
   return api.put(`/api/tasks/assign/${requestId}/${taskId}`, assignmentData);
 };
+
+// Update task details
+export const updateTaskDetails = (requestId, taskId, detailsData) => {
+  return api.put(`/api/tasks/details/${requestId}/${taskId}`, detailsData);
+};

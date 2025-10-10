@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getStaffTasks, updateTaskStatus } from '../api/taskApi';
+import { updateProfile, changePassword } from '../api/userApi';
 import BackButton from '../components/BackButton';
 import './StaffDashboard.css';
 
@@ -24,6 +25,19 @@ export default function StaffDashboard() {
     search: '',
     dateFrom: '',
     dateTo: ''
+  });
+  
+  // Profile update states
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [profileData, setProfileData] = useState({
+    name: user?.name || '',
+    phone: user?.phone || ''
+  });
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
   });
 
   // Load staff tasks
@@ -82,6 +96,81 @@ export default function StaffDashboard() {
   const openDetailsModal = (task) => {
     setSelectedTask(task);
     setShowDetailsModal(true);
+  };
+
+  // Handle profile update
+  const handleProfileUpdate = async () => {
+    try {
+      setLoading(true);
+      const response = await updateProfile(profileData);
+      
+      // Update user context if available
+      if (response.data.user) {
+        // You might want to update the user context here
+        // This depends on how your AuthContext is implemented
+      }
+      
+      setShowProfileModal(false);
+      alert('Profile updated successfully!');
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      setError(err?.response?.data?.message || 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle password change
+  const handlePasswordChange = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setError('New passwords do not match');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setError('New password must be at least 6 characters long');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword
+      });
+      
+      setShowPasswordModal(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+      alert('Password changed successfully!');
+    } catch (err) {
+      console.error('Error changing password:', err);
+      setError(err?.response?.data?.message || 'Failed to change password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Open profile modal
+  const openProfileModal = () => {
+    setProfileData({
+      name: user?.name || '',
+      phone: user?.phone || ''
+    });
+    setShowProfileModal(true);
+  };
+
+  // Open password modal
+  const openPasswordModal = () => {
+    setPasswordData({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setShowPasswordModal(true);
   };
 
   // Filter tasks
@@ -470,8 +559,8 @@ export default function StaffDashboard() {
               </div>
               <div className="profile-section">
                 <h3>Account Settings</h3>
-                <button className="action-btn secondary">Update Profile</button>
-                <button className="action-btn secondary">Change Password</button>
+                <button className="action-btn secondary" onClick={openProfileModal}>Update Profile</button>
+                <button className="action-btn secondary" onClick={openPasswordModal}>Change Password</button>
               </div>
             </div>
           </div>
@@ -596,25 +685,121 @@ export default function StaffDashboard() {
         </div>
       )}
 
-      {/* History and Performance */}
-      <section className="dashboard-stats">
-        <h3>My Performance</h3>
-        <div className="stats-grid">
-          <div className="stat-card"><span>Total</span><strong>{tasks.length}</strong></div>
-          <div className="stat-card"><span>In Progress</span><strong>{tasks.filter(t => t.status === 'in-progress').length}</strong></div>
-          <div className="stat-card"><span>Blocked</span><strong>{tasks.filter(t => t.status === 'blocked').length}</strong></div>
-          <div className="stat-card"><span>Completed</span><strong>{tasks.filter(t => t.status === 'completed').length}</strong></div>
-        </div>
-        <div className="history-list">
-          <h4>Recent Tasks</h4>
-          {tasks.slice(0, 10).map(t => (
-            <div key={`${t.taskId}-history`} className="history-item">
-              <span>#{t.requestNumber} • {t.taskType}</span>
-              <span className="status-badge" style={{ backgroundColor: getStatusColor(t.status) }}>{t.status.replace('-', ' ')}</span>
+      {/* Profile Update Modal */}
+      {showProfileModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Update Profile</h3>
+            
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Name:</label>
+                <input
+                  type="text"
+                  value={profileData.name}
+                  onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                  required
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Phone:</label>
+                <input
+                  type="tel"
+                  value={profileData.phone}
+                  onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Email:</label>
+                <input
+                  type="email"
+                  value={user?.email}
+                  disabled
+                  style={{ backgroundColor: '#f5f5f5', color: '#666' }}
+                />
+                <small style={{ color: '#666' }}>Email cannot be changed</small>
+              </div>
             </div>
-          ))}
+            
+            <div className="modal-actions">
+              <button 
+                className="cancel-btn"
+                onClick={() => setShowProfileModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="update-btn"
+                onClick={handleProfileUpdate}
+                disabled={loading}
+              >
+                {loading ? 'Updating...' : 'Update Profile'}
+              </button>
+            </div>
+          </div>
         </div>
-      </section>
+      )}
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Change Password</h3>
+            
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Current Password:</label>
+                <input
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                  required
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>New Password:</label>
+                <input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                  required
+                  minLength="6"
+                />
+                <small style={{ color: '#666' }}>Minimum 6 characters</small>
+              </div>
+              
+              <div className="form-group">
+                <label>Confirm New Password:</label>
+                <input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                  required
+                />
+              </div>
+            </div>
+            
+            <div className="modal-actions">
+              <button 
+                className="cancel-btn"
+                onClick={() => setShowPasswordModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="update-btn"
+                onClick={handlePasswordChange}
+                disabled={loading}
+              >
+                {loading ? 'Changing...' : 'Change Password'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

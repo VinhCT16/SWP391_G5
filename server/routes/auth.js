@@ -121,6 +121,83 @@ router.get("/me", auth, async (req, res) => {
   });
 });
 
+// Update user profile
+router.put("/profile", auth, async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+    const userId = req.userId;
+
+    if (!name) {
+      return res.status(400).json({ message: "Name is required" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Update user fields
+    user.name = name;
+    if (phone !== undefined) user.phone = phone;
+
+    await user.save();
+
+    const safeUser = { 
+      id: user._id, 
+      name: user.name, 
+      email: user.email,
+      role: user.role,
+      phone: user.phone
+    };
+
+    return res.json({ 
+      message: "Profile updated successfully",
+      user: safeUser 
+    });
+  } catch (err) {
+    console.error("Error updating profile:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Change password
+router.put("/password", auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.userId;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters long" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Verify current password
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    // Hash new password
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedNewPassword;
+
+    await user.save();
+
+    return res.json({ message: "Password changed successfully" });
+  } catch (err) {
+    console.error("Error changing password:", err);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
 // Create Manager Profile (requires manager role)
 router.post("/create-manager", auth, require("../utils/authMiddleware").requireManager, async (req, res) => {
   try {

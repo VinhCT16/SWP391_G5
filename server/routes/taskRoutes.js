@@ -3,6 +3,7 @@ const {
   createTasksFromContract,
   getStaffTasks,
   updateTaskStatus,
+  updateTaskDetails,
   getAllStaff,
   assignStaffToTask
 } = require("../controllers/taskController");
@@ -19,5 +20,6 @@ router.put("/assign/:requestId/:taskId", auth, requireManager, assignStaffToTask
 // Staff routes
 router.get("/my-tasks", auth, requireStaff, getStaffTasks);
 router.put("/update/:requestId/:taskId", auth, requireStaff, updateTaskStatus);
+router.put("/details/:requestId/:taskId", auth, requireStaff, updateTaskDetails);
 
 module.exports = router;
