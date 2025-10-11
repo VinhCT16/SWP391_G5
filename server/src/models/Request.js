@@ -27,7 +27,7 @@ const AddressSchema = new Schema(
 const GeoPointSchema = new Schema(
   {
     type:        { type: String, enum: ["Point"], default: "Point" },
-    coordinates: { type: [Number], default: undefined }, // [lng, lat] – có thể chưa có
+    coordinates: { type: [Number], default: undefined }, // [lng, lat]
   },
   { _id: false }
 );
@@ -39,47 +39,48 @@ const RequestSchema = new Schema(
     customerName:  { type: String, required: true, immutable: true },
     customerPhone: { type: String, required: true, immutable: true },
 
-    // Địa chỉ là OBJECT
     address: { type: AddressSchema, required: true },
 
-    // Tọa độ theo GeoJSON
     location: { type: GeoPointSchema, default: undefined },
 
     movingTime: { type: Date, required: true },
 
     serviceType: {
       type: String,
-      enum: ["STANDARD", "EXPRESS"], // Thường / Hỏa tốc
+      enum: ["STANDARD", "EXPRESS"],
       default: "STANDARD",
     },
 
-    // Lưu base64 (demo) hoặc URL sau này – tối đa 4 ảnh bên phía routes validate
     images: { type: [String], default: [] },
 
     status: {
       type: String,
       enum: [
-        "PENDING_REVIEW", // Đang chờ duyệt
-        "APPROVED",       // Đã duyệt
-        "REJECTED",       // Bị từ chối
-        "IN_PROGRESS",    // Đang thực hiện
-        "DONE",           // Hoàn tất
-        "CANCELLED",      // Đã hủy
+        "PENDING_REVIEW",
+        "APPROVED",
+        "REJECTED",
+        "IN_PROGRESS",
+        "DONE",
+        "CANCELLED",
       ],
       default: "PENDING_REVIEW",
     },
 
     notes: String,
 
-    // 3 field dưới có thể dùng trong luồng nghiệp vụ khác
     requestDate:       { type: Date, default: Date.now },
     estimatedDelivery: { type: Date },
     actualDelivery:    { type: Date },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    // 👇 Thêm dòng này để chỉ định collection chính xác
+    collection: "request",
+  }
 );
 
-// cần index không gian để truy vấn theo vị trí
+// Tạo index không gian cho truy vấn vị trí
 RequestSchema.index({ location: "2dsphere" });
 
-export default mongoose.model("Request", RequestSchema);
+// Xuất model, liên kết rõ collection "request"
+export default mongoose.model("Request", RequestSchema, "request");
