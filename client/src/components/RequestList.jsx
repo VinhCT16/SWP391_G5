@@ -12,11 +12,11 @@ const VN_STATUS = {
   CANCELLED: "Đã hủy",
 };
 
-export default function RequestList({ phone }) {
+export default function RequestList({ phone, onEdit }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
+  async function load() {
     if (!phone) { setRows([]); return; }
     setLoading(true);
     try {
@@ -25,15 +25,15 @@ export default function RequestList({ phone }) {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  useEffect(() => { load(); }, [phone]);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [phone]);
 
-  const handleCancel = async (id) => {
+  async function handleCancel(id) {
     if (!window.confirm("Bạn có chắc chắn muốn hủy request này?")) return;
     await cancelRequest(id);
     load();
-  };
+  }
 
   if (!phone) return <p>Nhập SĐT để tra cứu request</p>;
 
@@ -41,33 +41,42 @@ export default function RequestList({ phone }) {
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
         <tr>
-          <th>Tên</th><th>SDT</th><th>Địa chỉ</th><th>Thời gian</th><th>Dịch vụ</th><th>Trạng thái</th><th>Hành động</th>
+          <th>Tên</th>
+          <th>SDT</th>
+          <th>Địa chỉ LẤY HÀNG</th>
+          <th>Địa chỉ GIAO HÀNG</th>
+          <th>Thời gian</th>
+          <th>Dịch vụ</th>
+          <th>Trạng thái</th>
+          <th>Hành động</th>
         </tr>
       </thead>
       <tbody>
-        {loading
-          ? <tr><td colSpan="7">Đang tải...</td></tr>
-          : rows.map((r) => (
+        {loading && (
+          <tr><td colSpan={8}>Đang tải...</td></tr>
+        )}
+        {!loading && rows.length === 0 && (
+          <tr><td colSpan={8}>Không có dữ liệu</td></tr>
+        )}
+        {!loading && rows.length > 0 && rows.map((r) => {
+          const canEdit = r.status === "PENDING_REVIEW";
+          const canCancel = r.status === "PENDING_REVIEW" || r.status === "APPROVED";
+          return (
             <tr key={r._id}>
               <td>{r.customerName}</td>
               <td>{r.customerPhone}</td>
-              <td>{fmtAddress(r.address)}</td> {/* ✅ */}
+              <td>{fmtAddress(r.pickupAddress)}</td>
+              <td>{fmtAddress(r.deliveryAddress)}</td>
               <td>{fmtDateTime24(r.movingTime)}</td>
               <td>{r.serviceType === "EXPRESS" ? "Hỏa tốc" : "Thường"}</td>
               <td>{VN_STATUS[r.status] || r.status}</td>
               <td>
-                {r.status === "PENDING_REVIEW" ? (
-                  <>
-                    <button onClick={() => alert("TODO: Edit form")}>Sửa</button>{" "}
-                    <button onClick={() => handleCancel(r._id)}>Hủy</button>
-                  </>
-                ) : (
-                  <button disabled>Sửa</button>
-                )}
+                <button onClick={() => (onEdit ? onEdit(r._id) : alert("TODO: Edit form"))} disabled={!canEdit} style={{ marginRight: 8 }}>Sửa</button>
+                <button onClick={() => handleCancel(r._id)} disabled={!canCancel}>Hủy</button>
               </td>
             </tr>
-          ))
-        }
+          );
+        })}
       </tbody>
     </table>
   );

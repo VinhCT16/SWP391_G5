@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { getRequest, updateRequest } from "../api/requestApi";
-import { fileToBase64 } from "../utils/toBase64";
-import { validateMovingTime } from "../utils/validation";
-import { fmtDateTime24, nowForDatetimeLocal } from "../utils/datetime";
+import { useParams, useNavigate } from "react-router-dom";
+import { getRequestById, updateRequest } from "../api/requestApi";
 import AddressPicker from "../components/AddressPicker";
 import MapPicker from "../components/MapPicker";
-import { formatAddress } from "../utils/format";
+import { fileToBase64 } from "../utils/toBase64";
+import { fmtDateTime24, nowForDatetimeLocal } from "../utils/datetime";
+import { validateMovingTime } from "../utils/validation";
 
 const MAX_IMAGES = 4;
 const MAX_FILE_MB = 1.5;
@@ -31,33 +30,21 @@ export default function EditRequestPage() {
 
   useEffect(() => {
     (async () => {
-      const r = await getRequest(id);
-      // location: GeoJSON -> {lat,lng}
-      const lat = r?.location?.coordinates?.[1];
-      const lng = r?.location?.coordinates?.[0];
+      const d = await getRequestById(id);
       setForm({
-        id: r._id,
-        customerName: r.customerName,
-        customerPhone: r.customerPhone,
-        address: r.address || { province: null, district: null, ward: null, street: "" },
-        location: (typeof lat === "number" && typeof lng === "number") ? { lat, lng } : { lat: 21.0278, lng: 105.8342 },
-        movingTime: r.movingTime ? r.movingTime.slice(0, 16) : "",
-        serviceType: r.serviceType,
-        notes: r.notes || "",
-        images: r.images || [],
-        status: r.status,
+        ...d,
+        movingTime: d.movingTime ? new Date(d.movingTime).toISOString().slice(0,16) : "",
+        pickupLocation: d.pickupLocation?.coordinates
+          ? { lng: d.pickupLocation.coordinates[0], lat: d.pickupLocation.coordinates[1] }
+          : { lat: 21.0278, lng: 105.8342 },
+        deliveryLocation: d.deliveryLocation?.coordinates
+          ? { lng: d.deliveryLocation.coordinates[0], lat: d.deliveryLocation.coordinates[1] }
+          : { lat: 21.0278, lng: 105.8342 },
       });
     })();
   }, [id]);
 
-  if (!form) return <div style={{ padding: 24 }}>Đang tải…</div>;
-
-  const disabled = form.status !== "PENDING_REVIEW";
-
-  const onChange = (e) => {
-    const { name, value } = e.target;
-    setForm((s) => ({ ...s, [name]: value }));
-  };
+  const onChange = (e) => setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
 
   const addFiles = async (filesList) => {
     const files = Array.from(filesList || []);
@@ -80,128 +67,98 @@ export default function EditRequestPage() {
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  const removeImageAt = (idx) => {
-    setForm((s) => ({ ...s, images: s.images.filter((_, i) => i !== idx) }));
-    if (fileRef.current) fileRef.current.value = "";
-  };
+  const removeImageAt = (idx) =>
+    setForm((s) => ({ ...s, images: (s.images || []).filter((_, i) => i !== idx) }));
 
   const submit = async (e) => {
     e.preventDefault();
-    setMsg("");
+    if (!form) return;
 
-    if (disabled) {
-      setMsg("Không thể chỉnh sửa vì request đã qua bước duyệt.");
-      return;
+    if (form.status !== "PENDING_REVIEW") {
+      setMsg("Chỉ được sửa khi đang chờ duyệt"); return;
     }
 
-    // Validate address
-    if (!isAddressComplete(form.address)) {
-      setMsg("❌ Vui lòng chọn đủ Tỉnh/TP, Quận/Huyện, Phường/Xã và nhập Số nhà/Đường.");
-      return;
-    }
+    const v = validateMovingTime(form.movingTime);
+    if (!v.ok) { setMsg(v.msg); return; }
 
-    // Validate moving time
-    const vt = validateMovingTime(form.movingTime);
-    if (!vt.ok) {
-      setMsg("❌ " + vt.msg);
-      return;
-    }
+    const payload = {
+      pickupAddress: form.pickupAddress,
+      pickupLocation: { type: "Point", coordinates: [form.pickupLocation.lng, form.pickupLocation.lat] },
+      deliveryAddress: form.deliveryAddress,
+      deliveryLocation: { type: "Point", coordinates: [form.deliveryLocation.lng, form.deliveryLocation.lat] },
+      movingTime: new Date(form.movingTime),
+      serviceType: form.serviceType,
+      notes: form.notes,
+      images: form.images || [],
+    };
 
     try {
       setLoading(true);
-      await updateRequest(form.id, {
-        address: form.address,
-        location: { type: "Point", coordinates: [form.location.lng, form.location.lat] },
-        movingTime: new Date(form.movingTime),
-        serviceType: form.serviceType,
-        images: form.images,
-        notes: form.notes,
-      });
+      await updateRequest(id, payload);
       setMsg("✅ Cập nhật thành công");
-      setTimeout(() => nav("/my-requests"), 600);
+      setTimeout(() => nav("/my-requests"), 700);
     } catch (err) {
-      setMsg("❌ " + (err.message || "Không thể cập nhật"));
+      setMsg("❌ Lỗi cập nhật");
     } finally {
       setLoading(false);
     }
   };
 
+  if (!form) return <div>Đang tải…</div>;
+
   return (
-    <div style={{ padding: 24, display: "grid", gap: 12, maxWidth: 820 }}>
-      <h1>Chỉnh sửa Request</h1>
-      <div style={{ color: "#888" }}>Trạng thái: <b>{form.status}</b></div>
-      {disabled && <div style={{ color: "#c00" }}>Chỉ chỉnh sửa khi <b>Đang chờ duyệt</b>.</div>}
-
+    <div style={{ padding: 24, display: "grid", gap: 18, maxWidth: 920 }}>
+      <h1>Sửa Request</h1>
       <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
-        <label>Họ tên (không sửa)
-          <input value={form.customerName} disabled style={ipt}/>
-        </label>
-
-        <label>Số điện thoại (không sửa)
-          <input value={form.customerPhone} disabled style={ipt}/>
-        </label>
-
-        <div>
-          <h3 style={{ margin: "8px 0" }}>Địa chỉ</h3>
-          <AddressPicker
-            value={form.address}
-            onChange={(addr) => setForm((s) => ({ ...s, address: addr }))}
-          />
+        <div style={card}>
+          <h3>Địa chỉ LẤY HÀNG</h3>
+          <AddressPicker value={form.pickupAddress} onChange={(addr)=>setForm(s=>({ ...s, pickupAddress: addr }))}/>
+          <h4>Vị trí</h4>
+          <MapPicker value={form.pickupLocation} onChange={(loc)=>setForm(s=>({ ...s, pickupLocation: loc }))}/>
         </div>
 
-        <div>
-          <h3 style={{ margin: "8px 0" }}>Vị trí trên bản đồ</h3>
-          <MapPicker
-            value={form.location}
-            onChange={(loc) => setForm((s) => ({ ...s, location: loc }))}
-          />
+        <div style={card}>
+          <h3>Địa chỉ GIAO HÀNG</h3>
+          <AddressPicker value={form.deliveryAddress} onChange={(addr)=>setForm(s=>({ ...s, deliveryAddress: addr }))}/>
+          <h4>Vị trí</h4>
+          <MapPicker value={form.deliveryLocation} onChange={(loc)=>setForm(s=>({ ...s, deliveryLocation: loc }))}/>
         </div>
 
-        <label>Thời gian chuyển nhà
-          <input
-            type="datetime-local"
-            name="movingTime"
-            value={form.movingTime}
-            onChange={onChange}
-            disabled={disabled}
-            min={nowForDatetimeLocal()}
-            style={ipt}
-          />
+        <label>Thời gian
+          <input type="datetime-local" name="movingTime" value={form.movingTime || ""} onChange={onChange} min={nowForDatetimeLocal()} style={ipt}/>
           <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-            {form.movingTime ? `Hiển thị: ${fmtDateTime24(form.movingTime)}` : "định dạng: dd/MM/yyyy, HH:mm"}
+            {form.movingTime && `Hiển thị: ${fmtDateTime24(form.movingTime)}`}
           </div>
         </label>
 
         <label>Dịch vụ
-          <select name="serviceType" value={form.serviceType} onChange={onChange} disabled={disabled} style={ipt}>
+          <select name="serviceType" value={form.serviceType} onChange={onChange} style={ipt}>
             <option value="STANDARD">Thường</option>
             <option value="EXPRESS">Hỏa tốc</option>
           </select>
         </label>
 
-        <label>Ảnh (tối đa 4, ≤ {MAX_FILE_MB}MB/ảnh)
-          <input ref={fileRef} type="file" accept="image/*" multiple onChange={(e) => addFiles(e.target.files)} disabled={disabled}/>
+        <label>Thêm ảnh
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={(e)=>addFiles(e.target.files)}/>
         </label>
 
-        {!!form.images?.length && (
+        {(form.images || []).length > 0 && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             {form.images.map((src, i) => (
               <div key={i} style={{ position: "relative" }}>
                 <img src={src} alt="" style={{ width: 96, height: 96, objectFit: "cover", borderRadius: 8, border: "1px solid #ddd" }}/>
-                {!disabled && (
-                  <button type="button" onClick={() => removeImageAt(i)} title="Xóa ảnh" style={removeBtn}>×</button>
-                )}
+                <button type="button" onClick={()=>removeImageAt(i)} style={removeBtn}>×</button>
               </div>
             ))}
           </div>
         )}
 
         <label>Ghi chú
-          <textarea name="notes" rows={3} value={form.notes} onChange={onChange} disabled={disabled} style={ipt}/>
+          <textarea name="notes" rows={3} value={form.notes || ""} onChange={onChange} style={ipt}/>
         </label>
 
-        <button disabled={disabled || loading} style={btn}>
-          {loading ? "Đang lưu..." : "Lưu thay đổi"}
+        <button disabled={loading || form.status !== "PENDING_REVIEW"} style={btn}>
+          {loading ? "Đang cập nhật..." : "Lưu thay đổi"}
         </button>
       </form>
 
@@ -212,7 +169,5 @@ export default function EditRequestPage() {
 
 const ipt = { padding: 8, border: "1px solid #ccc", borderRadius: 6, width: "100%" };
 const btn = { padding: "10px 14px", border: "1px solid #111", background: "#111", color: "#fff", borderRadius: 8 };
-const removeBtn = {
-  position: "absolute", top: -8, right: -8, width: 22, height: 22,
-  borderRadius: "50%", border: "1px solid #c00", background: "#fff", color: "#c00", cursor: "pointer", lineHeight: "18px"
-};
+const removeBtn = { position: "absolute", top: -8, right: -8, width: 22, height: 22, borderRadius: "50%", border: "1px solid #c00", background: "#fff", color: "#c00", cursor: "pointer", lineHeight: "18px" };
+const card = { padding: 12, border: "1px solid #e5e5e5", borderRadius: 8 };

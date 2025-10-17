@@ -1,58 +1,42 @@
-// API base khớp server: /api
-const BASE = "http://localhost:3000/api";
+// client/src/api/requestApi.js
+const API = process.env.REACT_APP_API || "/api";
 
-// ----- CREATE (JSON body, images là mảng base64 nếu có) -----
-export async function createRequest(payload) {
-  const res = await fetch(`${BASE}/requests`, {
+async function json(res) {
+  if (!res.ok) {
+    const text = await res.text();
+    try { throw new Error(JSON.parse(text)?.error || text || "Request failed"); }
+    catch { throw new Error(text || "Request failed"); }
+  }
+  return res.json();
+}
+
+export function createRequest(payload) {
+  return fetch(`${API}/requests`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
-  return data;
+  }).then(json);
 }
 
-// ----- LIST theo phone (Manage) -----
-export async function listRequestsByPhone(phone, status) {
-  const u = new URL(`${BASE}/requests`);
-  if (phone) u.searchParams.set("phone", phone);
-  if (status) u.searchParams.set("status", status);
-  const res = await fetch(u.toString());
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
-  return data;
+export function listRequestsByPhone(phone, status) {
+  const q = new URLSearchParams();
+  if (phone) q.set("phone", phone);
+  if (status) q.set("status", status);
+  return fetch(`${API}/requests?${q.toString()}`).then(json);
 }
 
-// ----- GET ONE (Edit) -----
-export async function getRequest(id) {
-  const res = await fetch(`${BASE}/requests/${id}`);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
-  return data;
+export function getRequestById(id) {
+  return fetch(`${API}/requests/${id}`).then(json);
 }
 
-// ----- UPDATE (Edit): chỉ patch các trường cho phép -----
-export async function updateRequest(id, patch) {
-  const res = await fetch(`${BASE}/requests/${id}`, {
+export function updateRequest(id, payload) {
+  return fetch(`${API}/requests/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
-  return data;
+    body: JSON.stringify(payload),
+  }).then(json);
 }
 
-// ----- CANCEL (Manage) -----
-export async function cancelRequest(id) {
-  const res = await fetch(`${BASE}/requests/${id}/cancel`, { method: "POST" });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
-  return data;
+export function cancelRequest(id) {
+  return fetch(`${API}/requests/${id}/cancel`, { method: "POST" }).then(json);
 }
-
-/* (tùy chọn) nếu còn nơi nào gọi listRequests / deleteRequest cũ:
-export async function listRequests() { return listRequestsByPhone(""); }
-export async function deleteRequest(id) { return cancelRequest(id); }
-*/
