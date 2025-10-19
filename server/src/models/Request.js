@@ -18,16 +18,23 @@ const AddressSchema = new Schema(
     province: { type: AdministrativeUnitSchema, required: true },
     district: { type: AdministrativeUnitSchema, required: true },
     ward:     { type: AdministrativeUnitSchema, required: true },
-    street:   { type: String, required: true, trim: true }, // số nhà, tên đường
+    street:   { type: String, required: true, trim: true },
   },
   { _id: false }
 );
 
-/** Vị trí (GeoJSON Point) – bắt buộc dùng [lng, lat] */
+/** Điểm toạ độ GeoJSON: [lng, lat] */
 const GeoPointSchema = new Schema(
   {
-    type:        { type: String, enum: ["Point"], default: "Point" },
-    coordinates: { type: [Number], default: undefined }, // [lng, lat] – có thể chưa có
+    type: { type: String, enum: ["Point"], required: true, default: "Point" },
+    coordinates: {
+      type: [Number], // [lng, lat]
+      required: true,
+      validate: {
+        validator: (arr) => Array.isArray(arr) && arr.length === 2,
+        message: "coordinates phải là mảng [lng, lat]"
+      }
+    }
   },
   { _id: false }
 );
@@ -39,53 +46,70 @@ const RequestSchema = new Schema(
     customerName:  { type: String, required: true, immutable: true },
     customerPhone: { type: String, required: true, immutable: true },
 
-    // 🆕 TÁCH ĐỊA CHỈ
+    // ✅ TÁCH THÀNH 2 ĐỊA CHỈ & 2 TOẠ ĐỘ
     pickupAddress:   { type: AddressSchema, required: true },
     pickupLocation:  { type: GeoPointSchema, default: undefined },
     deliveryAddress: { type: AddressSchema, required: true },
     deliveryLocation:{ type: GeoPointSchema, default: undefined },
 
+    // ❗ Giữ lại trường cũ để đọc tài liệu lịch sử (DEPRECATED)
+    address:  { type: AddressSchema, required: false },     // deprecated
+    location: { type: GeoPointSchema, default: undefined }, // deprecated
+
     movingTime: { type: Date, required: true },
 
     serviceType: {
       type: String,
-      enum: ["STANDARD", "EXPRESS"], // Thường / Hỏa tốc
+      enum: ["STANDARD", "EXPRESS"],
       default: "STANDARD",
     },
 
-    // Lưu base64 (demo) hoặc URL sau này – tối đa 4 ảnh bên phía routes validate
-    images: { type: [String], default: [] },
+    images: [String],
 
     status: {
       type: String,
       enum: [
-        "PENDING_REVIEW", // Đang chờ duyệt
-        "APPROVED",       // Đã duyệt
-        "REJECTED",       // Bị từ chối
-        "IN_PROGRESS",    // Đang thực hiện
-        "DONE",           // Hoàn tất
-        "CANCELLED",      // Đã hủy
+        "PENDING_REVIEW",
+        "APPROVED",
+        "REJECTED",
+        "IN_PROGRESS",
+        "DONE",
+        "CANCELLED",
       ],
       default: "PENDING_REVIEW",
     },
 
     notes: String,
 
-    // 3 field dưới có thể dùng trong luồng nghiệp vụ khác
     requestDate:       { type: Date, default: Date.now },
     estimatedDelivery: { type: Date },
     actualDelivery:    { type: Date },
   },
   {
     timestamps: true,
-    collection: "request", // ép đúng collection 'request' trong DB SWP391
+    collection: "request",
+    toJSON: { virtuals: true, getters: true },
+    toObject: { virtuals: true, getters: true },
   }
 );
 
-// Index không gian cho truy vấn theo vị trí (phục vụ báo giá theo khoảng cách sau này)
+// 👉 Backward-compat khi tài liệu cũ chỉ có address/location
+RequestSchema.virtual("pickupAddressCompat").get(function () {
+  return this.pickupAddress || this.address || undefined;
+});
+RequestSchema.virtual("deliveryAddressCompat").get(function () {
+  // Nếu không có deliveryAddress, tạm thời dùng address (cũ) như cả 2 để hiển thị
+  return this.deliveryAddress || this.address || undefined;
+});
+RequestSchema.virtual("pickupLocationCompat").get(function () {
+  return this.pickupLocation || this.location || undefined;
+});
+RequestSchema.virtual("deliveryLocationCompat").get(function () {
+  return this.deliveryLocation || this.location || undefined;
+});
+
+// Index không gian cho truy vấn khoảng cách trong tương lai
 RequestSchema.index({ pickupLocation: "2dsphere" });
 RequestSchema.index({ deliveryLocation: "2dsphere" });
 
-// Chống cache model & buộc dùng collection 'request'
-export default mongoose.models.Request ||
-  mongoose.model("Request", RequestSchema, "request");
+export default mongoose.model("Request", RequestSchema, "request");

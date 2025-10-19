@@ -1,165 +1,162 @@
-import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { getRequestById, updateRequest } from "../api/requestApi";
+// client/src/pages/EditRequestPage.jsx
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { getRequest, updateRequest } from "../api/requestApi";
+import { validateMovingTime } from "../utils/validation";
 import AddressPicker from "../components/AddressPicker";
 import MapPicker from "../components/MapPicker";
-import { fileToBase64 } from "../utils/toBase64";
-import { fmtDateTime24, nowForDatetimeLocal } from "../utils/datetime";
-import { validateMovingTime } from "../utils/validation";
+
+// Convert to <input type="datetime-local"> value: "YYYY-MM-DDTHH:mm"
+function toInputLocal(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "";
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+}
+
+// Convert GeoJSON {type:"Point",coordinates:[lng,lat]} -> {lat,lng}
+function toLatLng(geo) {
+  if (!geo) return null;
+  if (geo.type === "Point" && Array.isArray(geo.coordinates) && geo.coordinates.length === 2) {
+    return { lng: geo.coordinates[0], lat: geo.coordinates[1] };
+  }
+  if (typeof geo.lat === "number" && typeof geo.lng === "number") return geo;
+  return null;
+}
 
 const MAX_IMAGES = 4;
-const MAX_FILE_MB = 1.5;
-
-function isAddressComplete(a) {
-  return !!(
-    a?.province?.code &&
-    a?.district?.code &&
-    a?.ward?.code &&
-    String(a?.street || "").trim()
-  );
-}
 
 export default function EditRequestPage() {
   const { id } = useParams();
   const nav = useNavigate();
-  const fileRef = useRef(null);
-
-  const [form, setForm] = useState(null);
   const [msg, setMsg] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(null);
 
   useEffect(() => {
     (async () => {
-      const d = await getRequestById(id);
-      setForm({
-        ...d,
-        movingTime: d.movingTime ? new Date(d.movingTime).toISOString().slice(0,16) : "",
-        pickupLocation: d.pickupLocation?.coordinates
-          ? { lng: d.pickupLocation.coordinates[0], lat: d.pickupLocation.coordinates[1] }
-          : { lat: 21.0278, lng: 105.8342 },
-        deliveryLocation: d.deliveryLocation?.coordinates
-          ? { lng: d.deliveryLocation.coordinates[0], lat: d.deliveryLocation.coordinates[1] }
-          : { lat: 21.0278, lng: 105.8342 },
-      });
+      try {
+        const data = await getRequest(id);
+        setForm({
+          customerName: data.customerName,
+          customerPhone: data.customerPhone,
+          pickupAddress: data.pickupAddress || data.address || { province: null, district: null, ward: null, street: "" },
+          pickupLocation: toLatLng(data.pickupLocation || data.location) || { lat: 21.0278, lng: 105.8342 },
+          deliveryAddress: data.deliveryAddress || data.address || { province: null, district: null, ward: null, street: "" },
+          deliveryLocation: toLatLng(data.deliveryLocation || data.location) || { lat: 21.0278, lng: 105.8342 },
+          movingTime: toInputLocal(data.movingTime),
+          serviceType: data.serviceType || "STANDARD",
+          notes: data.notes || "",
+          images: Array.isArray(data.images) ? data.images.slice(0, MAX_IMAGES) : [],
+          status: data.status
+        });
+      } catch (e) {
+        setMsg("Không tải được request");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [id]);
-
-  const onChange = (e) => setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
-
-  const addFiles = async (filesList) => {
-    const files = Array.from(filesList || []);
-    const remain = MAX_IMAGES - (form.images?.length || 0);
-    if (remain <= 0) { setMsg(`Tối đa ${MAX_IMAGES} ảnh.`); if (fileRef.current) fileRef.current.value = ""; return; }
-
-    const valid = [];
-    for (const f of files.slice(0, remain)) {
-      const mb = f.size / (1024 * 1024);
-      if (mb > MAX_FILE_MB) {
-        setMsg(`❌ Ảnh "${f.name}" quá lớn (> ${MAX_FILE_MB}MB).`);
-        continue;
-      }
-      valid.push(f);
-    }
-    if (!valid.length) { if (fileRef.current) fileRef.current.value = ""; return; }
-
-    const arr = await Promise.all(valid.map(fileToBase64));
-    setForm((s) => ({ ...s, images: [...(s.images || []), ...arr] }));
-    if (fileRef.current) fileRef.current.value = "";
-  };
-
-  const removeImageAt = (idx) =>
-    setForm((s) => ({ ...s, images: (s.images || []).filter((_, i) => i !== idx) }));
 
   const submit = async (e) => {
     e.preventDefault();
     if (!form) return;
-
-    if (form.status !== "PENDING_REVIEW") {
-      setMsg("Chỉ được sửa khi đang chờ duyệt"); return;
-    }
-
-    const v = validateMovingTime(form.movingTime);
-    if (!v.ok) { setMsg(v.msg); return; }
-
-    const payload = {
-      pickupAddress: form.pickupAddress,
-      pickupLocation: { type: "Point", coordinates: [form.pickupLocation.lng, form.pickupLocation.lat] },
-      deliveryAddress: form.deliveryAddress,
-      deliveryLocation: { type: "Point", coordinates: [form.deliveryLocation.lng, form.deliveryLocation.lat] },
-      movingTime: new Date(form.movingTime),
-      serviceType: form.serviceType,
-      notes: form.notes,
-      images: form.images || [],
-    };
-
+    setMsg(""); setSaving(true);
     try {
-      setLoading(true);
+      if (form.status !== "PENDING_REVIEW") throw new Error("Chỉ sửa khi đang chờ duyệt");
+      if (!validateMovingTime(form.movingTime)) throw new Error("Thời gian phải ở tương lai");
+
+      const payload = {
+        pickupAddress: form.pickupAddress,
+        pickupLocation: { type: "Point", coordinates: [form.pickupLocation.lng, form.pickupLocation.lat] },
+        deliveryAddress: form.deliveryAddress,
+        deliveryLocation: { type: "Point", coordinates: [form.deliveryLocation.lng, form.deliveryLocation.lat] },
+        movingTime: new Date(form.movingTime),
+        serviceType: form.serviceType,
+        notes: form.notes,
+        images: form.images
+      };
+
       await updateRequest(id, payload);
-      setMsg("✅ Cập nhật thành công");
-      setTimeout(() => nav("/my-requests"), 700);
+      setMsg("✅ Lưu thay đổi thành công");
+      setTimeout(() => nav("/my-requests"), 600);
     } catch (err) {
-      setMsg("❌ Lỗi cập nhật");
+      setMsg("❌ " + (err.message || "Có lỗi khi lưu"));
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (!form) return <div>Đang tải…</div>;
+  if (loading || !form) return <div style={{ padding: 24 }}>Đang tải…</div>;
 
   return (
-    <div style={{ padding: 24, display: "grid", gap: 18, maxWidth: 920 }}>
+    <div style={{ padding: 24, display: "grid", gap: 18, maxWidth: 860 }}>
       <h1>Sửa Request</h1>
+      <div>Trạng thái: <b>{form.status}</b></div>
+
       <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
-        <div style={card}>
-          <h3>Địa chỉ LẤY HÀNG</h3>
-          <AddressPicker value={form.pickupAddress} onChange={(addr)=>setForm(s=>({ ...s, pickupAddress: addr }))}/>
-          <h4>Vị trí</h4>
-          <MapPicker value={form.pickupLocation} onChange={(loc)=>setForm(s=>({ ...s, pickupLocation: loc }))}/>
-        </div>
+        <div>Họ tên: <b>{form.customerName}</b></div>
+        <div>SĐT: <b>{form.customerPhone}</b></div>
 
-        <div style={card}>
-          <h3>Địa chỉ GIAO HÀNG</h3>
-          <AddressPicker value={form.deliveryAddress} onChange={(addr)=>setForm(s=>({ ...s, deliveryAddress: addr }))}/>
-          <h4>Vị trí</h4>
-          <MapPicker value={form.deliveryLocation} onChange={(loc)=>setForm(s=>({ ...s, deliveryLocation: loc }))}/>
-        </div>
+        <fieldset style={fs}>
+          <legend>Địa chỉ LẤY HÀNG</legend>
+          <AddressPicker
+            value={form.pickupAddress}
+            onChange={(v) => setForm((s) => ({ ...s, pickupAddress: v }))}
+          />
+          <MapPicker
+            value={form.pickupLocation}
+            onChange={(v) => setForm((s) => ({ ...s, pickupLocation: v }))}
+          />
+        </fieldset>
 
-        <label>Thời gian
-          <input type="datetime-local" name="movingTime" value={form.movingTime || ""} onChange={onChange} min={nowForDatetimeLocal()} style={ipt}/>
-          <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-            {form.movingTime && `Hiển thị: ${fmtDateTime24(form.movingTime)}`}
-          </div>
+        <fieldset style={fs}>
+          <legend>Địa chỉ GIAO HÀNG</legend>
+          <AddressPicker
+            value={form.deliveryAddress}
+            onChange={(v) => setForm((s) => ({ ...s, deliveryAddress: v }))}
+          />
+          <MapPicker
+            value={form.deliveryLocation}
+            onChange={(v) => setForm((s) => ({ ...s, deliveryLocation: v }))}
+          />
+        </fieldset>
+
+        <label>Thời gian chuyển
+          <input
+            type="datetime-local"
+            name="movingTime"
+            value={form.movingTime}
+            onChange={(e) => setForm((s)=>({ ...s, movingTime: e.target.value }))}
+            style={ipt}
+          />
         </label>
 
         <label>Dịch vụ
-          <select name="serviceType" value={form.serviceType} onChange={onChange} style={ipt}>
+          <select
+            name="serviceType"
+            value={form.serviceType}
+            onChange={(e)=>setForm((s)=>({ ...s, serviceType: e.target.value }))}
+            style={ipt}
+          >
             <option value="STANDARD">Thường</option>
-            <option value="EXPRESS">Hỏa tốc</option>
+            <option value="EXPRESS">Hoả tốc</option>
           </select>
         </label>
 
-        <label>Thêm ảnh
-          <input ref={fileRef} type="file" accept="image/*" multiple onChange={(e)=>addFiles(e.target.files)}/>
-        </label>
-
-        {(form.images || []).length > 0 && (
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {form.images.map((src, i) => (
-              <div key={i} style={{ position: "relative" }}>
-                <img src={src} alt="" style={{ width: 96, height: 96, objectFit: "cover", borderRadius: 8, border: "1px solid #ddd" }}/>
-                <button type="button" onClick={()=>removeImageAt(i)} style={removeBtn}>×</button>
-              </div>
-            ))}
-          </div>
-        )}
-
         <label>Ghi chú
-          <textarea name="notes" rows={3} value={form.notes || ""} onChange={onChange} style={ipt}/>
+          <textarea
+            name="notes"
+            value={form.notes}
+            onChange={(e)=>setForm((s)=>({ ...s, notes: e.target.value }))}
+            rows={3}
+            style={ipt}
+          />
         </label>
 
-        <button disabled={loading || form.status !== "PENDING_REVIEW"} style={btn}>
-          {loading ? "Đang cập nhật..." : "Lưu thay đổi"}
-        </button>
+        <button disabled={saving} style={btn}>{saving ? "Đang lưu…" : "Lưu thay đổi"}</button>
       </form>
 
       {msg && <div>{msg}</div>}
@@ -169,5 +166,4 @@ export default function EditRequestPage() {
 
 const ipt = { padding: 8, border: "1px solid #ccc", borderRadius: 6, width: "100%" };
 const btn = { padding: "10px 14px", border: "1px solid #111", background: "#111", color: "#fff", borderRadius: 8 };
-const removeBtn = { position: "absolute", top: -8, right: -8, width: 22, height: 22, borderRadius: "50%", border: "1px solid #c00", background: "#fff", color: "#c00", cursor: "pointer", lineHeight: "18px" };
-const card = { padding: 12, border: "1px solid #e5e5e5", borderRadius: 8 };
+const fs  = { padding: 12, border: "1px dashed #aaa", borderRadius: 8 };

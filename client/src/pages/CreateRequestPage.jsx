@@ -11,7 +11,12 @@ const MAX_IMAGES = 4;
 const MAX_FILE_MB = 1.5;
 
 function isAddressComplete(a) {
-  return !!(a?.province?.code && a?.district?.code && a?.ward?.code && String(a?.street || "").trim());
+  return !!(
+    a?.province?.code &&
+    a?.district?.code &&
+    a?.ward?.code &&
+    String(a?.street || "").trim()
+  );
 }
 
 export default function CreateRequestPage() {
@@ -21,57 +26,58 @@ export default function CreateRequestPage() {
   const [form, setForm] = useState({
     customerName: "",
     customerPhone: "",
-    pickupAddress:   { province: null, district: null, ward: null, street: "" },
-    pickupLocation:  { lat: 21.0278, lng: 105.8342 },
+    pickupAddress: { province: null, district: null, ward: null, street: "" },
+    pickupLocation: { lat: 21.0278, lng: 105.8342 }, // Hà Nội
     deliveryAddress: { province: null, district: null, ward: null, street: "" },
-    deliveryLocation:{ lat: 21.0278, lng: 105.8342 },
+    deliveryLocation: { lat: 21.0278, lng: 105.8342 },
     movingTime: "",
     serviceType: "STANDARD",
     notes: "",
     images: [],
   });
-
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState(""); 
   const [loading, setLoading] = useState(false);
 
-  const onChange = (e) => setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
+  const onChange = (e) => {
+    const { name, value } = e.target;
+    setForm((s) => ({ ...s, [name]: value }));
+  };
 
   const addFiles = async (filesList) => {
     const files = Array.from(filesList || []);
     if (!files.length) return;
+
     const remain = MAX_IMAGES - form.images.length;
-    if (remain <= 0) { setMsg(`Bạn chỉ được thêm tối đa ${MAX_IMAGES} ảnh.`); fileRef.current && (fileRef.current.value=""); return; }
-
-    const valid = [];
-    for (const f of files.slice(0, remain)) {
-      const mb = f.size / (1024 * 1024);
-      if (mb > MAX_FILE_MB) { setMsg(`❌ Ảnh "${f.name}" quá lớn (> ${MAX_FILE_MB}MB).`); continue; }
-      valid.push(f);
+    if (remain <= 0) {
+      setMsg(`Bạn chỉ được thêm tối đa ${MAX_IMAGES} ảnh.`);
+      if (fileRef.current) fileRef.current.value = "";
+      return;
     }
-    if (!valid.length) { fileRef.current && (fileRef.current.value=""); return; }
 
-    const arr = await Promise.all(valid.map(fileToBase64));
-    setForm((s) => ({ ...s, images: [...s.images, ...arr] }));
-    fileRef.current && (fileRef.current.value="");
-  };
-
-  const removeImageAt = (idx) => {
-    setForm((s) => ({ ...s, images: s.images.filter((_, i) => i !== idx) }));
-    fileRef.current && (fileRef.current.value="");
+    const arr = [];
+    for (const f of files.slice(0, remain)) {
+      const sizeMB = f.size / (1024 * 1024);
+      if (sizeMB > MAX_FILE_MB) {
+        setMsg(`Ảnh ${f.name} vượt ${MAX_FILE_MB}MB`);
+        if (fileRef.current) fileRef.current.value = "";
+        return;
+      }
+      arr.push(await fileToBase64(f));
+    }
+    setForm((s) => ({ ...s, images: s.images.concat(arr) }));
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   const submit = async (e) => {
-    e.preventDefault(); setMsg("");
-
-    if (!isValidVNMobile(form.customerPhone)) return setMsg("❌ Số điện thoại không đúng định dạng.");
-    if (!isAddressComplete(form.pickupAddress)) return setMsg("❌ Vui lòng nhập đủ địa chỉ LẤY HÀNG.");
-    if (!isAddressComplete(form.deliveryAddress)) return setMsg("❌ Vui lòng nhập đủ địa chỉ GIAO HÀNG.");
-
-    const vt = validateMovingTime(form.movingTime);
-    if (!vt.ok) return setMsg("❌ " + vt.msg);
-
+    e.preventDefault();
+    setMsg(""); setLoading(true);
     try {
-      setLoading(true);
+      if (!form.customerName.trim()) throw new Error("Thiếu họ tên");
+      if (!isValidVNMobile(form.customerPhone)) throw new Error("SĐT không hợp lệ");
+      if (!isAddressComplete(form.pickupAddress)) throw new Error("Thiếu địa chỉ LẤY HÀNG");
+      if (!isAddressComplete(form.deliveryAddress)) throw new Error("Thiếu địa chỉ GIAO HÀNG");
+      if (!validateMovingTime(form.movingTime)) throw new Error("Thời gian phải ở tương lai");
+
       const payload = {
         customerName: form.customerName,
         customerPhone: normalizeVNPhone(form.customerPhone),
@@ -84,9 +90,12 @@ export default function CreateRequestPage() {
         notes: form.notes,
         images: form.images,
       };
+
       await createRequest(payload);
+
       localStorage.setItem("my_phone", normalizeVNPhone(form.customerPhone));
-      setMsg("✅ Tạo request thành công!"); setTimeout(()=>nav("/my-requests"), 700);
+      setMsg("✅ Tạo request thành công. Đang chuyển tới trang quản lý…");
+      setTimeout(() => nav("/my-requests"), 700);
     } catch (err) {
       setMsg("❌ " + (err.message || "Có lỗi xảy ra khi tạo request"));
     } finally {
@@ -95,65 +104,73 @@ export default function CreateRequestPage() {
   };
 
   return (
-    <div style={{ padding: 24, display: "grid", gap: 18, maxWidth: 920 }}>
+    <div style={{ padding: 24, display: "grid", gap: 18, maxWidth: 860 }}>
       <h1>Tạo Request</h1>
+
       <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
         <label>Họ và tên
-          <input name="customerName" value={form.customerName} onChange={onChange} required style={ipt}/>
+          <input name="customerName" value={form.customerName} onChange={onChange} style={ipt} />
         </label>
+
         <label>Số điện thoại
-          <input name="customerPhone" value={form.customerPhone} onChange={onChange} required style={ipt}/>
+          <input name="customerPhone" value={form.customerPhone} onChange={onChange} style={ipt} placeholder="0xxxxxxxxx" />
         </label>
 
-        <div style={card}>
-          <h3>Địa chỉ LẤY HÀNG</h3>
-          <AddressPicker value={form.pickupAddress} onChange={(addr)=>setForm(s=>({ ...s, pickupAddress: addr }))}/>
-          <h4>Vị trí</h4>
-          <MapPicker value={form.pickupLocation} onChange={(loc)=>setForm(s=>({ ...s, pickupLocation: loc }))}/>
-        </div>
+        <fieldset style={fs}>
+          <legend>Địa chỉ LẤY HÀNG</legend>
+          <AddressPicker
+            value={form.pickupAddress}
+            onChange={(v) => setForm((s) => ({ ...s, pickupAddress: v }))}
+          />
+          <MapPicker
+            value={form.pickupLocation}
+            onChange={(v) => setForm((s) => ({ ...s, pickupLocation: v }))}
+          />
+        </fieldset>
 
-        <div style={card}>
-          <h3>Địa chỉ GIAO HÀNG</h3>
-          <AddressPicker value={form.deliveryAddress} onChange={(addr)=>setForm(s=>({ ...s, deliveryAddress: addr }))}/>
-          <h4>Vị trí</h4>
-          <MapPicker value={form.deliveryLocation} onChange={(loc)=>setForm(s=>({ ...s, deliveryLocation: loc }))}/>
-        </div>
+        <fieldset style={fs}>
+          <legend>Địa chỉ GIAO HÀNG</legend>
+          <AddressPicker
+            value={form.deliveryAddress}
+            onChange={(v) => setForm((s) => ({ ...s, deliveryAddress: v }))}
+          />
+          <MapPicker
+            value={form.deliveryLocation}
+            onChange={(v) => setForm((s) => ({ ...s, deliveryLocation: v }))}
+          />
+        </fieldset>
 
-        <label>Thời gian chuyển nhà
-          <input type="datetime-local" name="movingTime" value={form.movingTime} onChange={onChange} required min={nowForDatetimeLocal()} style={ipt}/>
-          <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
-            {form.movingTime && `Hiển thị: ${fmtDateTime24(form.movingTime)}`}
-          </div>
+        <label>Thời gian chuyển
+          <input type="datetime-local" name="movingTime" value={form.movingTime} onChange={onChange} style={ipt} min={nowForDatetimeLocal()} />
         </label>
 
         <label>Dịch vụ
           <select name="serviceType" value={form.serviceType} onChange={onChange} style={ipt}>
             <option value="STANDARD">Thường</option>
-            <option value="EXPRESS">Hỏa tốc</option>
+            <option value="EXPRESS">Hoả tốc</option>
           </select>
         </label>
 
-        <label>Ảnh (tối đa 4, ≤ {MAX_FILE_MB}MB/ảnh)
-          <input ref={fileRef} type="file" accept="image/*" multiple onChange={(e)=>addFiles(e.target.files)}/>
+        <label>Ghi chú
+          <textarea name="notes" value={form.notes} onChange={onChange} rows={3} style={ipt} />
         </label>
 
-        {form.images.length > 0 && (
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            {form.images.map((src, i) => (
-              <div key={i} style={{ position: "relative" }}>
-                <img src={src} alt="" style={{ width: 96, height: 96, objectFit: "cover", borderRadius: 8, border: "1px solid #ddd" }}/>
-                <button type="button" onClick={()=>removeImageAt(i)} style={removeBtn}>×</button>
+        <div style={{ display: "grid", gap: 8 }}>
+          <div>Ảnh (tối đa {MAX_IMAGES})</div>
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={(e) => addFiles(e.target.files)} />
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {form.images.map((b64, idx) => (
+              <div key={idx} style={{ position: "relative" }}>
+                <img src={b64} alt="preview" style={{ width: 120, height: 90, objectFit: "cover", borderRadius: 6, border: "1px solid #ddd" }} />
+                <button type="button" onClick={() => setForm((s) => ({ ...s, images: s.images.filter((_,i)=>i!==idx) }))} style={removeBtn}>×</button>
               </div>
             ))}
           </div>
-        )}
+        </div>
 
-        <label>Ghi chú
-          <textarea name="notes" rows={3} value={form.notes} onChange={onChange} style={ipt}/>
-        </label>
-
-        <button disabled={loading} style={btn}>{loading ? "Đang gửi..." : "Gửi Request (Chờ duyệt)"}</button>
+        <button disabled={loading} style={btn}>{loading ? "Đang tạo…" : "Tạo Request"}</button>
       </form>
+
       {msg && <div>{msg}</div>}
     </div>
   );
@@ -161,5 +178,8 @@ export default function CreateRequestPage() {
 
 const ipt = { padding: 8, border: "1px solid #ccc", borderRadius: 6, width: "100%" };
 const btn = { padding: "10px 14px", border: "1px solid #111", background: "#111", color: "#fff", borderRadius: 8 };
-const removeBtn = { position: "absolute", top: -8, right: -8, width: 22, height: 22, borderRadius: "50%", border: "1px solid #c00", background: "#fff", color: "#c00", cursor: "pointer", lineHeight: "18px" };
-const card = { padding: 12, border: "1px solid #e5e5e5", borderRadius: 8 };
+const removeBtn = {
+  position: "absolute", top: -8, right: -8, width: 22, height: 22,
+  borderRadius: "50%", border: "1px solid #c00", background: "#fff", color: "#c00", cursor: "pointer", lineHeight: "18px"
+};
+const fs = { padding: 12, border: "1px dashed #aaa", borderRadius: 8 };

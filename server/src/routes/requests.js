@@ -1,219 +1,233 @@
 // server/src/routes/requests.js
-import express from "express";
-import mongoose from "mongoose";
+import { Router } from "express";
 import Request from "../models/Request.js";
 
-const router = express.Router();
+const router = Router();
 
-/* ===================== Helpers ===================== */
+/* ================= Helpers ================= */
 
-function normalizeVNPhone(raw = "") {
-  const s = String(raw).replace(/\s|-/g, "");
-  if (s.startsWith("+84")) return "0" + s.slice(3);
-  return s;
-}
+// Chuẩn hoá số VN: +84xxx -> 0xxx
+const normalizeVNPhone = (s = "") => {
+  const x = String(s).trim().replace(/\s+/g, "");
+  if (x.startsWith("+84")) return "0" + x.slice(3);
+  return x;
+};
+const isVNMobile = (s = "") =>
+  /^0(3[2-9]|5[2689]|7[06-9]|8[1-689]|9[0-46-9])\d{7}$/.test(s);
 
-function isVNMobile(phone = "") {
-  return /^0(3|5|7|8|9)\d{8}$/.test(phone);
-}
+const isAddressComplete = (a) =>
+  !!(
+    a &&
+    a.province?.code && a.province?.name &&
+    a.district?.code && a.district?.name &&
+    a.ward?.code && a.ward?.name &&
+    String(a.street || "").trim()
+  );
 
-function isAddressComplete(a) {
-  return !!(a?.province?.code && a?.district?.code && a?.ward?.code && a?.street);
-}
-
-function normalizeLocation(loc) {
-  if (!loc) return undefined;
+// Chuẩn hoá location về GeoJSON Point
+const normalizeLocation = (loc) => {
+  if (!loc) return undefined; // optional
+  // client gửi { lat, lng }
   if (typeof loc.lat === "number" && typeof loc.lng === "number") {
     return { type: "Point", coordinates: [loc.lng, loc.lat] };
   }
-  if (loc?.type === "Point" && Array.isArray(loc.coordinates)) {
+  // đã là GeoJSON
+  if (
+    loc.type === "Point" &&
+    Array.isArray(loc.coordinates) &&
+    loc.coordinates.length === 2 &&
+    typeof loc.coordinates[0] === "number" &&
+    typeof loc.coordinates[1] === "number"
+  ) {
     return loc;
   }
-  return null;
-}
+  return null; // sai định dạng
+};
 
-function validateImages(imgs) {
-  if (!imgs) return { ok: true };
-  if (!Array.isArray(imgs)) return { ok: false, msg: "images phải là mảng" };
-  if (imgs.length > 4) return { ok: false, msg: "Tối đa 4 ảnh" };
-
-  const MAX = 1.5 * 1024 * 1024; // ~1.5MB
-  for (const s of imgs) {
-    if (typeof s !== "string") return { ok: false, msg: "Mỗi ảnh phải là chuỗi base64" };
-    const pure = s.includes(",") ? s.split(",")[1] : s;
-    const sizeEstimate = (pure.length * 3) / 4;
-    if (sizeEstimate > MAX) return { ok: false, msg: "Ảnh quá nặng (>1.5MB)" };
-  }
-  return { ok: true };
-}
-
-function validateMovingTime(isoString) {
-  const t = new Date(isoString);
-  if (Number.isNaN(t.getTime())) return { ok: false, msg: "movingTime không hợp lệ" };
-
-  const now = new Date();
-  if (t <= now) return { ok: false, msg: "Thời gian phải ở tương lai" };
-
-  const sameDay =
-    t.getFullYear() === now.getFullYear() &&
-    t.getMonth() === now.getMonth() &&
-    t.getDate() === now.getDate();
-
-  if (sameDay) {
-    if (now.getHours() < 12) {
-      if (t.getHours() < 12) return { ok: false, msg: "Trong ngày chỉ nhận từ 12:00" };
-    } else {
-      return { ok: false, msg: "Sau 12:00 hôm nay chỉ nhận từ ngày mai" };
-    }
-  }
-  return { ok: true };
-}
-
-/* ===================== Routes ===================== */
-
-// Create
-router.post("/requests", async (req, res) => {
+/* ================= CREATE ================= */
+// POST /api/requests
+router.post("/requests", async (req, res, next) => {
   try {
-    const body = { ...req.body };
-    delete body._id;
+    const {
+      customerName,
+      customerPhone,
+      pickupAddress,
+      pickupLocation,
+      deliveryAddress,
+      deliveryLocation,
+      movingTime,
+      serviceType,
+      notes,
+      images,
+    } = req.body || {};
 
-    // Phone
-    const phone = normalizeVNPhone(body.customerPhone);
-    if (!isVNMobile(phone)) {
-      return res.status(400).json({ error: "Số điện thoại VN không hợp lệ" });
+    if (!customerName?.trim())
+      return res.status(400).json({ error: "Thiếu họ tên" });
+    if (!isVNMobile(normalizeVNPhone(customerPhone || "")))
+      return res.status(400).json({ error: "Số điện thoại không hợp lệ" });
+
+    if (!isAddressComplete(pickupAddress))
+      return res.status(400).json({ error: "Thiếu hoặc sai địa chỉ LẤY HÀNG" });
+    if (!isAddressComplete(deliveryAddress))
+      return res.status(400).json({ error: "Thiếu hoặc sai địa chỉ GIAO HÀNG" });
+
+    const pickLoc = normalizeLocation(pickupLocation);
+    const delivLoc = normalizeLocation(deliveryLocation);
+    if (pickLoc === null) return res.status(400).json({ error: "pickupLocation sai định dạng" });
+    if (delivLoc === null) return res.status(400).json({ error: "deliveryLocation sai định dạng" });
+
+    const mt = new Date(movingTime);
+    if (!(mt instanceof Date) || isNaN(mt.getTime()) || mt.getTime() <= Date.now()) {
+      return res.status(400).json({ error: "Thời gian chuyển phải ở tương lai" });
     }
 
-    // Address
-    if (!isAddressComplete(body.pickupAddress)) {
-      return res.status(400).json({ error: "Thiếu địa chỉ LẤY HÀNG" });
-    }
-    if (!isAddressComplete(body.deliveryAddress)) {
-      return res.status(400).json({ error: "Thiếu địa chỉ GIAO HÀNG" });
-    }
+    const doc = await Request.create({
+      customerName: customerName.trim(),
+      customerPhone: normalizeVNPhone(customerPhone),
+      pickupAddress,
+      pickupLocation: pickLoc,
+      deliveryAddress,
+      deliveryLocation: delivLoc,
+      movingTime: mt,
+      serviceType: serviceType || "STANDARD",
+      notes,
+      images: Array.isArray(images) ? images.slice(0, 4) : []
+    });
 
-    // Location
-    const pickupLoc = normalizeLocation(body.pickupLocation);
-    const deliveryLoc = normalizeLocation(body.deliveryLocation);
-    if (pickupLoc === null || deliveryLoc === null) {
-      return res.status(400).json({ error: "Tọa độ không hợp lệ" });
-    }
-    body.pickupLocation = pickupLoc;
-    body.deliveryLocation = deliveryLoc;
-
-    // Time
-    const vTime = validateMovingTime(body.movingTime);
-    if (!vTime.ok) return res.status(400).json({ error: vTime.msg });
-
-    // Images
-    const vImgs = validateImages(body.images);
-    if (!vImgs.ok) return res.status(400).json({ error: vImgs.msg });
-
-    body.customerPhone = phone;
-    body.status = "PENDING_REVIEW";
-
-    const doc = await Request.create(body);
     return res.status(201).json(doc);
-  } catch (err) {
-    console.error("Create request error:", err);
-    return res.status(500).json({ error: "Lỗi server khi tạo request" });
+  } catch (e) {
+    next(e);
   }
 });
 
-// List by phone (and optional status)
-router.get("/requests", async (req, res) => {
+/* ================= LIST (My Requests) ================= */
+// GET /api/requests?phone=0xxxxxxxxx
+router.get("/requests", async (req, res, next) => {
   try {
-    const q = {};
-    if (req.query.phone) q.customerPhone = normalizeVNPhone(req.query.phone);
-    if (req.query.status) q.status = req.query.status;
+    const phone = normalizeVNPhone(req.query.phone || "");
+    if (!isVNMobile(phone)) {
+      return res.status(400).json({ error: "Thiếu/ sai số điện thoại để lọc" });
+    }
+    const docs = await Request.find({ customerPhone: phone })
+      .sort({ createdAt: -1 })
+      .lean();
 
-    const list = await Request.find(q).sort({ createdAt: -1 });
-    return res.json(list);
-  } catch (err) {
-    console.error("List requests error:", err);
-    return res.status(500).json({ error: "Lỗi server khi lấy danh sách" });
+    // Kèm fields compat để front-end cũ không vỡ nếu còn dùng
+    const mapped = docs.map((d) => ({
+      ...d,
+      pickupAddress: d.pickupAddress || d.address || null,
+      deliveryAddress: d.deliveryAddress || d.address || null,
+      pickupLocation: d.pickupLocation || d.location || null,
+      deliveryLocation: d.deliveryLocation || d.location || null,
+    }));
+
+    res.json(mapped);
+  } catch (e) {
+    next(e);
   }
 });
 
-// Get one
-router.get("/requests/:id", async (req, res) => {
+/* ================= GET ONE (Edit) ================= */
+// GET /api/requests/:id
+router.get("/requests/:id", async (req, res, next) => {
   try {
-    const doc = await Request.findById(req.params.id);
-    if (!doc) return res.status(404).json({ error: "Không tìm thấy request" });
-    return res.json(doc);
-  } catch (err) {
-    console.error("Get request error:", err);
-    return res.status(500).json({ error: "Lỗi server khi lấy chi tiết" });
+    const doc = await Request.findById(req.params.id).lean();
+    if (!doc) return res.status(404).json({ error: "Not found" });
+
+    // compat map
+    doc.pickupAddress = doc.pickupAddress || doc.address || null;
+    doc.deliveryAddress = doc.deliveryAddress || doc.address || null;
+    doc.pickupLocation = doc.pickupLocation || doc.location || null;
+    doc.deliveryLocation = doc.deliveryLocation || doc.location || null;
+
+    res.json(doc);
+  } catch (e) {
+    next(e);
   }
 });
 
-// Update (PENDING_REVIEW only)
-router.patch("/requests/:id", async (req, res) => {
+/* ================= UPDATE (Edit) ================= */
+// Chỉ cho sửa khi đang chờ duyệt; CẤM đổi customerName / customerPhone
+router.patch("/requests/:id", async (req, res, next) => {
   try {
-    const doc = await Request.findById(req.params.id);
-    if (!doc) return res.status(404).json({ error: "Không tìm thấy request" });
-
-    if (doc.status !== "PENDING_REVIEW") {
-      return res.status(409).json({ error: "Chỉ cho sửa khi đang chờ duyệt" });
+    const r = await Request.findById(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    if (r.status !== "PENDING_REVIEW") {
+      return res.status(409).json({ error: "Không thể sửa sau khi đã duyệt" });
     }
 
-    const patch = { ...req.body };
-    delete patch.customerName;
-    delete patch.customerPhone;
-
-    if (patch.pickupAddress && !isAddressComplete(patch.pickupAddress)) {
-      return res.status(400).json({ error: "Thiếu địa chỉ LẤY HÀNG" });
-    }
-    if (patch.deliveryAddress && !isAddressComplete(patch.deliveryAddress)) {
-      return res.status(400).json({ error: "Thiếu địa chỉ GIAO HÀNG" });
+    // Cấm đổi các trường định danh
+    if ("customerName" in req.body || "customerPhone" in req.body) {
+      return res.status(400).json({ error: "Không được phép đổi họ tên / số điện thoại" });
     }
 
-    if ("pickupLocation" in patch) {
-      const l = normalizeLocation(patch.pickupLocation);
-      if (l === null) return res.status(400).json({ error: "pickupLocation không hợp lệ" });
-      patch.pickupLocation = l;
+    // pickup/delivery address (nếu có)
+    if (req.body.pickupAddress) {
+      if (!isAddressComplete(req.body.pickupAddress)) {
+        return res.status(400).json({ error: "pickupAddress thiếu hoặc sai" });
+      }
+      r.pickupAddress = req.body.pickupAddress;
     }
-    if ("deliveryLocation" in patch) {
-      const l = normalizeLocation(patch.deliveryLocation);
-      if (l === null) return res.status(400).json({ error: "deliveryLocation không hợp lệ" });
-      patch.deliveryLocation = l;
-    }
-
-    if (patch.movingTime) {
-      const vTime = validateMovingTime(patch.movingTime);
-      if (!vTime.ok) return res.status(400).json({ error: vTime.msg });
+    if (req.body.deliveryAddress) {
+      if (!isAddressComplete(req.body.deliveryAddress)) {
+        return res.status(400).json({ error: "deliveryAddress thiếu hoặc sai" });
+      }
+      r.deliveryAddress = req.body.deliveryAddress;
     }
 
-    if ("images" in patch) {
-      const vImgs = validateImages(patch.images);
-      if (!vImgs.ok) return res.status(400).json({ error: vImgs.msg });
+    // locations (optional)
+    if ("pickupLocation" in req.body) {
+      const loc = normalizeLocation(req.body.pickupLocation);
+      if (loc === null) return res.status(400).json({ error: "pickupLocation sai định dạng" });
+      r.pickupLocation = loc;
+    }
+    if ("deliveryLocation" in req.body) {
+      const loc = normalizeLocation(req.body.deliveryLocation);
+      if (loc === null) return res.status(400).json({ error: "deliveryLocation sai định dạng" });
+      r.deliveryLocation = loc;
     }
 
-    Object.assign(doc, patch);
-    await doc.save();
-    return res.json(doc);
-  } catch (err) {
-    console.error("Update request error:", err);
-    return res.status(500).json({ error: "Lỗi server khi cập nhật" });
+    if ("movingTime" in req.body) {
+      const mt = new Date(req.body.movingTime);
+      if (!(mt instanceof Date) || isNaN(mt.getTime()) || mt.getTime() <= Date.now()) {
+        return res.status(400).json({ error: "Thời gian chuyển phải ở tương lai" });
+      }
+      r.movingTime = mt;
+    }
+
+    if ("serviceType" in req.body) {
+      r.serviceType = req.body.serviceType;
+    }
+    if ("notes" in req.body) {
+      r.notes = req.body.notes;
+    }
+    if ("images" in req.body) {
+      r.images = Array.isArray(req.body.images) ? req.body.images.slice(0,4) : [];
+    }
+
+    await r.save();
+    return res.json(r);
+  } catch (e) {
+    next(e);
   }
 });
 
-// Cancel (idempotent)
-router.post("/requests/:id/cancel", async (req, res) => {
+/* ================= CANCEL ================= */
+router.post("/requests/:id/cancel", async (req, res, next) => {
   try {
-    const doc = await Request.findById(req.params.id);
-    if (!doc) return res.status(404).json({ error: "Không tìm thấy request" });
+    const r = await Request.findById(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
 
-    if (doc.status === "CANCELLED") return res.json(doc);
-    if (!["PENDING_REVIEW", "APPROVED"].includes(doc.status)) {
-      return res.status(409).json({ error: "Chỉ hủy được từ chờ duyệt/đã duyệt" });
+    // chỉ cho hủy khi đang Chờ duyệt hoặc Đã duyệt
+    if (!["PENDING_REVIEW", "APPROVED"].includes(r.status)) {
+      return res.status(409).json({ error: "Không thể hủy ở giai đoạn này" });
     }
 
-    doc.status = "CANCELLED";
-    await doc.save();
-    return res.json(doc);
-  } catch (err) {
-    console.error("Cancel request error:", err);
-    return res.status(500).json({ error: "Lỗi server khi hủy" });
+    r.status = "CANCELLED";
+    await r.save();
+    return res.json(r);
+  } catch (e) {
+    next(e);
   }
 });
 
