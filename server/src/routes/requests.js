@@ -112,7 +112,7 @@ router.get("/requests", async (req, res, next) => {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Kèm fields compat để front-end cũ không vỡ nếu còn dùng
+    // Compat cho doc cũ
     const mapped = docs.map((d) => ({
       ...d,
       pickupAddress: d.pickupAddress || d.address || null,
@@ -147,18 +147,28 @@ router.get("/requests/:id", async (req, res, next) => {
 });
 
 /* ================= UPDATE (Edit) ================= */
-// Chỉ cho sửa khi đang chờ duyệt; CẤM đổi customerName / customerPhone
+// Chỉ cho sửa khi đang chờ duyệt
 router.patch("/requests/:id", async (req, res, next) => {
   try {
     const r = await Request.findById(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
     if (r.status !== "PENDING_REVIEW") {
-      return res.status(409).json({ error: "Không thể sửa sau khi đã duyệt" });
+      return res.status(409).json({ error: "Chỉ được sửa khi đang chờ duyệt" });
     }
 
-    // Cấm đổi các trường định danh
-    if ("customerName" in req.body || "customerPhone" in req.body) {
-      return res.status(400).json({ error: "Không được phép đổi họ tên / số điện thoại" });
+    // ✅ Cho phép đổi họ tên / SĐT (kèm validate)
+    if ("customerName" in req.body) {
+      if (!String(req.body.customerName || "").trim()) {
+        return res.status(400).json({ error: "Thiếu họ tên" });
+      }
+      r.customerName = String(req.body.customerName).trim();
+    }
+    if ("customerPhone" in req.body) {
+      const np = normalizeVNPhone(req.body.customerPhone || "");
+      if (!isVNMobile(np)) {
+        return res.status(400).json({ error: "Số điện thoại không hợp lệ" });
+      }
+      r.customerPhone = np;
     }
 
     // pickup/delivery address (nếu có)
@@ -195,15 +205,9 @@ router.patch("/requests/:id", async (req, res, next) => {
       r.movingTime = mt;
     }
 
-    if ("serviceType" in req.body) {
-      r.serviceType = req.body.serviceType;
-    }
-    if ("notes" in req.body) {
-      r.notes = req.body.notes;
-    }
-    if ("images" in req.body) {
-      r.images = Array.isArray(req.body.images) ? req.body.images.slice(0,4) : [];
-    }
+    if ("serviceType" in req.body) r.serviceType = req.body.serviceType;
+    if ("notes" in req.body)       r.notes = req.body.notes;
+    if ("images" in req.body)      r.images = Array.isArray(req.body.images) ? req.body.images.slice(0,4) : [];
 
     await r.save();
     return res.json(r);
@@ -218,7 +222,6 @@ router.post("/requests/:id/cancel", async (req, res, next) => {
     const r = await Request.findById(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
 
-    // chỉ cho hủy khi đang Chờ duyệt hoặc Đã duyệt
     if (!["PENDING_REVIEW", "APPROVED"].includes(r.status)) {
       return res.status(409).json({ error: "Không thể hủy ở giai đoạn này" });
     }

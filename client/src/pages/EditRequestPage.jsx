@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getRequest, updateRequest } from "../api/requestApi";
-import { validateMovingTime } from "../utils/validation";
+import { validateMovingTime, isValidVNMobile, normalizeVNPhone } from "../utils/validation";
 import AddressPicker from "../components/AddressPicker";
 import MapPicker from "../components/MapPicker";
 
@@ -24,6 +24,15 @@ function toLatLng(geo) {
   if (typeof geo.lat === "number" && typeof geo.lng === "number") return geo;
   return null;
 }
+
+const VN_STATUS = {
+  PENDING_REVIEW: "Đang chờ duyệt",
+  APPROVED: "Đã duyệt",
+  REJECTED: "Bị từ chối",
+  IN_PROGRESS: "Đang thực hiện",
+  DONE: "Hoàn tất",
+  CANCELLED: "Đã hủy",
+};
 
 const MAX_IMAGES = 4;
 
@@ -66,9 +75,13 @@ export default function EditRequestPage() {
     setMsg(""); setSaving(true);
     try {
       if (form.status !== "PENDING_REVIEW") throw new Error("Chỉ sửa khi đang chờ duyệt");
+      if (!form.customerName.trim()) throw new Error("Thiếu họ tên");
+      if (!isValidVNMobile(form.customerPhone)) throw new Error("SĐT không hợp lệ");
       if (!validateMovingTime(form.movingTime)) throw new Error("Thời gian phải ở tương lai");
 
       const payload = {
+        customerName: form.customerName,
+        customerPhone: normalizeVNPhone(form.customerPhone),
         pickupAddress: form.pickupAddress,
         pickupLocation: { type: "Point", coordinates: [form.pickupLocation.lng, form.pickupLocation.lat] },
         deliveryAddress: form.deliveryAddress,
@@ -94,11 +107,27 @@ export default function EditRequestPage() {
   return (
     <div style={{ padding: 24, display: "grid", gap: 18, maxWidth: 860 }}>
       <h1>Sửa Request</h1>
-      <div>Trạng thái: <b>{form.status}</b></div>
+      <div>Trạng thái: <b>{VN_STATUS[form.status] || form.status}</b></div>
 
       <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
-        <div>Họ tên: <b>{form.customerName}</b></div>
-        <div>SĐT: <b>{form.customerPhone}</b></div>
+        <label>Họ và tên
+          <input
+            name="customerName"
+            value={form.customerName}
+            onChange={(e)=>setForm((s)=>({ ...s, customerName: e.target.value }))}
+            style={ipt}
+          />
+        </label>
+
+        <label>Số điện thoại
+          <input
+            name="customerPhone"
+            value={form.customerPhone}
+            onChange={(e)=>setForm((s)=>({ ...s, customerPhone: e.target.value }))}
+            style={ipt}
+            placeholder="0xxxxxxxxx"
+          />
+        </label>
 
         <fieldset style={fs}>
           <legend>Địa chỉ LẤY HÀNG</legend>

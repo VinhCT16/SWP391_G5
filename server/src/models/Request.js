@@ -43,16 +43,17 @@ const RequestSchema = new Schema(
   {
     orderId: { type: Schema.Types.ObjectId, ref: "Order" },
 
-    customerName:  { type: String, required: true, immutable: true },
-    customerPhone: { type: String, required: true, immutable: true },
+    // ➜ Cho phép chỉnh sửa khi PATCH (không immutable)
+    customerName:  { type: String, required: true },
+    customerPhone: { type: String, required: true },
 
-    // ✅ TÁCH THÀNH 2 ĐỊA CHỈ & 2 TOẠ ĐỘ
+    // ✅ Tách 2 địa chỉ + 2 toạ độ
     pickupAddress:   { type: AddressSchema, required: true },
     pickupLocation:  { type: GeoPointSchema, default: undefined },
     deliveryAddress: { type: AddressSchema, required: true },
     deliveryLocation:{ type: GeoPointSchema, default: undefined },
 
-    // ❗ Giữ lại trường cũ để đọc tài liệu lịch sử (DEPRECATED)
+    // ❗ Giữ trường cũ để đọc tài liệu lịch sử (DEPRECATED)
     address:  { type: AddressSchema, required: false },     // deprecated
     location: { type: GeoPointSchema, default: undefined }, // deprecated
 
@@ -93,12 +94,11 @@ const RequestSchema = new Schema(
   }
 );
 
-// 👉 Backward-compat khi tài liệu cũ chỉ có address/location
+// Backward-compat khi tài liệu cũ chỉ có address/location
 RequestSchema.virtual("pickupAddressCompat").get(function () {
   return this.pickupAddress || this.address || undefined;
 });
 RequestSchema.virtual("deliveryAddressCompat").get(function () {
-  // Nếu không có deliveryAddress, tạm thời dùng address (cũ) như cả 2 để hiển thị
   return this.deliveryAddress || this.address || undefined;
 });
 RequestSchema.virtual("pickupLocationCompat").get(function () {
@@ -108,7 +108,7 @@ RequestSchema.virtual("deliveryLocationCompat").get(function () {
   return this.deliveryLocation || this.location || undefined;
 });
 
-// Index không gian cho truy vấn khoảng cách trong tương lai
+// Index không gian cho truy vấn khoảng cách
 RequestSchema.index({ pickupLocation: "2dsphere" });
 RequestSchema.index({ deliveryLocation: "2dsphere" });
 

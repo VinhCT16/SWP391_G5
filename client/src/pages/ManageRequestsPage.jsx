@@ -26,6 +26,8 @@ export default function ManageRequestsPage() {
     setLoading(true);
     try {
       const data = await listRequestsByPhone(p);
+      // backend đã map compat: nếu doc cũ không có pickup/delivery,
+      // vẫn có thể fallback sang address/location
       setRows(Array.isArray(data) ? data : []);
     } finally {
       setLoading(false);
@@ -62,7 +64,8 @@ export default function ManageRequestsPage() {
             <tr>
               <th style={th}>Tên</th>
               <th style={th}>SĐT</th>
-              <th style={th}>Địa chỉ</th>
+              <th style={th}>Lấy hàng</th>
+              <th style={th}>Giao hàng</th>
               <th style={th}>Thời gian</th>
               <th style={th}>Dịch vụ</th>
               <th style={th}>Trạng thái</th>
@@ -74,7 +77,8 @@ export default function ManageRequestsPage() {
               <tr key={r._id}>
                 <td style={td}>{r.customerName}</td>
                 <td style={td}>{r.customerPhone}</td>
-                <td style={td}>{fmtAddress(r.address)}</td> {/* ✅ KHÔNG render object */}
+                <td style={td}>{fmtAddress(r.pickupAddress || r.address)}</td>
+                <td style={td}>{fmtAddress(r.deliveryAddress || r.address)}</td>
                 <td style={td}>{fmtDateTime24(r.movingTime)}</td>
                 <td style={td}>{r.serviceType === "EXPRESS" ? "Hỏa tốc" : "Thường"}</td>
                 <td style={td}>{VN_STATUS[r.status] || r.status}</td>
@@ -93,9 +97,11 @@ export default function ManageRequestsPage() {
               </tr>
             ))}
             {!rows.length && (
-              <tr><td colSpan={7} style={{ padding: 16, textAlign: "center", color: "#777" }}>
-                Chưa có request nào. Hãy tạo mới.
-              </td></tr>
+              <tr>
+                <td colSpan={8} style={{ padding: 16, textAlign: "center", color: "#777" }}>
+                  Chưa có request nào. Hãy tạo mới.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

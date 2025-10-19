@@ -2,6 +2,15 @@ import { useMemo } from "react";
 import { fmtAddress } from "../utils/address";
 import { fmtDateTime24 } from "../utils/datetime";
 
+const VN_STATUS = {
+  PENDING_REVIEW: "Đang chờ duyệt",
+  APPROVED: "Đã duyệt",
+  REJECTED: "Bị từ chối",
+  IN_PROGRESS: "Đang thực hiện",
+  DONE: "Hoàn tất",
+  CANCELLED: "Đã hủy",
+};
+
 export default function RequestList({ items = [], onEdit, onCancel }) {
   const rows = useMemo(() => items.map((r) => ({
     id: r._id,
@@ -31,7 +40,7 @@ export default function RequestList({ items = [], onEdit, onCancel }) {
             <td style={td}>{VN_STATUS[r.status] || r.status}</td>
             <td style={td}>
               <button onClick={() => onEdit?.(r.id)}>Sửa</button>{" "}
-              <button onClick={() => onCancel?.(r.id)}>Huỷ</button>
+              <button onClick={() => onCancel?.(r.id)}>Hủy</button>
             </td>
           </tr>
         ))}
@@ -39,15 +48,6 @@ export default function RequestList({ items = [], onEdit, onCancel }) {
     </table>
   );
 }
-
-const VN_STATUS = {
-  PENDING_REVIEW: "Đang chờ duyệt",
-  APPROVED: "Đã duyệt",
-  REJECTED: "Bị từ chối",
-  IN_PROGRESS: "Đang thực hiện",
-  DONE: "Hoàn tất",
-  CANCELLED: "Đã hủy",
-};
 
 const th = { textAlign: "left", padding: 8, borderBottom: "1px solid #ddd" };
 const td = { padding: 8, borderBottom: "1px solid #eee" };
