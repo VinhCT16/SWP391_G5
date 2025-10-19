@@ -2,8 +2,8 @@ const Request = require("../models/Request");
 const Staff = require("../models/Staff");
 const { v4: uuidv4 } = require('uuid');
 
-// Create tasks from approved contract
-const createTasksFromContract = async (req, res) => {
+// Create tasks from approved request
+const createTasksFromRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
     const { tasks } = req.body;
@@ -14,9 +14,9 @@ const createTasksFromContract = async (req, res) => {
       return res.status(404).json({ message: "Request not found" });
     }
 
-    // Check if request has a contract
-    if (!request.contractId) {
-      return res.status(400).json({ message: "Request must have a contract before creating tasks" });
+    // Check if request is approved
+    if (request.status !== 'approved') {
+      return res.status(400).json({ message: "Request must be approved before creating tasks" });
     }
 
     // Check if tasks already exist
@@ -110,7 +110,6 @@ const getStaffTasks = async (req, res) => {
             managerNotes: task.managerNotes,
             customerNotes: task.customerNotes,
             attachments: task.attachments,
-            contractId: request.contractId,
             moveDetails: request.moveDetails,
             createdAt: request.createdAt
           });
@@ -135,7 +134,6 @@ const getStaffTasks = async (req, res) => {
             managerNotes: task.managerNotes,
             customerNotes: task.customerNotes,
             attachments: task.attachments,
-            contractId: request.contractId,
             moveDetails: request.moveDetails,
             createdAt: request.createdAt,
             isTransporter: true
@@ -347,7 +345,7 @@ const updateTaskDetails = async (req, res) => {
 };
 
 module.exports = {
-  createTasksFromContract,
+  createTasksFromRequest,
   getStaffTasks,
   updateTaskStatus,
   updateTaskDetails,

@@ -1,6 +1,6 @@
 const express = require("express");
 const {
-  createTasksFromContract,
+  createTasksFromRequest,
   getStaffTasks,
   updateTaskStatus,
   updateTaskDetails,
@@ -13,7 +13,7 @@ const { requireManager, requireStaff } = require("../utils/authMiddleware");
 const router = express.Router();
 
 // Manager routes
-router.post("/create/:requestId", auth, requireManager, createTasksFromContract);
+router.post("/create/:requestId", auth, requireManager, createTasksFromRequest);
 router.get("/staff", auth, requireManager, getAllStaff);
 router.put("/assign/:requestId/:taskId", auth, requireManager, assignStaffToTask);
 

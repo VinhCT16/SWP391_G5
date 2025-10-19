@@ -1,7 +1,7 @@
 import api from '../apiClient';
 
-// Create tasks from contract
-export const createTasksFromContract = (requestId, tasksData) => {
+// Create tasks from request
+export const createTasksFromRequest = (requestId, tasksData) => {
   return api.post(`/api/tasks/create/${requestId}`, tasksData);
 };
 

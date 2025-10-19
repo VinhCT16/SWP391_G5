@@ -667,9 +667,6 @@ export default function StaffDashboard() {
               )}
               <div className="links">
                 <a href={`/requests/${selectedTask?.requestId}`} className="link-btn">View Request</a>
-                {selectedTask?.contractId && (
-                  <a href={`/contracts/${selectedTask.contractId}`} className="link-btn">View Contract</a>
-                )}
               </div>
             </div>
             <div className="modal-actions">

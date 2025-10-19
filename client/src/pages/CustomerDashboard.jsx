@@ -234,7 +234,7 @@ export default function CustomerDashboard() {
                 <p>Completed Moves</p>
               </div>
               <div className="stat-card">
-                <h3>{requests.filter(r => ['submitted', 'approved', 'contract_created', 'in_progress'].includes(r.status)).length}</h3>
+                <h3>{requests.filter(r => ['submitted', 'approved', 'in_progress'].includes(r.status)).length}</h3>
                 <p>Active Moves</p>
               </div>
               <div className="stat-card">

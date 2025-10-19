@@ -41,11 +41,6 @@ const requestSchema = new mongoose.Schema({
     }
   ],
   
-  // Contract Reference
-  contractId: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: "Contract" 
-  },
   
   // Tasks
   tasks: [
@@ -94,7 +89,7 @@ const requestSchema = new mongoose.Schema({
   // Request Status
   status: { 
     type: String, 
-    enum: ["draft", "submitted", "under_review", "approved", "rejected", "contract_created", "in_progress", "completed", "cancelled"], 
+    enum: ["draft", "submitted", "under_review", "approved", "rejected", "in_progress", "completed", "cancelled"], 
     default: "draft" 
   },
   
