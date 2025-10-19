@@ -1,23 +1,16 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { createRequest } from "../api/requestApi";
 import { fileToBase64 } from "../utils/toBase64";
 import { isValidVNMobile, normalizeVNPhone, validateMovingTime } from "../utils/validation";
-import { fmtDateTime24, nowForDatetimeLocal } from "../utils/datetime";
+import { nowForDatetimeLocal } from "../utils/datetime";
 import AddressPicker from "../components/AddressPicker";
-import MapPicker from "../components/MapPicker";
+
+import RouteMapLibre from "../components/RouteMapLibre";
+import { orsGeocode, orsDirections, joinAddress, isAddressComplete } from "../utils/ors";
 
 const MAX_IMAGES = 4;
 const MAX_FILE_MB = 1.5;
-
-function isAddressComplete(a) {
-  return !!(
-    a?.province?.code &&
-    a?.district?.code &&
-    a?.ward?.code &&
-    String(a?.street || "").trim()
-  );
-}
 
 export default function CreateRequestPage() {
   const nav = useNavigate();
@@ -27,16 +20,90 @@ export default function CreateRequestPage() {
     customerName: "",
     customerPhone: "",
     pickupAddress: { province: null, district: null, ward: null, street: "" },
-    pickupLocation: { lat: 21.0278, lng: 105.8342 }, // Hà Nội
+    pickupLocation: null,   // { lat, lng } - tự geocode
     deliveryAddress: { province: null, district: null, ward: null, street: "" },
-    deliveryLocation: { lat: 21.0278, lng: 105.8342 },
+    deliveryLocation: null, // { lat, lng } - tự geocode
     movingTime: "",
     serviceType: "STANDARD",
     notes: "",
     images: [],
   });
-  const [msg, setMsg] = useState(""); 
+  const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Route preview state
+  const [routeGeo, setRouteGeo] = useState(null);          // GeoJSON from ORS
+  const [routeSummary, setRouteSummary] = useState(null);  // {distance, duration}
+
+  // ---- Bias geocode theo tỉnh/thành người dùng chọn (ổn định hơn)
+  function resolveFocus(addr) {
+    const name = addr?.province?.name || "";
+    if (name.includes("Hà Nội")) return { lat: 21.028, lng: 105.854 };
+    if (name.includes("Hồ Chí Minh") || name.includes("HCM")) return { lat: 10.77, lng: 106.69 };
+    if (name.includes("Đà Nẵng")) return { lat: 16.054, lng: 108.202 };
+    if (name.includes("Hải Phòng")) return { lat: 20.864, lng: 106.683 };
+    if (name.includes("Cần Thơ")) return { lat: 10.045, lng: 105.746 };
+    // fallback: tâm Việt Nam
+    return { lat: 16.2, lng: 107.8 };
+  }
+
+  // Geocode PICKUP khi nhập đủ địa chỉ (debounce 500ms)
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        if (!isAddressComplete(form.pickupAddress)) {
+          setForm(s => ({ ...s, pickupLocation: null }));
+          return;
+        }
+        const focus = resolveFocus(form.pickupAddress);
+        const r = await orsGeocode(joinAddress(form.pickupAddress), ctrl.signal, { focus });
+        setForm(s => ({ ...s, pickupLocation: r ? { lat: r.lat, lng: r.lng } : null }));
+      } catch (e) {
+        if (e?.name !== "AbortError") console.warn("pickup geocode error", e);
+      }
+    }, 500);
+    return () => { clearTimeout(timer); ctrl.abort(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(form.pickupAddress)]);
+
+  // Geocode DELIVERY khi nhập đủ địa chỉ (debounce 500ms)
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        if (!isAddressComplete(form.deliveryAddress)) {
+          setForm(s => ({ ...s, deliveryLocation: null }));
+          return;
+        }
+        const focus = resolveFocus(form.deliveryAddress);
+        const r = await orsGeocode(joinAddress(form.deliveryAddress), ctrl.signal, { focus });
+        setForm(s => ({ ...s, deliveryLocation: r ? { lat: r.lat, lng: r.lng } : null }));
+      } catch (e) {
+        if (e?.name !== "AbortError") console.warn("delivery geocode error", e);
+      }
+    }, 500);
+    return () => { clearTimeout(timer); ctrl.abort(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(form.deliveryAddress)]);
+
+  // Gọi ORS Directions khi đã có đủ 2 tọa độ
+  useEffect(() => {
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const o = form.pickupLocation, d = form.deliveryLocation;
+        if (!o || !d) { setRouteGeo(null); setRouteSummary(null); return; }
+        const r = await orsDirections(o, d, ctrl.signal);
+        setRouteGeo(r?.geojson || null);
+        setRouteSummary(r?.summary || null);
+      } catch (e) {
+        if (e?.name !== "AbortError") console.warn("directions error", e);
+        setRouteGeo(null); setRouteSummary(null);
+      }
+    })();
+    return () => ctrl.abort();
+  }, [form.pickupLocation?.lat, form.pickupLocation?.lng, form.deliveryLocation?.lat, form.deliveryLocation?.lng]);
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -77,6 +144,7 @@ export default function CreateRequestPage() {
       if (!isAddressComplete(form.pickupAddress)) throw new Error("Thiếu địa chỉ LẤY HÀNG");
       if (!isAddressComplete(form.deliveryAddress)) throw new Error("Thiếu địa chỉ GIAO HÀNG");
       if (!validateMovingTime(form.movingTime)) throw new Error("Thời gian phải ở tương lai");
+      if (!form.pickupLocation || !form.deliveryLocation) throw new Error("Không xác định được tọa độ từ địa chỉ. Vui lòng kiểm tra lại.");
 
       const payload = {
         customerName: form.customerName,
@@ -122,10 +190,6 @@ export default function CreateRequestPage() {
             value={form.pickupAddress}
             onChange={(v) => setForm((s) => ({ ...s, pickupAddress: v }))}
           />
-          <MapPicker
-            value={form.pickupLocation}
-            onChange={(v) => setForm((s) => ({ ...s, pickupLocation: v }))}
-          />
         </fieldset>
 
         <fieldset style={fs}>
@@ -134,10 +198,28 @@ export default function CreateRequestPage() {
             value={form.deliveryAddress}
             onChange={(v) => setForm((s) => ({ ...s, deliveryAddress: v }))}
           />
-          <MapPicker
-            value={form.deliveryLocation}
-            onChange={(v) => setForm((s) => ({ ...s, deliveryLocation: v }))}
+        </fieldset>
+
+        {/* ✅ Map luôn hiển thị — route xuất hiện khi đủ 2 tọa độ */}
+        <fieldset style={fs}>
+          <legend>Tuyến đường (xem trước)</legend>
+
+          <RouteMapLibre
+            pickup={form.pickupLocation}
+            delivery={form.deliveryLocation}
+            routeGeojson={routeGeo}
+            height={320}
           />
+
+          {routeSummary ? (
+            <div style={{ marginTop: 8, color: "#444" }}>
+              Ước tính: {(routeSummary.distance/1000).toFixed(1)} km • {Math.round(routeSummary.duration/60)} phút
+            </div>
+          ) : (
+            <div style={{ marginTop: 8, color: "#666" }}>
+              Nhập đủ địa chỉ LẤY & GIAO (tỉnh/ huyện/ xã + số nhà, đường) để hiển thị tuyến đường.
+            </div>
+          )}
         </fieldset>
 
         <label>Thời gian chuyển

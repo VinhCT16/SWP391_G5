@@ -4,7 +4,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { getRequest, updateRequest } from "../api/requestApi";
 import { validateMovingTime, isValidVNMobile, normalizeVNPhone } from "../utils/validation";
 import AddressPicker from "../components/AddressPicker";
-import MapPicker from "../components/MapPicker";
 
 // Convert to <input type="datetime-local"> value: "YYYY-MM-DDTHH:mm"
 function toInputLocal(value) {
@@ -49,8 +48,8 @@ export default function EditRequestPage() {
       try {
         const data = await getRequest(id);
         setForm({
-          customerName: data.customerName,
-          customerPhone: data.customerPhone,
+          customerName: data.customerName || "",
+          customerPhone: data.customerPhone || "",
           pickupAddress: data.pickupAddress || data.address || { province: null, district: null, ward: null, street: "" },
           pickupLocation: toLatLng(data.pickupLocation || data.location) || { lat: 21.0278, lng: 105.8342 },
           deliveryAddress: data.deliveryAddress || data.address || { province: null, district: null, ward: null, street: "" },
@@ -135,10 +134,6 @@ export default function EditRequestPage() {
             value={form.pickupAddress}
             onChange={(v) => setForm((s) => ({ ...s, pickupAddress: v }))}
           />
-          <MapPicker
-            value={form.pickupLocation}
-            onChange={(v) => setForm((s) => ({ ...s, pickupLocation: v }))}
-          />
         </fieldset>
 
         <fieldset style={fs}>
@@ -146,10 +141,6 @@ export default function EditRequestPage() {
           <AddressPicker
             value={form.deliveryAddress}
             onChange={(v) => setForm((s) => ({ ...s, deliveryAddress: v }))}
-          />
-          <MapPicker
-            value={form.deliveryLocation}
-            onChange={(v) => setForm((s) => ({ ...s, deliveryLocation: v }))}
           />
         </fieldset>
 

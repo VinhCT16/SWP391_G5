@@ -26,8 +26,6 @@ export default function ManageRequestsPage() {
     setLoading(true);
     try {
       const data = await listRequestsByPhone(p);
-      // backend đã map compat: nếu doc cũ không có pickup/delivery,
-      // vẫn có thể fallback sang address/location
       setRows(Array.isArray(data) ? data : []);
     } finally {
       setLoading(false);
