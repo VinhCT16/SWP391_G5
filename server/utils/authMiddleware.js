@@ -52,4 +52,10 @@ module.exports.requireCustomer = module.exports.requireRole(["customer"]);
 // Manager or Staff middleware
 module.exports.requireEmployee = module.exports.requireRole(["manager", "staff"]);
 
+// Admin-specific middleware
+module.exports.requireAdmin = module.exports.requireRole(["admin"]);
+
+// Admin or Manager middleware
+module.exports.requireAdminOrManager = module.exports.requireRole(["admin", "manager"]);
+
 

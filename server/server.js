@@ -27,10 +27,15 @@ app.use("/api/auth", require("./routes/auth"));
 app.use("/api/requests", require("./routes/requestRoutes"));
 app.use("/api/contracts", require("./routes/contractRoutes"));
 app.use("/api/tasks", require("./routes/taskRoutes"));
+app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/reviews", reviewRoutes);
 
+
+app.get("/", (req, res) => {
+  res.send("API is running...");
+});
 // Start server after DB connect
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
 connectDB().then(() => {
   app.listen(port, () => console.log(`🚀 Server listening on port ${port}`));
 });

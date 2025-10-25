@@ -21,6 +21,8 @@ export default function DashboardRedirect() {
       return <Navigate to="/manager-dashboard" replace />;
     case 'staff':
       return <Navigate to="/staff-dashboard" replace />;
+    case 'admin':
+      return <Navigate to="/admin-dashboard" replace />;
     default:
       return <Navigate to="/" replace />;
   }

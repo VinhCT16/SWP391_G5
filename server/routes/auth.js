@@ -17,7 +17,7 @@ router.post("/register", async (req, res) => {
     }
 
     // Validate role
-    const validRoles = ["customer", "manager", "staff"];
+    const validRoles = ["customer", "manager", "staff", "admin"];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ message: "Invalid role specified" });
     }
@@ -248,6 +248,48 @@ router.post("/create-staff", auth, require("../utils/authMiddleware").requireSta
     });
     
     return res.status(201).json({ staff });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Create Admin Profile (requires admin role)
+router.post("/create-admin", auth, require("../utils/authMiddleware").requireAdmin, async (req, res) => {
+  try {
+    const Admin = require("../models/Admin");
+    const { adminId, department, permissions } = req.body;
+    
+    // Check if admin profile already exists
+    const existingAdmin = await Admin.findOne({ userId: req.userId });
+    if (existingAdmin) {
+      return res.status(409).json({ message: "Admin profile already exists" });
+    }
+    
+    const admin = await Admin.create({
+      userId: req.userId,
+      adminId,
+      department,
+      permissions: permissions || {
+        userManagement: {
+          canViewUsers: true,
+          canCreateUsers: true,
+          canUpdateUsers: true,
+          canDeleteUsers: true,
+          canLockUnlockUsers: true
+        },
+        staffManagement: {
+          canManageStaff: true,
+          canAssignRoles: true,
+          canViewStaffPerformance: true
+        },
+        systemManagement: {
+          canViewSystemLogs: true,
+          canManageSystemSettings: true
+        }
+      }
+    });
+    
+    return res.status(201).json({ admin });
   } catch (err) {
     return res.status(500).json({ message: "Server error" });
   }

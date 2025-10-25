@@ -15,6 +15,7 @@ import CustomerReview from "./pages/CustomerReview";
 import ManagerReview from "./pages/ManagerReview";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import StaffDashboard from "./pages/StaffDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import About from "./pages/About";
 import './App.css';
 import './components/Navigation.css';
@@ -50,6 +51,9 @@ function App() {
             </Route>
             <Route element={<RoleProtectedRoute allowedRoles={['staff']} />}>
               <Route path="/staff-dashboard" element={<StaffDashboard />} />
+            </Route>
+            <Route element={<RoleProtectedRoute allowedRoles={['admin']} />}>
+              <Route path="/admin-dashboard" element={<AdminDashboard />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

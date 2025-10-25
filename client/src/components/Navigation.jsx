@@ -66,6 +66,15 @@ export default function Navigation() {
                 </Link>
               )}
 
+              {user.role === 'admin' && (
+                <Link 
+                  to="/admin-dashboard" 
+                  className={`nav-link ${location.pathname === '/admin-dashboard' ? 'active' : ''}`}
+                >
+                  Admin Panel
+                </Link>
+              )}
+
               <Link to="/about" className="nav-link">About</Link>
             </>
           )}
