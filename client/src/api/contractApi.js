@@ -19,3 +19,25 @@ export const getAllContracts = (params = {}) => {
 export const updateContractStatus = (id, statusData) => {
   return api.put(`/api/contracts/${id}/status`, statusData);
 };
+
+// Export contract to PDF
+export const exportContractPDF = (id) => {
+  return api.get(`/api/contracts/${id}/export`, {
+    responseType: 'blob'
+  });
+};
+
+// Approve contract
+export const approveContract = (id, data) => {
+  return api.put(`/api/contracts/${id}/approve`, data);
+};
+
+// Reject contract
+export const rejectContract = (id, data) => {
+  return api.put(`/api/contracts/${id}/reject`, data);
+};
+
+// Get contracts for approval
+export const getContractsForApproval = (params = {}) => {
+  return api.get('/api/contracts/approval', { params });
+};

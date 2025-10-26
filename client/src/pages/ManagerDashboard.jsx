@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getAllRequests, updateRequestStatus } from '../api/requestApi';
 import { createContractFromRequest } from '../api/contractApi';
@@ -8,6 +9,7 @@ import './ManagerDashboard.css';
 
 export default function ManagerDashboard() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -205,6 +207,12 @@ export default function ManagerDashboard() {
             >
               🗂️ Clear Filters
             </button>
+            <button 
+              className="contract-approval-btn"
+              onClick={() => navigate('/contract-approval')}
+            >
+              📋 Contract Approval
+            </button>
           </div>
           <div className="filters">
             <select 
@@ -312,7 +320,7 @@ export default function ManagerDashboard() {
                     <>
                       <button 
                         className="contract-btn"
-                        onClick={() => handleCreateContract(request)}
+                        onClick={() => navigate(`/contract-form/${request._id}`)}
                         disabled={loading}
                       >
                         Create Contract

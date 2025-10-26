@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createRequest, getMyRequests } from '../api/requestApi';
 import { updateProfile, changePassword } from '../api/userApi';
+import { getContractsForApproval } from '../api/contractApi';
 import BackButton from '../components/BackButton';
 import './Home.css';
 
 export default function CustomerDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [requests, setRequests] = useState([]);
+  const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
@@ -43,6 +47,22 @@ export default function CustomerDashboard() {
     } catch (err) {
       console.error('Error loading requests:', err);
       setError('Failed to load requests');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load user's contracts
+  const loadContracts = async () => {
+    try {
+      setLoading(true);
+      // This would need to be implemented in the API
+      // For now, we'll use a mock approach
+      const response = await getContractsForApproval();
+      setContracts(response.data.contracts || []);
+    } catch (err) {
+      console.error('Error loading contracts:', err);
+      setError('Failed to load contracts');
     } finally {
       setLoading(false);
     }
@@ -175,6 +195,7 @@ export default function CustomerDashboard() {
   // Load requests on component mount
   useEffect(() => {
     loadRequests();
+    loadContracts();
   }, []);
 
   return (
@@ -211,6 +232,12 @@ export default function CustomerDashboard() {
           onClick={() => setActiveTab('my-moves')}
         >
           My Moves
+        </button>
+        <button 
+          className={activeTab === 'contracts' ? 'nav-btn active' : 'nav-btn'}
+          onClick={() => setActiveTab('contracts')}
+        >
+          Contracts
         </button>
         <button 
           className={activeTab === 'profile' ? 'nav-btn active' : 'nav-btn'}
@@ -408,6 +435,49 @@ export default function CustomerDashboard() {
                 <button className="action-btn primary" onClick={() => setActiveTab('book-move')}>
                   Book a Move
                 </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'contracts' && (
+          <div className="contracts">
+            <h2>My Contracts</h2>
+            {loading ? (
+              <div className="loading-state">
+                <p>Loading contracts...</p>
+              </div>
+            ) : contracts.length === 0 ? (
+              <div className="empty-state">
+                <h3>No contracts found</h3>
+                <p>You don't have any contracts yet.</p>
+              </div>
+            ) : (
+              <div className="contracts-grid">
+                {contracts.map((contract) => (
+                  <div key={contract._id} className="contract-card">
+                    <div className="contract-header">
+                      <h3>Contract #{contract.contractId}</h3>
+                      <span className={`status-badge ${contract.status}`}>
+                        {contract.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className="contract-details">
+                      <p><strong>Service:</strong> {contract.serviceId?.name}</p>
+                      <p><strong>Total Price:</strong> ${contract.pricing?.totalPrice}</p>
+                      <p><strong>Status:</strong> {contract.status}</p>
+                      <p><strong>Created:</strong> {new Date(contract.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <div className="contract-actions">
+                      <button 
+                        className="view-btn"
+                        onClick={() => navigate(`/contracts/${contract._id}`)}
+                      >
+                        View Contract
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

@@ -2,6 +2,7 @@ const Contract = require("../models/Contract");
 const Request = require("../models/Request");
 const Service = require("../models/Service");
 const { v4: uuidv4 } = require('uuid');
+const { generateContractPDFBuffer } = require('../utils/pdfGenerator');
 
 // Generate unique contract ID
 const generateContractId = () => `CON-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -148,6 +149,150 @@ const updateContractStatus = async (req, res) => {
   }
 };
 
+// Approve contract (Manager only)
+const approveContract = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const managerId = req.userId;
+
+    const contract = await Contract.findById(id);
+    if (!contract) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    contract.status = 'approved';
+    contract.approval = {
+      approvedBy: managerId,
+      approvedAt: new Date(),
+      notes: notes || ''
+    };
+
+    await contract.save();
+
+    // Populate contract details for response
+    await contract.populate([
+      { path: 'customerId', select: 'name email phone' },
+      { path: 'managerId', select: 'userId' },
+      { path: 'serviceId', select: 'name price' }
+    ]);
+
+    res.json({
+      message: "Contract approved successfully",
+      contract: {
+        id: contract._id,
+        contractId: contract.contractId,
+        status: contract.status,
+        approval: contract.approval,
+        createdAt: contract.createdAt
+      }
+    });
+  } catch (err) {
+    console.error("Error approving contract:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Reject contract (Manager only)
+const rejectContract = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { rejectionReason, notes } = req.body;
+    const managerId = req.userId;
+
+    const contract = await Contract.findById(id);
+    if (!contract) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    if (!rejectionReason) {
+      return res.status(400).json({ message: "Rejection reason is required" });
+    }
+
+    contract.status = 'cancelled';
+    contract.approval = {
+      approvedBy: managerId,
+      approvedAt: new Date(),
+      rejectionReason: rejectionReason,
+      notes: notes || ''
+    };
+
+    await contract.save();
+
+    res.json({
+      message: "Contract rejected successfully",
+      contract: {
+        id: contract._id,
+        contractId: contract.contractId,
+        status: contract.status,
+        approval: contract.approval
+      }
+    });
+  } catch (err) {
+    console.error("Error rejecting contract:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get contracts for manager approval
+const getContractsForApproval = async (req, res) => {
+  try {
+    const { status = 'pending_approval', page = 1, limit = 10 } = req.query;
+    
+    const filter = { status };
+    if (status === 'pending_approval') {
+      filter.status = { $in: ['draft', 'pending_approval'] };
+    }
+
+    const contracts = await Contract.find(filter)
+      .populate('customerId', 'name email phone')
+      .populate('managerId', 'userId')
+      .populate('serviceId', 'name price')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Contract.countDocuments(filter);
+
+    res.json({
+      contracts,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      total
+    });
+  } catch (err) {
+    console.error("Error fetching contracts for approval:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Export contract to PDF
+const exportContractPDF = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const contract = await Contract.findById(id)
+      .populate('customerId', 'name email phone')
+      .populate('managerId', 'userId')
+      .populate('serviceId', 'name price');
+
+    if (!contract) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    const pdfBuffer = await generateContractPDFBuffer(contract);
+    
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="contract-${contract.contractId}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    res.send(Buffer.from(pdfBuffer));
+  } catch (err) {
+    console.error("Error exporting contract PDF:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Get all contracts
 const getAllContracts = async (req, res) => {
   try {
@@ -184,5 +329,9 @@ module.exports = {
   createContractFromRequest,
   getContractById,
   updateContractStatus,
-  getAllContracts
+  getAllContracts,
+  approveContract,
+  rejectContract,
+  getContractsForApproval,
+  exportContractPDF
 };
