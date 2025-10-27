@@ -1,11 +1,13 @@
 const Contract = require("../models/Contract");
 const Request = require("../models/Request");
 const Service = require("../models/Service");
+const Staff = require("../models/Staff");
+const User = require("../models/User");
 const { v4: uuidv4 } = require('uuid');
 const { generateContractPDFBuffer } = require('../utils/pdfGenerator');
 
 // Generate unique contract ID
-const generateContractId = () => `CON-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+const generateContractId = () => `CON-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
 // Create contract from approved request
 const createContractFromRequest = async (req, res) => {
@@ -97,7 +99,12 @@ const getContractById = async (req, res) => {
     const contract = await Contract.findById(id)
       .populate('customerId', 'name email phone')
       .populate('managerId', 'userId')
-      .populate('serviceId', 'name price');
+      .populate('serviceId', 'name price')
+      .populate({
+        path: 'assignedStaff.staffId',
+        select: 'employeeId role',
+        populate: { path: 'userId', select: 'name email phone' }
+      });
 
     if (!contract) {
       return res.status(404).json({ message: "Contract not found" });
@@ -325,6 +332,225 @@ const getAllContracts = async (req, res) => {
   }
 };
 
+// Assign staff to contract (Manager only)
+const assignStaffToContract = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { staffId, notes } = req.body;
+    const managerId = req.userId;
+
+    const contract = await Contract.findById(id);
+    if (!contract) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    // Check if staff exists
+    const staff = await Staff.findById(staffId);
+    if (!staff) {
+      return res.status(404).json({ message: "Staff not found" });
+    }
+
+    // Check if staff is already assigned
+    const alreadyAssigned = contract.assignedStaff.some(
+      assignment => assignment.staffId.toString() === staffId
+    );
+    
+    if (alreadyAssigned) {
+      return res.status(400).json({ message: "Staff is already assigned to this contract" });
+    }
+
+    // Add staff assignment
+    contract.assignedStaff.push({
+      staffId,
+      assignedBy: managerId,
+      assignedAt: new Date(),
+      status: 'pending',
+      notes: notes || ''
+    });
+
+    // Update contract status
+    if (contract.status === 'signed' || contract.status === 'approved') {
+      contract.status = 'staff_pending';
+    }
+
+    await contract.save();
+
+    // Populate assigned staff details
+    await contract.populate({
+      path: 'assignedStaff.staffId',
+      select: 'employeeId role',
+      populate: { path: 'userId', select: 'name email phone' }
+    });
+
+    res.json({
+      message: "Staff assigned successfully",
+      contract: contract
+    });
+  } catch (err) {
+    console.error("Error assigning staff:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get available staff for assignment
+const getAvailableStaff = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const contract = await Contract.findById(id);
+    if (!contract) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    // Get all active staff
+    const allStaff = await Staff.find({ isActive: true })
+      .populate('userId', 'name email phone');
+    
+    // Get already assigned staff IDs
+    const assignedStaffIds = contract.assignedStaff.map(a => a.staffId.toString());
+    
+    // Filter available staff
+    const availableStaff = allStaff.filter(
+      staff => !assignedStaffIds.includes(staff._id.toString())
+    );
+
+    res.json({ availableStaff });
+  } catch (err) {
+    console.error("Error fetching available staff:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Accept assignment (Staff only)
+const acceptAssignment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const staffUserId = req.userId;
+
+    // Find staff record
+    const staff = await Staff.findOne({ userId: staffUserId });
+    if (!staff) {
+      return res.status(404).json({ message: "Staff not found" });
+    }
+
+    const contract = await Contract.findById(id);
+    if (!contract) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    // Find the assignment for this staff
+    const assignment = contract.assignedStaff.find(
+      a => a.staffId.toString() === staff._id.toString()
+    );
+
+    if (!assignment) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+
+    if (assignment.status !== 'pending') {
+      return res.status(400).json({ message: "Assignment cannot be accepted" });
+    }
+
+    // Update assignment status
+    assignment.status = 'accepted';
+    assignment.acceptedAt = new Date();
+
+    // Update contract status
+    const allAccepted = contract.assignedStaff.every(
+      a => a.status === 'accepted'
+    );
+
+    if (allAccepted) {
+      contract.status = 'active';
+    } else if (contract.status === 'staff_pending') {
+      contract.status = 'in_progress';
+    }
+
+    await contract.save();
+
+    res.json({
+      message: "Assignment accepted successfully",
+      contract: contract
+    });
+  } catch (err) {
+    console.error("Error accepting assignment:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Reject assignment (Staff only)
+const rejectAssignment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const staffUserId = req.userId;
+
+    const staff = await Staff.findOne({ userId: staffUserId });
+    if (!staff) {
+      return res.status(404).json({ message: "Staff not found" });
+    }
+
+    const contract = await Contract.findById(id);
+    if (!contract) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    const assignment = contract.assignedStaff.find(
+      a => a.staffId.toString() === staff._id.toString()
+    );
+
+    if (!assignment) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+
+    if (assignment.status !== 'pending') {
+      return res.status(400).json({ message: "Assignment cannot be rejected" });
+    }
+
+    assignment.status = 'rejected';
+    assignment.notes = reason || assignment.notes;
+
+    await contract.save();
+
+    res.json({
+      message: "Assignment rejected successfully",
+      contract: contract
+    });
+  } catch (err) {
+    console.error("Error rejecting assignment:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get contracts assigned to staff
+const getAssignedContracts = async (req, res) => {
+  try {
+    const staffUserId = req.userId;
+
+    const staff = await Staff.findOne({ userId: staffUserId });
+    if (!staff) {
+      return res.status(404).json({ message: "Staff not found" });
+    }
+
+    const contracts = await Contract.find({
+      'assignedStaff.staffId': staff._id
+    })
+      .populate('customerId', 'name email phone')
+      .populate('managerId', 'userId')
+      .populate('serviceId', 'name price')
+      .populate({
+        path: 'assignedStaff.staffId',
+        populate: { path: 'userId', select: 'name email phone' }
+      })
+      .sort({ createdAt: -1 });
+
+    res.json({ contracts });
+  } catch (err) {
+    console.error("Error fetching assigned contracts:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   createContractFromRequest,
   getContractById,
@@ -333,5 +559,10 @@ module.exports = {
   approveContract,
   rejectContract,
   getContractsForApproval,
-  exportContractPDF
+  exportContractPDF,
+  assignStaffToContract,
+  getAvailableStaff,
+  acceptAssignment,
+  rejectAssignment,
+  getAssignedContracts
 };

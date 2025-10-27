@@ -7,10 +7,15 @@ const {
   approveContract,
   rejectContract,
   getContractsForApproval,
-  exportContractPDF
+  exportContractPDF,
+  assignStaffToContract,
+  getAvailableStaff,
+  acceptAssignment,
+  rejectAssignment,
+  getAssignedContracts
 } = require("../controllers/contractController");
 const auth = require("../utils/authMiddleware");
-const { requireManager, requireCustomer } = require("../utils/authMiddleware");
+const { requireManager, requireCustomer, requireStaff } = require("../utils/authMiddleware");
 const Contract = require("../models/Contract");
 
 const router = express.Router();
@@ -38,6 +43,15 @@ router.get("/customer/:customerId", auth, requireCustomer, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+// Staff assignment routes (Manager)
+router.post("/:id/assign-staff", auth, requireManager, assignStaffToContract);
+router.get("/:id/available-staff", auth, requireManager, getAvailableStaff);
+
+// Staff routes
+router.get("/staff/assigned", auth, requireStaff, getAssignedContracts);
+router.post("/:id/accept-assignment", auth, requireStaff, acceptAssignment);
+router.post("/:id/reject-assignment", auth, requireStaff, rejectAssignment);
 
 // PDF Export routes
 router.get("/:id/export", auth, exportContractPDF);

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const reviewSchema = new mongoose.Schema({
   reviewId: { type: mongoose.Schema.Types.ObjectId, default: new mongoose.Types.ObjectId() },
@@ -29,4 +29,4 @@ const customerSchema = new mongoose.Schema({
   ]
 });
 
-export default mongoose.model("Customer", customerSchema);
+module.exports = mongoose.model("Customer", customerSchema);

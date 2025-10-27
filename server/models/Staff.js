@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const staffSchema = new mongoose.Schema({
   userId: { 
@@ -52,4 +52,4 @@ const staffSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
-export default mongoose.model("Staff", staffSchema);
+module.exports = mongoose.model("Staff", staffSchema);

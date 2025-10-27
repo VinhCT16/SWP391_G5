@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getContractsForApproval, approveContract, rejectContract } from '../api/contractApi';
+import { 
+  getContractsForApproval, 
+  approveContract, 
+  rejectContract, 
+  getContractById,
+  assignStaffToContract, 
+  getAvailableStaff 
+} from '../api/contractApi';
 import './ContractApproval.css';
 
 const ContractApproval = () => {
@@ -11,6 +18,11 @@ const ContractApproval = () => {
   const [selectedContract, setSelectedContract] = useState(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [showAssignStaffModal, setShowAssignStaffModal] = useState(false);
+  const [availableStaff, setAvailableStaff] = useState([]);
+  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [staffNotes, setStaffNotes] = useState('');
+  const [contractDetails, setContractDetails] = useState(null);
   const [approvalNotes, setApprovalNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejectionNotes, setRejectionNotes] = useState('');
@@ -72,6 +84,47 @@ const ContractApproval = () => {
   const openRejectionModal = (contract) => {
     setSelectedContract(contract);
     setShowRejectionModal(true);
+  };
+
+  const openAssignStaffModal = async (contract) => {
+    try {
+      setSelectedContract(contract);
+      
+      // Load contract details with assigned staff
+      const response = await getContractById(contract._id);
+      setContractDetails(response.data.contract);
+      
+      // Load available staff
+      const staffResponse = await getAvailableStaff(contract._id);
+      setAvailableStaff(staffResponse.data.availableStaff || []);
+      
+      setShowAssignStaffModal(true);
+    } catch (err) {
+      setError('Failed to load staff information');
+    }
+  };
+
+  const handleAssignStaff = async () => {
+    if (!selectedStaffId) {
+      setError('Please select a staff member');
+      return;
+    }
+
+    try {
+      await assignStaffToContract(selectedContract._id, {
+        staffId: selectedStaffId,
+        notes: staffNotes
+      });
+      
+      setShowAssignStaffModal(false);
+      setSelectedStaffId('');
+      setStaffNotes('');
+      setSelectedContract(null);
+      setContractDetails(null);
+      loadContracts();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to assign staff');
+    }
   };
 
   const getStatusBadge = (status) => {
@@ -170,6 +223,12 @@ const ContractApproval = () => {
                   className="reject-btn"
                 >
                   Reject
+                </button>
+                <button
+                  onClick={() => openAssignStaffModal(contract)}
+                  className="assign-btn"
+                >
+                  Assign Staff
                 </button>
                 <button
                   onClick={() => navigate(`/contracts/${contract._id}`)}
@@ -276,6 +335,96 @@ const ContractApproval = () => {
                 className="reject-btn"
               >
                 Reject Contract
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Staff Modal */}
+      {showAssignStaffModal && contractDetails && (
+        <div className="modal-overlay">
+          <div className="modal large-modal">
+            <div className="modal-header">
+              <h3>Assign Staff to Contract</h3>
+              <button
+                onClick={() => setShowAssignStaffModal(false)}
+                className="close-btn"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="contract-summary">
+                <h4>Contract Details</h4>
+                <p><strong>Contract ID:</strong> {contractDetails.contractId}</p>
+                <p><strong>Customer:</strong> {contractDetails.customerId?.name}</p>
+                <p><strong>From:</strong> {contractDetails.moveDetails?.fromAddress}</p>
+                <p><strong>To:</strong> {contractDetails.moveDetails?.toAddress}</p>
+              </div>
+
+              {contractDetails.assignedStaff && contractDetails.assignedStaff.length > 0 && (
+                <div className="assigned-staff-list">
+                  <h4>Currently Assigned Staff</h4>
+                  {contractDetails.assignedStaff.map((assignment, index) => (
+                    <div key={index} className="assigned-staff-item">
+                      <p>
+                        <strong>{assignment.staffId?.userId?.name}</strong> - 
+                        {assignment.staffId?.role} - 
+                        <span className={`status-badge status-${assignment.status}`}>
+                          {assignment.status}
+                        </span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="staffSelect">Select Staff *</label>
+                <select
+                  id="staffSelect"
+                  value={selectedStaffId}
+                  onChange={(e) => setSelectedStaffId(e.target.value)}
+                  required
+                >
+                  <option value="">Select a staff member...</option>
+                  {availableStaff.map(staff => (
+                    <option key={staff._id} value={staff._id}>
+                      {staff.userId?.name} - {staff.role} ({staff.employeeId})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {availableStaff.length === 0 && (
+                <p className="no-staff-message">No available staff members</p>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="staffNotes">Notes (optional)</label>
+                <textarea
+                  id="staffNotes"
+                  value={staffNotes}
+                  onChange={(e) => setStaffNotes(e.target.value)}
+                  rows="3"
+                  placeholder="Add any notes for this assignment..."
+                />
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button
+                onClick={() => setShowAssignStaffModal(false)}
+                className="cancel-btn"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignStaff}
+                className="assign-btn"
+                disabled={!selectedStaffId || availableStaff.length === 0}
+              >
+                Assign Staff
               </button>
             </div>
           </div>

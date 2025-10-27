@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getContractById, exportContractPDF } from '../api/contractApi';
 import './CustomerContractView.css';
@@ -10,11 +10,7 @@ const CustomerContractView = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadContract();
-  }, [id]);
-
-  const loadContract = async () => {
+  const loadContract = useCallback(async () => {
     try {
       setLoading(true);
       const response = await getContractById(id);
@@ -24,7 +20,11 @@ const CustomerContractView = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    loadContract();
+  }, [loadContract]);
 
   const handleExportPDF = async () => {
     try {
@@ -267,6 +267,35 @@ const CustomerContractView = () => {
                   <span className="rejection-reason">{contract.approval.rejectionReason}</span>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Assigned Staff */}
+        {contract.assignedStaff && contract.assignedStaff.length > 0 && (
+          <div className="contract-section">
+            <h2>Assigned Staff</h2>
+            <div className="staff-list">
+              {contract.assignedStaff.map((assignment, index) => (
+                <div key={index} className="staff-item">
+                  <div className="staff-info">
+                    <h3>{assignment.staffId?.userId?.name || 'Unknown Staff'}</h3>
+                    <p>Role: {assignment.staffId?.role || 'N/A'}</p>
+                    <p>Employee ID: {assignment.staffId?.employeeId || 'N/A'}</p>
+                    {assignment.staffId?.userId?.phone && (
+                      <p>Phone: {assignment.staffId.userId.phone}</p>
+                    )}
+                  </div>
+                  <div className="staff-status">
+                    <span className={`status-badge status-${assignment.status}`}>
+                      {assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
+                    </span>
+                    {assignment.acceptedAt && (
+                      <p className="accepted-date">Accepted: {formatDate(assignment.acceptedAt)}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

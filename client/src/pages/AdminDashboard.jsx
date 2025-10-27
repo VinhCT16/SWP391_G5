@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import adminApi from '../api/adminApi';
 import './AdminDashboard.css';
@@ -51,25 +51,6 @@ const AdminDashboard = () => {
     loadComplaintStats();
   }, []);
 
-  // Load users when filters change
-  useEffect(() => {
-    loadUsers();
-  }, [filters, pagination.currentPage]);
-
-  // Load customers when filters change
-  useEffect(() => {
-    if (activeTab === 'customers') {
-      loadCustomers();
-    }
-  }, [customerFilters, customerPagination.currentPage, activeTab]);
-
-  // Load complaints when filters change
-  useEffect(() => {
-    if (activeTab === 'complaints') {
-      loadComplaints();
-    }
-  }, [complaintFilters, complaintPagination.currentPage, activeTab]);
-
   const loadUserStats = async () => {
     try {
       const response = await adminApi.getUserStats();
@@ -97,7 +78,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
       const params = {
@@ -113,9 +94,9 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.currentPage, filters]);
 
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     setLoading(true);
     try {
       const params = {
@@ -131,9 +112,9 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [customerPagination.currentPage, customerFilters]);
 
-  const loadComplaints = async () => {
+  const loadComplaints = useCallback(async () => {
     setLoading(true);
     try {
       const params = {
@@ -149,7 +130,26 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [complaintPagination.currentPage, complaintFilters]);
+
+  // Load users when filters change
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  // Load customers when filters change
+  useEffect(() => {
+    if (activeTab === 'customers') {
+      loadCustomers();
+    }
+  }, [loadCustomers, activeTab]);
+
+  // Load complaints when filters change
+  useEffect(() => {
+    if (activeTab === 'complaints') {
+      loadComplaints();
+    }
+  }, [loadComplaints, activeTab]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));

@@ -41,3 +41,25 @@ export const rejectContract = (id, data) => {
 export const getContractsForApproval = (params = {}) => {
   return api.get('/api/contracts/approval', { params });
 };
+
+// Staff assignment (Manager)
+export const assignStaffToContract = (contractId, data) => {
+  return api.post(`/api/contracts/${contractId}/assign-staff`, data);
+};
+
+export const getAvailableStaff = (contractId) => {
+  return api.get(`/api/contracts/${contractId}/available-staff`);
+};
+
+// Staff assignment actions
+export const acceptAssignment = (contractId) => {
+  return api.post(`/api/contracts/${contractId}/accept-assignment`);
+};
+
+export const rejectAssignment = (contractId, data) => {
+  return api.post(`/api/contracts/${contractId}/reject-assignment`, data);
+};
+
+export const getAssignedContracts = () => {
+  return api.get('/api/contracts/staff/assigned');
+};

@@ -13,13 +13,20 @@ const app = express();
 // Middlewares
 app.use(express.json());
 
-const allowedOrigins = process.env.CLIENT_URL ? [process.env.CLIENT_URL] : ["http://localhost:3000", "http://localhost:3001"];
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+    "http://3.106.202.106:3000",
+    "http://3.106.202.106:3001",
+    "https://api-agritrack.ungdunghay.info.vn"
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+}));
 app.use(cookieParser());
 
 // Routes

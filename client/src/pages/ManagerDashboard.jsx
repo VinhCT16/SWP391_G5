@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getAllRequests, updateRequestStatus } from '../api/requestApi';
-import { createContractFromRequest } from '../api/contractApi';
 import { createTasksFromContract } from '../api/taskApi';
 import BackButton from '../components/BackButton';
 import './ManagerDashboard.css';
 
 export default function ManagerDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -26,7 +25,7 @@ export default function ManagerDashboard() {
   });
 
   // Load all requests
-  const loadRequests = async () => {
+  const loadRequests = useCallback(async () => {
     try {
       setLoading(true);
       const response = await getAllRequests({ status: filters.status });
@@ -37,7 +36,7 @@ export default function ManagerDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters.status]);
 
   // Handle request approval/rejection
   const handleApproval = async () => {
@@ -63,40 +62,6 @@ export default function ManagerDashboard() {
     } catch (err) {
       console.error('Error updating request:', err);
       setError(err?.response?.data?.message || 'Failed to update request');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle contract creation
-  const handleCreateContract = async (request) => {
-    try {
-      setLoading(true);
-      
-      // Simple contract data - in a real app, this would be more complex
-      const contractData = {
-        serviceId: 'default-service-id', // This should be selected from available services
-        pricing: {
-          basePrice: 500, // This should be calculated based on move details
-          additionalServices: [],
-          totalPrice: 500,
-          deposit: 100
-        },
-        paymentMethod: {
-          type: 'cash',
-          details: {}
-        }
-      };
-
-      await createContractFromRequest(request._id, contractData);
-      
-      // Reload requests to show updated status
-      await loadRequests();
-      
-      alert('Contract created successfully!');
-    } catch (err) {
-      console.error('Error creating contract:', err);
-      setError(err?.response?.data?.message || 'Failed to create contract');
     } finally {
       setLoading(false);
     }
@@ -172,7 +137,7 @@ export default function ManagerDashboard() {
   // Load requests on component mount
   useEffect(() => {
     loadRequests();
-  }, [filters.status]);
+  }, [loadRequests]);
 
   return (
     <div className="manager-dashboard">

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const managerSchema = new mongoose.Schema({
   userId: { 
@@ -31,4 +31,4 @@ const managerSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-export default mongoose.model("Manager", managerSchema);
+module.exports = mongoose.model("Manager", managerSchema);

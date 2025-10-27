@@ -6,7 +6,7 @@ import BackButton from '../components/BackButton';
 import './StaffDashboard.css';
 
 export default function StaffDashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);

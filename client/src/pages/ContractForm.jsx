@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { createContractFromRequest } from '../api/contractApi';
 import './ContractForm.css';
@@ -107,7 +107,7 @@ const ContractForm = () => {
     }));
   };
 
-  const calculateTotal = () => {
+  const calculateTotal = useCallback(() => {
     const basePrice = formData.pricing.basePrice || 0;
     const additionalTotal = formData.pricing.additionalServices.reduce((sum, service) => 
       sum + (service.price || 0), 0
@@ -123,11 +123,11 @@ const ContractForm = () => {
         balance: balance
       }
     }));
-  };
+  }, [formData.pricing.basePrice, formData.pricing.additionalServices, formData.pricing.deposit]);
 
   useEffect(() => {
     calculateTotal();
-  }, [formData.pricing.basePrice, formData.pricing.additionalServices, formData.pricing.deposit]);
+  }, [calculateTotal]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
