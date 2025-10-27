@@ -1,65 +1,43 @@
-const API_URL = "http://localhost:3000/contracts"; 
-export const getContracts = async () => {
-  try {
-    const response = await fetch(API_URL);
-    if (!response.ok) throw new Error("Không thể tải danh sách hợp đồng");
-    return await response.json();
-  } catch (error) {
-    console.error("Lỗi khi tải danh sách hợp đồng:", error);
-    return [];
-  }
+import api from '../apiClient';
+
+// Create contract from approved request
+export const createContractFromRequest = (requestId, contractData) => {
+  return api.post(`/api/contracts/from-request/${requestId}`, contractData);
 };
 
-export const getContractById = async (id) => {
-  try {
-    const response = await fetch(`${API_URL}/${id}`);
-    if (!response.ok) throw new Error("Không thể tải chi tiết hợp đồng");
-    return await response.json();
-  } catch (error) {
-    console.error("Lỗi khi tải chi tiết hợp đồng:", error);
-    return null;
-  }
+// Get contract by ID
+export const getContractById = (id) => {
+  return api.get(`/api/contracts/${id}`);
 };
 
-export const createContract = async (contractData) => {
-  try {
-    const response = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(contractData),
-    });
-    if (!response.ok) throw new Error("Không thể tạo hợp đồng mới");
-    return await response.json();
-  } catch (error) {
-    console.error("Lỗi khi tạo hợp đồng:", error);
-    throw error;
-  }
+// Get all contracts
+export const getAllContracts = (params = {}) => {
+  return api.get('/api/contracts', { params });
 };
 
-export const updateContract = async (id, updatedData) => {
-  try {
-    const response = await fetch(`${API_URL}/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updatedData),
-    });
-    if (!response.ok) throw new Error("Không thể cập nhật hợp đồng");
-    return await response.json();
-  } catch (error) {
-    console.error("Lỗi khi cập nhật hợp đồng:", error);
-    throw error;
-  }
+// Update contract status
+export const updateContractStatus = (id, statusData) => {
+  return api.put(`/api/contracts/${id}/status`, statusData);
 };
 
-export const deleteContract = async (id) => {
-  try {
-    const response = await fetch(`${API_URL}/${id}`, {
-      method: "DELETE",
-    });
-    if (!response.ok) throw new Error("Không thể xóa hợp đồng");
-    return true;
-  } catch (error) {
-    console.error("Lỗi khi xóa hợp đồng:", error);
-    throw error;
-  }
+// Export contract to PDF
+export const exportContractPDF = (id) => {
+  return api.get(`/api/contracts/${id}/export`, {
+    responseType: 'blob'
+  });
+};
+
+// Approve contract
+export const approveContract = (id, data) => {
+  return api.put(`/api/contracts/${id}/approve`, data);
+};
+
+// Reject contract
+export const rejectContract = (id, data) => {
+  return api.put(`/api/contracts/${id}/reject`, data);
+};
+
+// Get contracts for approval
+export const getContractsForApproval = (params = {}) => {
+  return api.get('/api/contracts/approval', { params });
 };
