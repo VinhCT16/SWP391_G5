@@ -12,8 +12,21 @@ app.use(cors());
 app.use(express.json({ limit: "8mb" }));
 
 connectMongo().then(() => {
-  app.use("/api", requestsRouter);
-  app.use("/api", contractsRouter);
+  // Mount feature routers under explicit bases
+  app.use("/api/requests", requestsRouter);
+  app.use("/api/contracts", contractsRouter);
+
+  // API 404 handler for unmatched routes under /api
+  app.use("/api", (req, res) => {
+    res.status(404).json({ error: "Not found" });
+  });
+
+  // Centralized error handler
+  app.use((err, req, res, next) => {
+    console.error(err);
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || "Internal Server Error" });
+  });
 
   const port = process.env.PORT || 3000;
   app.listen(port, () => console.log(`🚀 Server chạy tại http://localhost:${port}`));

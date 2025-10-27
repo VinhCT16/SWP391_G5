@@ -13,9 +13,9 @@ const calcTotal = (pricing = {}) => {
   return Math.max(0, base + sur - discount);
 };
 
-// POST /api/contracts/from-request/:requestId
+// POST /from-request/:requestId
 // Create a draft contract by copying fields from a request
-router.post("/contracts/from-request/:requestId", async (req, res, next) => {
+router.post("/from-request/:requestId", async (req, res, next) => {
   try {
     const r = await Request.findById(req.params.requestId);
     if (!r) return res.status(404).json({ error: "Request not found" });
@@ -45,8 +45,8 @@ router.post("/contracts/from-request/:requestId", async (req, res, next) => {
   }
 });
 
-// GET /api/contracts
-router.get("/contracts", async (req, res, next) => {
+// GET /
+router.get("/", async (req, res, next) => {
   try {
     const { requestId, status } = req.query;
     const q = {};
@@ -59,8 +59,8 @@ router.get("/contracts", async (req, res, next) => {
   }
 });
 
-// GET /api/contracts/:id
-router.get("/contracts/:id", async (req, res, next) => {
+// GET /:id
+router.get("/:id", async (req, res, next) => {
   try {
     const c = await Contract.findById(req.params.id);
     if (!c) return res.status(404).json({ error: "Not found" });
@@ -70,8 +70,8 @@ router.get("/contracts/:id", async (req, res, next) => {
   }
 });
 
-// PATCH /api/contracts/:id (update editable fields while DRAFT)
-router.patch("/contracts/:id", async (req, res, next) => {
+// PATCH /:id (update editable fields while DRAFT)
+router.patch("/:id", async (req, res, next) => {
   try {
     const c = await Contract.findById(req.params.id);
     if (!c) return res.status(404).json({ error: "Not found" });
@@ -94,8 +94,8 @@ router.patch("/contracts/:id", async (req, res, next) => {
   }
 });
 
-// POST /api/contracts/:id/issue -> ISSUED
-router.post("/contracts/:id/issue", async (req, res, next) => {
+// POST /:id/issue -> ISSUED
+router.post("/:id/issue", async (req, res, next) => {
   try {
     const c = await Contract.findById(req.params.id);
     if (!c) return res.status(404).json({ error: "Not found" });
@@ -108,8 +108,8 @@ router.post("/contracts/:id/issue", async (req, res, next) => {
   }
 });
 
-// POST /api/contracts/:id/accept -> ACCEPTED
-router.post("/contracts/:id/accept", async (req, res, next) => {
+// POST /:id/accept -> ACCEPTED
+router.post("/:id/accept", async (req, res, next) => {
   try {
     const c = await Contract.findById(req.params.id);
     if (!c) return res.status(404).json({ error: "Not found" });
@@ -124,8 +124,8 @@ router.post("/contracts/:id/accept", async (req, res, next) => {
   }
 });
 
-// POST /api/contracts/:id/reject -> REJECTED
-router.post("/contracts/:id/reject", async (req, res, next) => {
+// POST /:id/reject -> REJECTED
+router.post("/:id/reject", async (req, res, next) => {
   try {
     const c = await Contract.findById(req.params.id);
     if (!c) return res.status(404).json({ error: "Not found" });
@@ -140,8 +140,8 @@ router.post("/contracts/:id/reject", async (req, res, next) => {
   }
 });
 
-// POST /api/contracts/:id/cancel -> CANCELLED
-router.post("/contracts/:id/cancel", async (req, res, next) => {
+// POST /:id/cancel -> CANCELLED
+router.post("/:id/cancel", async (req, res, next) => {
   try {
     const c = await Contract.findById(req.params.id);
     if (!c) return res.status(404).json({ error: "Not found" });
@@ -152,6 +152,21 @@ router.post("/contracts/:id/cancel", async (req, res, next) => {
     c.status = "CANCELLED";
     await c.save();
     res.json(c);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// DELETE /:id (only allow deleting DRAFT contracts)
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const c = await Contract.findById(req.params.id);
+    if (!c) return res.status(404).json({ error: "Not found" });
+    if (c.status !== "DRAFT") {
+      return res.status(409).json({ error: "Only DRAFT contracts can be deleted" });
+    }
+    await c.deleteOne();
+    return res.status(204).end();
   } catch (e) {
     next(e);
   }

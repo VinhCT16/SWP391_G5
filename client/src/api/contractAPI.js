@@ -24,4 +24,7 @@ export const rejectContract = (id) =>
 export const cancelContract = (id) =>
   api.post(`/api/contracts/${id}/cancel`);
 
+export const deleteContract = (id) =>
+  api.delete(`/api/contracts/${id}`);
+
 

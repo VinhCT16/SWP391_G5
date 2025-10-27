@@ -52,6 +52,52 @@ export async function cancelRequest(id) {
   return data;
 }
 
+// ----- GET MY REQUESTS (Customer Dashboard) -----
+export async function getMyRequests() {
+  // For now, return mock data since we don't have user authentication yet
+  // TODO: Replace with actual API call when authentication is implemented
+  const mockRequests = [
+    {
+      _id: "1",
+      requestId: "REQ001",
+      moveDetails: {
+        fromAddress: "123 Main St, District 1, HCMC",
+        toAddress: "456 Oak Ave, District 3, HCMC",
+        moveDate: "2024-01-15",
+        serviceType: "Local Move",
+        phone: "0123456789"
+      },
+      status: "submitted",
+      createdAt: "2024-01-10T10:00:00Z",
+      approval: {
+        approved: false,
+        rejectionReason: null,
+        notes: "Under review"
+      }
+    },
+    {
+      _id: "2",
+      requestId: "REQ002",
+      moveDetails: {
+        fromAddress: "789 Pine St, District 2, HCMC",
+        toAddress: "321 Elm St, District 7, HCMC",
+        moveDate: "2024-01-20",
+        serviceType: "Long Distance",
+        phone: "0987654321"
+      },
+      status: "approved",
+      createdAt: "2024-01-12T14:30:00Z",
+      approval: {
+        approved: true,
+        rejectionReason: null,
+        notes: "Approved for moving"
+      }
+    }
+  ];
+  
+  return { data: { requests: mockRequests } };
+}
+
 /* (tùy chọn) nếu còn nơi nào gọi listRequests / deleteRequest cũ:
 export async function listRequests() { return listRequestsByPhone(""); }
 export async function deleteRequest(id) { return cancelRequest(id); }

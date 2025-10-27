@@ -88,8 +88,8 @@ const validateImages = (imgsRaw) => {
 };
 
 /* ================= CREATE ================= */
-// POST /api/requests
-router.post("/requests", async (req, res, next) => {
+// POST /
+router.post("/", async (req, res, next) => {
   try {
     const body = { ...(req.body || {}) };
     if ("_id" in body) delete body._id; // không ghi đè doc cũ
@@ -140,8 +140,8 @@ router.post("/requests", async (req, res, next) => {
 });
 
 /* ================= LIST (Manage) ================= */
-// GET /api/requests?phone=&status=&userId=
-router.get("/requests", async (req, res, next) => {
+// GET /?phone=&status=&userId=
+router.get("/", async (req, res, next) => {
   try {
     const { phone, status, userId } = req.query;
     const q = {};
@@ -157,8 +157,8 @@ router.get("/requests", async (req, res, next) => {
 });
 
 /* ================= GET ONE (Edit) ================= */
-// GET /api/requests/:id
-router.get("/requests/:id", async (req, res, next) => {
+// GET /:id
+router.get("/:id", async (req, res, next) => {
   try {
     const doc = await Request.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: "Not found" });
@@ -169,9 +169,9 @@ router.get("/requests/:id", async (req, res, next) => {
 });
 
 /* ================= UPDATE (Edit) ================= */
-// PATCH /api/requests/:id
+// PATCH /:id
 // Chỉ cho sửa khi đang chờ duyệt; CẤM đổi customerName / customerPhone
-router.patch("/requests/:id", async (req, res, next) => {
+router.patch("/:id", async (req, res, next) => {
   try {
     const r = await Request.findById(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
@@ -229,8 +229,8 @@ router.patch("/requests/:id", async (req, res, next) => {
 });
 
 /* ================= CANCEL ================= */
-// POST /api/requests/:id/cancel
-router.post("/requests/:id/cancel", async (req, res, next) => {
+// POST /:id/cancel
+router.post("/:id/cancel", async (req, res, next) => {
   try {
     const r = await Request.findById(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
