@@ -82,6 +82,12 @@ export default function ManageRequestsPage() {
                 <td style={td}>{VN_STATUS[r.status] || r.status}</td>
                 <td style={td}>
                   <button
+                    onClick={() => nav(`/requests/${r._id}/quote`)}
+                    style={{ ...btnSmall, marginLeft: 6 }}
+                                                                >
+                                                      Báo giá
+                  </button>
+                  <button
                     disabled={r.status !== "PENDING_REVIEW"}
                     onClick={() => nav(`/requests/${r._id}/edit`)}
                     style={btnSmall}

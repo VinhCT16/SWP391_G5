@@ -34,3 +34,7 @@ export const statusVN = (s) =>
     DONE: "Hoàn tất",
     CANCELLED: "Đã hủy",
   }[s] || s);
+export function fmtNumber(n) {
+  if (typeof n !== "number" || isNaN(n)) return "0";
+  return n.toLocaleString("vi-VN");  // format theo chuẩn Việt Nam
+}
