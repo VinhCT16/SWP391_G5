@@ -1,26 +1,58 @@
-import api from '../apiClient';
+// API base khớp server: /api
+const BASE = "http://localhost:3000/api";
 
-// Create a new moving request
-export const createRequest = (requestData) => {
-  return api.post('/api/requests', requestData);
-};
+// ----- CREATE (JSON body, images là mảng base64 nếu có) -----
+export async function createRequest(payload) {
+  const res = await fetch(`${BASE}/requests`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
 
-// Get customer's requests
-export const getMyRequests = () => {
-  return api.get('/api/requests/my-requests');
-};
+// ----- LIST theo phone (Manage) -----
+export async function listRequestsByPhone(phone, status) {
+  const u = new URL(`${BASE}/requests`);
+  if (phone) u.searchParams.set("phone", phone);
+  if (status) u.searchParams.set("status", status);
+  const res = await fetch(u.toString());
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
 
-// Get a specific request by ID
-export const getRequestById = (id) => {
-  return api.get(`/api/requests/${id}`);
-};
+// ----- GET ONE (Edit) -----
+export async function getRequest(id) {
+  const res = await fetch(`${BASE}/requests/${id}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
 
-// Get all requests (for managers)
-export const getAllRequests = (params = {}) => {
-  return api.get('/api/requests', { params });
-};
+// ----- UPDATE (Edit): chỉ patch các trường cho phép -----
+export async function updateRequest(id, patch) {
+  const res = await fetch(`${BASE}/requests/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
 
-// Update request status (for managers)
-export const updateRequestStatus = (id, statusData) => {
-  return api.put(`/api/requests/${id}/status`, statusData);
-};
+// ----- CANCEL (Manage) -----
+export async function cancelRequest(id) {
+  const res = await fetch(`${BASE}/requests/${id}/cancel`, { method: "POST" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+/* (tùy chọn) nếu còn nơi nào gọi listRequests / deleteRequest cũ:
+export async function listRequests() { return listRequestsByPhone(""); }
+export async function deleteRequest(id) { return cancelRequest(id); }
+*/
