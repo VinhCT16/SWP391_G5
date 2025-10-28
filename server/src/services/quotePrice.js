@@ -1,40 +1,36 @@
 // server/src/services/quotePrice.js
 
-export function calcQuote(input, config = {}) {
-  const distanceKm = input.distanceKm;
-  const durationMin = input.durationMin;
-  const workers = input.workers || 2;
-  const vehicle = input.vehicleType;
-  const packOption = input.packOption;
-  const speed = input.speed;
+export function calcQuote(input) {
+  const { distanceKm = 5, workers = 2, vehicleType = "1_ton", serviceType = "STANDARD", addons = [], items = [] } = input;
 
-  // Base đơn giản (sau có thể lấy từ PricingConfig)
-  const basePricePerKm = config.pricePerKm || 10000;
-  const baseLabor = config.laborPerWorker || 100000;
-  const basePack = { customer_self_pack: 0, standard_pack: 200000, premium_pack: 400000 };
-  const speedMultiplier = speed === "express" ? 1.5 : 1;
-
-  const distanceFee = distanceKm * basePricePerKm;
-  const laborFee = workers * baseLabor;
-  const packingFee = basePack[packOption] || 0;
-
-  // tính phí tầng từ items
-  const stairsFee = (input.items || []).reduce(
-    (acc, item) => acc + (item.floorsFrom + item.floorsTo) * 10000 * (item.qty || 1),
-    0
-  );
-
-  const nightFee = 0; // có thể mở rộng theo giờ
-
-  const total = (distanceFee + laborFee + packingFee + stairsFee + nightFee) * speedMultiplier;
-
-  return {
-    distanceFee,
-    laborFee,
-    packingFee,
-    stairsFee,
-    nightFee,
-    speedMultiplier,
-    total: Math.round(total),
+  const vehicleRates = {
+    "500kg": 8000,
+    "1_ton": 10000,
+    "1.5_ton": 12000,
+    "2_ton": 14000,
   };
+  const workerRate = 150000;
+  const expressMultiplier = serviceType === "EXPRESS" ? 1.5 : 1;
+
+  const addonFees = {
+    pack: 100000,
+    disassemble: 80000,
+    lift: 120000,
+    clean: 100000,
+    storage: 200000,
+  };
+
+  const vehicleFee = distanceKm * (vehicleRates[vehicleType] || 10000);
+  const laborFee = workers * workerRate;
+  const addonFee = addons.reduce((sum, k) => sum + (addonFees[k] || 0), 0);
+
+  const itemFee = items.reduce((sum, it) => {
+    const vol = (it.width * it.height * it.length) / 1000000;
+    return sum + vol * 50000;
+  }, 0);
+
+  const subtotal = vehicleFee + laborFee + addonFee + itemFee;
+  const total = Math.round(subtotal * expressMultiplier);
+
+  return { distanceKm, vehicleFee, laborFee, addonFee, itemFee, total };
 }

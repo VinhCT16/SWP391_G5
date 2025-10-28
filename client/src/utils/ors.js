@@ -1,96 +1,139 @@
 // client/src/utils/ors.js
 const ORS_KEY = process.env.REACT_APP_ORS_API_KEY;
+const MAPTILER_KEY = process.env.REACT_APP_MAPTILER_KEY;
 
 /**
- * Geocode: text -> {lat, lng}
- * opts: { focus: {lat, lng} }   // bias về tỉnh/thành đang chọn
+ * 🗺️ Geocode (ổn định tại Việt Nam)
+ * Ưu tiên MapTiler → fallback sang ORS.
  */
 export async function orsGeocode(text, signal, opts = {}) {
-  if (!text || !ORS_KEY) return null;
+  if (!text) return null;
+
+  // --- MapTiler (ưu tiên cho Việt Nam, độ chính xác cao) ---
+  try {
+    const mtUrl = new URL(
+      "https://api.maptiler.com/geocoding/" + encodeURIComponent(text) + ".json"
+    );
+    mtUrl.searchParams.set("key", MAPTILER_KEY);
+    mtUrl.searchParams.set("country", "VN");
+    if (opts.focus?.lng && opts.focus?.lat)
+      mtUrl.searchParams.set("proximity", `${opts.focus.lng},${opts.focus.lat}`);
+
+    const res = await fetch(mtUrl, { signal });
+    if (!res.ok) throw new Error("MapTiler geocode failed " + res.status);
+
+    const data = await res.json();
+    const feat = data?.features?.[0];
+    if (!feat) throw new Error("No MapTiler result");
+    const [lng, lat] = feat.geometry.coordinates;
+    return { lat, lng, label: feat.place_name || feat.text };
+  } catch (e) {
+    if (e?.name !== "AbortError")
+      console.warn("MapTiler geocode error → fallback to ORS:", e.message);
+  }
+
+  // --- Fallback sang OpenRouteService ---
   try {
     const url = new URL("https://api.openrouteservice.org/geocode/search");
     url.searchParams.set("api_key", ORS_KEY);
     url.searchParams.set("text", text);
+    url.searchParams.set("boundary.country", "VN");
     url.searchParams.set("size", "1");
-    url.searchParams.set("layers", "address,street,venue");        // ưu tiên địa chỉ chi tiết
-    url.searchParams.set("sources", "osm,wof");                    // nguồn dữ liệu
-    url.searchParams.set("boundary.country", "VN");                // chỉ trong VN
-
-    // Giới hạn trong bbox Việt Nam để tránh nhảy ra Ấn Độ Dương
-    // VN approx: (min_lon, min_lat, max_lon, max_lat)
-    url.searchParams.set("boundary.rect.min_lon", "102.0");
-    url.searchParams.set("boundary.rect.min_lat", "8.0");
-    url.searchParams.set("boundary.rect.max_lon", "110.0");
-    url.searchParams.set("boundary.rect.max_lat", "24.5");
-
-    // Bias theo tỉnh/thành đang chọn (nếu có)
-    if (opts.focus?.lat && opts.focus?.lng) {
-      url.searchParams.set("focus.point.lat", String(opts.focus.lat));
-      url.searchParams.set("focus.point.lon", String(opts.focus.lng));
-    }
+    url.searchParams.set("sources", "osm");
 
     const res = await fetch(url.toString(), { signal });
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error("ORS geocode failed " + res.status);
+
     const data = await res.json();
     const feat = data?.features?.[0];
-    const [lng, lat] = feat?.geometry?.coordinates || [];
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
-      return { lat, lng, label: feat?.properties?.label };
-    }
-    return null;
+    if (!feat) return null;
+    const [lng, lat] = feat.geometry.coordinates;
+    return { lat, lng, label: feat.properties?.label };
   } catch (e) {
-    if (e?.name === "AbortError") return null; // bỏ qua AbortError
-    console.warn("orsGeocode error:", e);
+    if (e?.name !== "AbortError") console.warn("ORS geocode error:", e.message);
     return null;
   }
 }
 
 /**
- * Directions: origin/dest -> { geojson, summary }
+ * 🚗 Directions (ORS)
+ * Tính tuyến đường lái xe giữa 2 điểm (trả về khoảng cách & thời gian)
  */
 export async function orsDirections(origin, dest, signal) {
-  if (!origin || !dest || !ORS_KEY) return null;
+  if (!origin || !dest || !ORS_KEY) {
+    console.warn("❌ orsDirections thiếu dữ liệu hoặc key");
+    return null;
+  }
+
   try {
-    const url = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
+    // ✅ Key bắt buộc nằm trong query string, body cần đúng format
+    const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_KEY}`;
+
     const res = await fetch(url, {
       method: "POST",
-      headers: {
-        "Authorization": ORS_KEY,
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       signal,
       body: JSON.stringify({
         coordinates: [
           [origin.lng, origin.lat],
           [dest.lng, dest.lat],
         ],
+        language: "vi",
+        preference: "recommended",
+        units: "m",
+        instructions: false,
       }),
     });
-    if (!res.ok) return null;
-    const geo = await res.json();
-    const feature = geo?.features?.[0];
-    const summary = feature?.properties?.summary || null;
-    return { geojson: geo, summary };
+
+    if (!res.ok) {
+      const msg = await res.text();
+      console.warn("ORS directions failed:", res.status, msg);
+      return null;
+    }
+
+    const data = await res.json();
+    const feature = data?.features?.[0];
+    const summary = feature?.properties?.summary || {};
+
+    const distance = summary.distance || 0;
+    const duration = summary.duration || 0;
+
+    console.log(`✅ ORS: ${(distance / 1000).toFixed(2)} km • ${(duration / 60).toFixed(1)} phút`);
+
+    return {
+      geojson: data,
+      summary: { distance, duration },
+    };
   } catch (e) {
-    if (e?.name === "AbortError") return null;
-    console.warn("orsDirections error:", e);
+    if (e?.name !== "AbortError") console.warn("orsDirections error:", e.message);
     return null;
   }
 }
 
-// Ghép chuỗi địa chỉ từ AddressPicker của bạn
+/**
+ * 📍 Chuỗi địa chỉ
+ */
 export function joinAddress(addr) {
   if (!addr) return "";
-  const parts = [
-    (addr.street || "").trim(),
+  return [
+    addr.street?.trim(),
     addr.ward?.name,
     addr.district?.name,
     addr.province?.name,
     "Việt Nam",
-  ].filter(Boolean);
-  return parts.join(", ");
+  ]
+    .filter(Boolean)
+    .join(", ");
 }
 
+/**
+ * ✅ Kiểm tra địa chỉ đủ 4 cấp chưa
+ */
 export function isAddressComplete(a) {
-  return !!(a?.province?.code && a?.district?.code && a?.ward?.code && String(a?.street||"").trim());
+  return !!(
+    a?.province?.code &&
+    a?.district?.code &&
+    a?.ward?.code &&
+    String(a?.street || "").trim()
+  );
 }

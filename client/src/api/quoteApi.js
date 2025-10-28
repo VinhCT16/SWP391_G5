@@ -1,26 +1,23 @@
-import { apiGet, apiPost, apiPut, apiDelete } from "./_base";
+// client/src/api/quoteApi.js
+import api from "./_base";
 
+/** 🔹 Gọi báo giá tạm thời (ước tính giá) */
+export const estimateQuote = (data) => api.post("/quotes/estimate", data);
 
-export function estimateQuote(data) {
-  return apiPost("/quotes/estimate", data);
-}
+/** 🔹 Tạo báo giá chính thức (sau khi confirm hoặc lưu DB) */
+export const createQuote = (data) => api.post("/quotes", data);
 
-export function createQuote(requestId, data) {
-  return apiPost(`/quotes?requestId=${requestId}`, data);
-}
+/** 🔹 Lấy tất cả báo giá của một request */
+export const listQuotesByRequest = (requestId) =>
+  api.get(`/quotes/request/${requestId}`);
 
-export function getQuotesByRequest(requestId) {
-  return apiGet(`/quotes/request/${requestId}`);
-}
+/** 🔹 Lấy chi tiết 1 báo giá cụ thể */
+export const getQuote = (quoteId) => api.get(`/quotes/${quoteId}`);
 
-export function getQuote(id) {
-  return apiGet(`/quotes/${id}`);
-}
+/** 🔹 Gửi thương lượng giá */
+export const negotiateQuote = (id, payload) =>
+  api.post(`/quotes/${id}/negotiate`, payload);
 
-export function negotiateQuote(id, payload) {
-  return apiPost(`/quotes/${id}/negotiate`, payload);
-}
-
-export function confirmQuote(id, payload) {
-  return apiPost(`/quotes/${id}/confirm`, payload);
-}
+/** 🔹 Nhân viên xác nhận báo giá cuối */
+export const confirmQuote = (id, payload) =>
+  api.post(`/quotes/${id}/confirm`, payload);
