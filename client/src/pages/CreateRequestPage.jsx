@@ -5,7 +5,8 @@ import { isValidVNMobile, normalizeVNPhone, validateMovingTime } from "../utils/
 import { nowForDatetimeLocal } from "../utils/datetime";
 import AddressPicker from "../components/AddressPicker";
 import RouteMapLibre from "../components/RouteMapLibre";
-import { orsGeocode, orsDirections, joinAddress, isAddressComplete } from "../utils/ors";
+import { orsGeocode, joinAddress, isAddressComplete } from "../utils/ors";
+import { estimateQuote } from "../api/quoteApi";
 
 const MAX_IMAGES = 4;
 const MAX_FILE_MB = 1.5;
@@ -100,9 +101,10 @@ export default function CreateRequestPage() {
           setRouteSummary(null);
           return;
         }
-        const r = await orsDirections(o, d, ctrl.signal);
-        setRouteGeo(r?.geojson || null);
-        setRouteSummary(r?.summary || null);
+        // gọi backend để tránh CORS và lấy route chính xác từ server
+        const r = await estimateQuote({ pickupLocation: o, deliveryLocation: d });
+        setRouteGeo(r?.routeGeojson || null);
+        setRouteSummary(r?.distanceKm && r?.durationMin ? { distance: r.distanceKm * 1000, duration: r.durationMin * 60 } : null);
       } catch (e) {
         if (e?.name !== "AbortError") console.warn("directions error", e);
         setRouteGeo(null);

@@ -3,6 +3,7 @@ import CreateRequestPage from "./pages/CreateRequestPage";
 import ManageRequestsPage from "./pages/ManageRequestsPage";
 import EditRequestPage from "./pages/EditRequestPage";
 import QuotePage from "./pages/QuotePage";
+import DraftContractPage from "./pages/DraftContractPage";
 
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
       <Route path="/my-requests" element={<ManageRequestsPage />} />
       <Route path="/requests/:id/edit" element={<EditRequestPage />} />
       <Route path="/quote" element={<QuotePage />} />
+      <Route path="/contracts/draft" element={<DraftContractPage />} />
       <Route path="*" element={<div style={{ padding: 16 }}>404 Not Found</div>} />
     </Routes>
   );

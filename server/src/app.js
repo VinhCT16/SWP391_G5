@@ -17,5 +17,12 @@ app.use("/api", requestsRouter);
 
 connectMongo().then(() => {
   const port = process.env.PORT || 3001; // DÙNG 3001
-  app.listen(port, () => console.log(`🚀 Server chạy tại http://localhost:${port}`));
+  app.listen(port, () => {
+    console.log(`🚀 Server chạy tại http://localhost:${port}`);
+    console.log(`📊 API endpoints:`);
+    console.log(`   - GET  http://localhost:${port}/api/quotes/_ping`);
+    console.log(`   - POST http://localhost:${port}/api/quotes/estimate`);
+    console.log(`   - POST http://localhost:${port}/api/requests`);
+    console.log(`   - GET  http://localhost:${port}/api/requests?phone=xxx`);
+  });
 });

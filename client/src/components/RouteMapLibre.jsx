@@ -19,7 +19,15 @@ export default function RouteMapLibre({ routeGeojson, height = 320 }) {
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const styleUrl = `https://api.maptiler.com/maps/streets/style.json?key=${mtKey}`;
+    let styleUrl;
+    if (mtKey) {
+      styleUrl = `https://api.maptiler.com/maps/streets/style.json?key=${mtKey}`;
+    } else {
+      // Fallback to OpenStreetMap style when no MapTiler key
+      console.warn("⚠️ MapTiler key missing, using OpenStreetMap style");
+      styleUrl = "https://demotiles.maplibre.org/style.json";
+    }
+
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: styleUrl,
@@ -32,6 +40,10 @@ export default function RouteMapLibre({ routeGeojson, height = 320 }) {
     map.on("load", () => {
       mapRef.current = map;
       updateRoute(map, routeGeojson, lastFitKeyRef);
+    });
+
+    map.on("error", (e) => {
+      console.error("Map error:", e);
     });
 
     return () => map.remove();

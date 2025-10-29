@@ -1,11 +1,12 @@
 // client/src/pages/QuotePage.jsx
 import { useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { estimateQuote } from "../api/quoteApi";
 import { fileToBase64 } from "../utils/toBase64";
 
 export default function QuotePage() {
   const { state } = useLocation(); // nhận data từ CreateRequestPage
+  const nav = useNavigate();
   const [items, setItems] = useState([]);
   const [options, setOptions] = useState({
     serviceType: "STANDARD",
@@ -192,6 +193,9 @@ export default function QuotePage() {
           <p>
             {quote.distanceKm?.toFixed(1)} km • {Math.round(quote.durationMin)} phút ước tính
           </p>
+          <button onClick={() => nav("/contracts/draft", { state: { request: state, quote } })}>
+            Tạo hợp đồng
+          </button>
         </div>
       )}
 

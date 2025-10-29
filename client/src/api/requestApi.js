@@ -1,5 +1,5 @@
 // API base khớp server: /api
-const BASE = "http://localhost:3000/api";
+const BASE = process.env.REACT_APP_API_URL || "http://localhost:3001/api";
 
 // ----- CREATE (JSON body, images là mảng base64 nếu có) -----
 export async function createRequest(payload) {

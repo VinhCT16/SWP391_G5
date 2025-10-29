@@ -5,11 +5,17 @@ dotenv.config();
 
 const ORS_KEY = process.env.ORS_API_KEY;
 
-/** Gọi ORS để lấy khoảng cách lái xe (đơn vị km) */
+/** Gọi ORS để lấy khoảng cách lái xe (đơn vị km) + geometry nếu có */
 export async function calcDistanceFromORS(origin, dest) {
   if (!ORS_KEY) {
-    console.warn("⚠️ Không có ORS_API_KEY");
-    return null;
+    console.warn("⚠️ Không có ORS_API_KEY, sử dụng haversine fallback");
+    // Fallback to haversine if no ORS key
+    const distanceKm = haversineDistance(origin, dest);
+    return {
+      distanceKm,
+      durationMin: distanceKm * 2, // 2 minutes per km estimate
+      geojson: toLineGeoJSON(origin, dest),
+    };
   }
 
   try {
@@ -26,7 +32,13 @@ export async function calcDistanceFromORS(origin, dest) {
     });
     if (!res.ok) {
       console.warn("❌ ORS distance failed:", res.status);
-      return null;
+      // Fallback to haversine on API failure
+      const distanceKm = haversineDistance(origin, dest);
+      return {
+        distanceKm,
+        durationMin: distanceKm * 2,
+        geojson: toLineGeoJSON(origin, dest),
+      };
     }
 
     const data = await res.json();
@@ -34,10 +46,17 @@ export async function calcDistanceFromORS(origin, dest) {
     return {
       distanceKm: summary?.distance / 1000,
       durationMin: summary?.duration / 60,
+      geojson: data, // trả về nguyên GeoJSON để client vẽ
     };
   } catch (e) {
     console.error("calcDistanceFromORS error:", e);
-    return null;
+    // Fallback to haversine on error
+    const distanceKm = haversineDistance(origin, dest);
+    return {
+      distanceKm,
+      durationMin: distanceKm * 2,
+      geojson: toLineGeoJSON(origin, dest),
+    };
   }
 }
 
@@ -53,4 +72,23 @@ export function haversineDistance(a, b) {
     Math.sin(dLat / 2) ** 2 +
     Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
   return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function toLineGeoJSON(a, b) {
+  return {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        properties: {},
+        geometry: {
+          type: "LineString",
+          coordinates: [
+            [a.lng, a.lat],
+            [b.lng, b.lat]
+          ],
+        },
+      },
+    ],
+  };
 }

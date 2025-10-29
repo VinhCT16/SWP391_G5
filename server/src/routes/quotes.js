@@ -35,6 +35,7 @@ router.post("/estimate", async (req, res) => {
       ...breakdown,
       distanceKm: dist.distanceKm,
       durationMin: dist.durationMin,
+      routeGeojson: dist.geojson || null,
     });
   } catch (e) {
     console.error("Estimate error:", e);
