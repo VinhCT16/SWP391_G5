@@ -6,7 +6,8 @@ import {
   rejectContract, 
   getContractById,
   assignStaffToContract, 
-  getAvailableStaff 
+  getAvailableStaff,
+  approveAndAssignContract
 } from '../api/contractApi';
 import './ContractApproval.css';
 
@@ -45,10 +46,20 @@ const ContractApproval = () => {
 
   const handleApprove = async () => {
     try {
-      await approveContract(selectedContract._id, { notes: approvalNotes });
+      // If a staff is selected in the modal, approve and assign in one call
+      if (selectedStaffId) {
+        await approveAndAssignContract({
+          contractId: selectedContract._id,
+          staffId: selectedStaffId,
+          notes: approvalNotes
+        });
+      } else {
+        await approveContract(selectedContract._id, { notes: approvalNotes });
+      }
       setShowApprovalModal(false);
       setApprovalNotes('');
       setSelectedContract(null);
+      setSelectedStaffId('');
       loadContracts();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to approve contract');

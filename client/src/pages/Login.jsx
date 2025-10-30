@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import './Auth.css';
 
 export default function Login() {
   const { login, user, logout } = useAuth();
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const toggleLanguage = () => {
+    const next = i18n.language === 'vi' ? 'en' : 'vi';
+    i18n.changeLanguage(next);
+  };
 
   const handleLogout = async () => {
     try {
@@ -28,7 +35,7 @@ export default function Login() {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err?.response?.data?.message || 'Login failed');
+      setError(err?.response?.data?.message || t('login.error.default'));
     } finally {
       setLoading(false);
     }
@@ -44,22 +51,22 @@ export default function Login() {
             <div className="auth-card">
               <div className="auth-header">
                 <div className="logo">
-                  <h1>MoveEase</h1>
-                  <span>Professional Moving Services</span>
+                  <h1>{t('app.name')}</h1>
+                  <span>{t('app.tagline')}</span>
                 </div>
-                <h2>Already Logged In</h2>
-                <p>You are currently logged in as {user.name}</p>
+                <h2>{t('login.alreadyLoggedIn.title')}</h2>
+                <p>{t('login.alreadyLoggedIn.message', { name: user.name })}</p>
               </div>
               <div className="auth-actions" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '2rem' }}>
                 <button onClick={() => navigate('/dashboard')} className="btn btn-primary">
-                  Go to Dashboard
+                  {t('login.goToDashboard')}
                 </button>
                 <button onClick={handleLogout} className="btn btn-outline">
-                  Logout
+                  {t('login.logout')}
                 </button>
               </div>
               <div className="auth-footer">
-                <Link to="/">← Back to Home</Link>
+                <Link to="/">{t('common.backHome')}</Link>
               </div>
             </div>
           </div>
@@ -76,34 +83,39 @@ export default function Login() {
           <div className="auth-card">
             <div className="auth-header">
               <div className="logo">
-                <h1>MoveEase</h1>
-                <span>Professional Moving Services</span>
+                <h1>{t('app.name')}</h1>
+                <span>{t('app.tagline')}</span>
               </div>
-              <h2>Welcome Back</h2>
-              <p>Sign in to manage your moving needs</p>
+              <h2>{t('login.title')}</h2>
+              <p>{t('login.subtitle')}</p>
+              <div style={{ marginTop: '0.5rem' }}>
+                <button type="button" className="btn btn-outline" onClick={toggleLanguage}>
+                  {t('lang.toggle')}: {i18n.language === 'vi' ? t('lang.vi') : t('lang.en')}
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit} className="auth-form">
               <div className="form-group">
-                <label htmlFor="email">Email Address</label>
+                <label htmlFor="email">{t('login.email')}</label>
                 <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
+                  placeholder={t('login.email.placeholder')}
                   required
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="password">Password</label>
+                <label htmlFor="password">{t('login.password')}</label>
                 <input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder={t('login.password.placeholder')}
                   required
                 />
               </div>
@@ -119,19 +131,19 @@ export default function Login() {
                 {loading ? (
                   <>
                     <span className="loading-spinner"></span>
-                    Signing in...
+                    {t('login.submitting')}
                   </>
                 ) : (
-                  'Sign In'
+                  t('login.submit')
                 )}
               </button>
             </form>
 
             <div className="auth-footer">
               <p>
-                Don't have an account?{' '}
+                {t('login.noAccount')}{' '}
                 <Link to="/register" className="auth-link">
-                  Create Account
+                  {t('login.createAccount')}
                 </Link>
               </p>
             </div>
@@ -139,15 +151,15 @@ export default function Login() {
             <div className="auth-features">
               <div className="feature">
                 <span className="feature-icon">🚚</span>
-                <span>Professional Movers</span>
+                <span>{t('features.movers')}</span>
               </div>
               <div className="feature">
                 <span className="feature-icon">📦</span>
-                <span>Safe & Secure</span>
+                <span>{t('features.secure')}</span>
               </div>
               <div className="feature">
                 <span className="feature-icon">💰</span>
-                <span>Best Prices</span>
+                <span>{t('features.prices')}</span>
               </div>
             </div>
           </div>

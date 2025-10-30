@@ -24,3 +24,13 @@ export const getAllRequests = (params = {}) => {
 export const updateRequestStatus = (id, statusData) => {
   return api.put(`/api/requests/${id}/status`, statusData);
 };
+
+// Get available staff for a request (Manager)
+export const getAvailableStaffForRequest = (id) => {
+  return api.get(`/api/requests/${id}/available-staff`);
+};
+
+// Assign staff to request (Manager)
+export const assignStaffToRequest = (id, data) => {
+  return api.post(`/api/requests/${id}/assign-staff`, data);
+};

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getAllRequests, updateRequestStatus } from '../api/requestApi';
+import { getAllRequests, updateRequestStatus, getAvailableStaffForRequest, assignStaffToRequest } from '../api/requestApi';
 import { createTasksFromContract } from '../api/taskApi';
 import BackButton from '../components/BackButton';
 import './ManagerDashboard.css';
@@ -23,6 +23,11 @@ export default function ManagerDashboard() {
     status: '',
     search: ''
   });
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignForRequest, setAssignForRequest] = useState(null);
+  const [availableStaff, setAvailableStaff] = useState([]);
+  const [selectedStaffId, setSelectedStaffId] = useState('');
+  const [assignNotes, setAssignNotes] = useState('');
 
   // Load all requests
   const loadRequests = useCallback(async () => {
@@ -123,6 +128,33 @@ export default function ManagerDashboard() {
     setShowApprovalModal(true);
   };
 
+  const openAssignStaffModal = async (request) => {
+    try {
+      setAssignForRequest(request);
+      setSelectedStaffId('');
+      setAssignNotes('');
+      const res = await getAvailableStaffForRequest(request._id);
+      setAvailableStaff(res.data?.availableStaff || []);
+      setShowAssignModal(true);
+    } catch (e) {
+      setError('Failed to load available staff');
+    }
+  };
+
+  const handleAssignStaffToRequest = async () => {
+    if (!assignForRequest || !selectedStaffId) return;
+    try {
+      await assignStaffToRequest(assignForRequest._id, { staffId: selectedStaffId, notes: assignNotes });
+      setShowAssignModal(false);
+      setAssignForRequest(null);
+      setSelectedStaffId('');
+      setAssignNotes('');
+      await loadRequests();
+    } catch (e) {
+      setError(e?.response?.data?.message || 'Failed to assign staff');
+    }
+  };
+
   // Filter requests
   const filteredRequests = requests.filter(request => {
     const matchesStatus = !filters.status || request.status === filters.status;
@@ -139,7 +171,28 @@ export default function ManagerDashboard() {
     loadRequests();
   }, [loadRequests]);
 
+  const openContractDetail = async (request) => {
+    try {
+      if (request.contractId) {
+        navigate(`/contracts/${request.contractId}`);
+        return;
+      }
+      // Fallback: try to find contract by requestId
+      const { getAllContracts } = await import('../api/contractApi');
+      const res = await getAllContracts({ requestId: request._id, limit: 1 });
+      const found = res.data.contracts && res.data.contracts[0];
+      if (found && found._id) {
+        navigate(`/contracts/${found._id}`);
+      } else {
+        alert('No contract found for this request yet.');
+      }
+    } catch (e) {
+      alert('Failed to open contract details.');
+    }
+  };
+
   return (
+    <>
     <div className="manager-dashboard">
       <BackButton fallbackPath="/dashboard" />
       
@@ -291,8 +344,14 @@ export default function ManagerDashboard() {
                         Create Contract
                       </button>
                       <button 
+                        className="assign-btn"
+                        onClick={() => openAssignStaffModal(request)}
+                      >
+                        Assign Staff
+                      </button>
+                      <button 
                         className="view-btn"
-                        onClick={() => setSelectedRequest(request)}
+                        onClick={() => navigate(`/contract-form/${request._id}`)}
                       >
                         View Details
                       </button>
@@ -309,7 +368,7 @@ export default function ManagerDashboard() {
                       </button>
                       <button 
                         className="view-btn"
-                        onClick={() => setSelectedRequest(request)}
+                        onClick={() => openContractDetail(request)}
                       >
                         View Contract
                       </button>
@@ -396,5 +455,33 @@ export default function ManagerDashboard() {
         </div>
       )}
     </div>
+
+    {showAssignModal && (
+      <div className="modal-overlay">
+        <div className="modal-content">
+          <h3>Assign Staff to Request</h3>
+          <div className="form-group">
+            <label>Select Staff</label>
+            <select value={selectedStaffId} onChange={(e) => setSelectedStaffId(e.target.value)}>
+              <option value="">-- Select --</option>
+              {availableStaff.map(s => (
+                <option key={s._id} value={s._id}>
+                  {s.userId?.name || s.employeeId} ({s.role})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Notes</label>
+            <textarea value={assignNotes} onChange={(e) => setAssignNotes(e.target.value)} />
+          </div>
+          <div className="modal-actions">
+            <button className="cancel-btn" onClick={() => setShowAssignModal(false)}>Cancel</button>
+            <button className="assign-btn" disabled={!selectedStaffId} onClick={handleAssignStaffToRequest}>Assign</button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

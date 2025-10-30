@@ -1,0 +1,28 @@
+{
+  "app.name": "MoveEase",
+  "app.tagline": "Professional Moving Services",
+  "login.title": "Welcome Back",
+  "login.subtitle": "Sign in to manage your moving needs",
+  "login.email": "Email Address",
+  "login.email.placeholder": "Enter your email",
+  "login.password": "Password",
+  "login.password.placeholder": "Enter your password",
+  "login.submit": "Sign In",
+  "login.submitting": "Signing in...",
+  "login.error.default": "Login failed",
+  "login.noAccount": "Don't have an account?",
+  "login.createAccount": "Create Account",
+  "login.alreadyLoggedIn.title": "Already Logged In",
+  "login.alreadyLoggedIn.message": "You are currently logged in as {{name}}",
+  "login.goToDashboard": "Go to Dashboard",
+  "login.logout": "Logout",
+  "common.backHome": "← Back to Home",
+  "features.movers": "Professional Movers",
+  "features.secure": "Safe & Secure",
+  "features.prices": "Best Prices",
+  "lang.vi": "Tiếng Việt",
+  "lang.en": "English",
+  "lang.toggle": "Language"
+}
+
+

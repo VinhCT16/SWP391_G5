@@ -46,6 +46,21 @@ const requestSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, 
     ref: "Contract" 
   },
+
+  // Staff Assignment at Request Level (before contract)
+  assignedStaff: [{
+    staffId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Staff",
+      required: true
+    },
+    assignedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Manager"
+    },
+    assignedAt: { type: Date, default: Date.now },
+    notes: String
+  }],
   
   // Tasks
   tasks: [

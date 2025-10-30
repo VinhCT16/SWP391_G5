@@ -43,6 +43,14 @@ const AdminDashboard = () => {
     priority: '',
     category: ''
   });
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    role: 'customer'
+  });
 
   // Load user statistics
   useEffect(() => {
@@ -176,6 +184,32 @@ const AdminDashboard = () => {
 
   const handleComplaintPageChange = (page) => {
     setComplaintPagination(prev => ({ ...prev, currentPage: page }));
+  };
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      await adminApi.createUser(newUser);
+      setShowAddUserModal(false);
+      setNewUser({ name: '', email: '', password: '', phone: '', role: 'customer' });
+      await loadUsers();
+      await loadUserStats();
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to create user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateUserRole = async (userId, role) => {
+    try {
+      await adminApi.updateUser(userId, { role });
+      await loadUsers();
+      await loadUserStats();
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to update role');
+    }
   };
 
   const handleToggleUserStatus = async (userId, currentStatus) => {
@@ -341,7 +375,7 @@ const AdminDashboard = () => {
     <div className="user-management">
       <div className="management-header">
         <h2>User Management</h2>
-        <button className="btn-primary">Add New User</button>
+        <button className="btn-primary" onClick={() => setShowAddUserModal(true)}>Add New User</button>
       </div>
 
       <div className="filters">
@@ -395,9 +429,16 @@ const AdminDashboard = () => {
                   <td>{user.name}</td>
                   <td>{user.email}</td>
                   <td>
-                    <span className={`role-badge role-${user.role}`}>
-                      {user.role}
-                    </span>
+                    <select
+                      value={user.role}
+                      onChange={(e) => handleUpdateUserRole(user._id, e.target.value)}
+                      className="role-select"
+                    >
+                      <option value="customer">customer</option>
+                      <option value="staff">staff</option>
+                      <option value="manager">manager</option>
+                      <option value="admin">admin</option>
+                    </select>
                   </td>
                   <td>
                     <span className={`status-badge ${user.isActive ? 'active' : 'locked'}`}>
@@ -812,6 +853,67 @@ const AdminDashboard = () => {
           </div>
         )}
       </div>
+
+      {showAddUserModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Add New User</h3>
+            <form onSubmit={handleCreateUser} className="form-grid">
+              <div className="form-group">
+                <label>Name</label>
+                <input
+                  type="text"
+                  value={newUser.name}
+                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Password</label>
+                <input
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Phone</label>
+                <input
+                  type="tel"
+                  value={newUser.phone}
+                  onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Role</label>
+                <select
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                >
+                  <option value="customer">Customer</option>
+                  <option value="staff">Staff</option>
+                  <option value="manager">Manager</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-secondary" onClick={() => setShowAddUserModal(false)}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={loading}>Create</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

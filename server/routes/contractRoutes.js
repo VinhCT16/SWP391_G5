@@ -22,11 +22,14 @@ const router = express.Router();
 
 // Manager routes
 router.post("/from-request/:requestId", auth, requireManager, createContractFromRequest);
-router.get("/", auth, requireManager, getAllContracts);
+// Role-based listing is handled in controller; allow all authenticated users
+router.get("/", auth, getAllContracts);
 router.get("/approval", auth, requireManager, getContractsForApproval);
 router.put("/:id/status", auth, requireManager, updateContractStatus);
 router.put("/:id/approve", auth, requireManager, approveContract);
 router.put("/:id/reject", auth, requireManager, rejectContract);
+// New combined approval endpoint (POST /contracts/approve)
+router.post("/approve", auth, requireManager, require("../controllers/contractController").approveAndAssign);
 
 // Customer routes
 router.get("/customer/:customerId", auth, requireCustomer, async (req, res) => {

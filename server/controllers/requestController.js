@@ -1,5 +1,6 @@
 const Request = require("../models/Request");
 const Service = require("../models/Service");
+const Staff = require("../models/Staff");
 const { v4: uuidv4 } = require('uuid');
 
 // Generate unique request ID
@@ -177,10 +178,67 @@ const getAllRequests = async (req, res) => {
   }
 };
 
+// Get available staff for a request (Manager)
+const getAvailableStaffForRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const request = await Request.findById(id);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    const allStaff = await Staff.find({ isActive: true }).populate('userId', 'name email phone');
+    const assignedIds = (request.assignedStaff || []).map(a => a.staffId.toString());
+    const availableStaff = allStaff.filter(s => !assignedIds.includes(s._id.toString()));
+    return res.json({ availableStaff });
+  } catch (err) {
+    console.error('Error getting available staff:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Assign staff to request (Manager)
+const assignStaffToRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { staffId, notes } = req.body;
+    const managerId = req.userId;
+
+    const request = await Request.findById(id);
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+
+    const staff = await Staff.findById(staffId);
+    if (!staff) {
+      return res.status(404).json({ message: 'Staff not found' });
+    }
+
+    const exists = (request.assignedStaff || []).some(a => a.staffId.toString() === staffId);
+    if (!exists) {
+      request.assignedStaff.push({ staffId, assignedBy: managerId, assignedAt: new Date(), notes: notes || '' });
+      await request.save();
+    }
+
+    await request.populate({
+      path: 'assignedStaff.staffId',
+      select: 'employeeId role',
+      populate: { path: 'userId', select: 'name email phone' }
+    });
+
+    return res.json({ message: 'Staff assigned to request', request });
+  } catch (err) {
+    console.error('Error assigning staff to request:', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   createRequest,
   getCustomerRequests,
   getRequestById,
   updateRequestStatus,
-  getAllRequests
+  getAllRequests,
+  getAvailableStaffForRequest,
+  assignStaffToRequest
 };

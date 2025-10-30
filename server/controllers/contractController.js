@@ -38,7 +38,7 @@ const createContractFromRequest = async (req, res) => {
       return res.status(404).json({ message: "Service not found" });
     }
 
-    // Create contract
+    // Create contract. If request has assigned staff, carry over
     const contractData = {
       contractId: generateContractId(),
       requestId: request._id,
@@ -57,7 +57,19 @@ const createContractFromRequest = async (req, res) => {
         type: paymentMethod.type || 'cash',
         details: paymentMethod.details || {}
       },
-      status: 'draft'
+      assignedStaff: (request.assignedStaff || []).map(a => ({
+        staffId: a.staffId,
+        assignedBy: a.assignedBy || managerId,
+        assignedAt: a.assignedAt || new Date(),
+        status: 'pending',
+        notes: a.notes || ''
+      })),
+      status: 'approved',
+      approval: {
+        approvedBy: managerId,
+        approvedAt: new Date(),
+        notes: 'Auto-approved upon contract creation from approved request'
+      }
     };
 
     const contract = await Contract.create(contractData);
@@ -300,35 +312,131 @@ const exportContractPDF = async (req, res) => {
   }
 };
 
-// Get all contracts
+// Get all contracts with role-based filtering
 const getAllContracts = async (req, res) => {
   try {
-    const { status, page = 1, limit = 10 } = req.query;
-    
+    const { status, page = 1, limit = 10, requestId } = req.query;
+
+    // Base filter from query
     const filter = {};
     if (status) {
       filter.status = status;
     }
+    if (requestId) {
+      filter.requestId = requestId;
+    }
 
-    const contracts = await Contract.find(filter)
+    // Role-based visibility
+    const role = req.userRole || req.user?.role;
+    if (role === 'customer') {
+      // Customers only see approved contracts (per requirement)
+      filter.status = 'approved';
+    } else if (role === 'staff') {
+      // Staff only see contracts assigned to them
+      const staff = await Staff.findOne({ userId: req.userId });
+      if (!staff) {
+        return res.json({ contracts: [], totalPages: 0, currentPage: page, total: 0 });
+      }
+      filter['assignedStaff.staffId'] = staff._id;
+    } else if (role === 'manager' || role === 'admin') {
+      // Managers and Admins see all contracts; no additional filter
+    } else {
+      // Unknown roles see nothing
+      return res.json({ contracts: [], totalPages: 0, currentPage: page, total: 0 });
+    }
+
+    const query = Contract.find(filter)
       .populate('customerId', 'name email phone')
       .populate('managerId', 'userId')
       .populate('serviceId', 'name price')
+      .populate({
+        path: 'assignedStaff.staffId',
+        select: 'employeeId role',
+        populate: { path: 'userId', select: 'name email phone' }
+      })
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(Number(limit))
+      .skip((Number(page) - 1) * Number(limit));
 
-    const total = await Contract.countDocuments(filter);
+    const [contracts, total] = await Promise.all([
+      query,
+      Contract.countDocuments(filter)
+    ]);
 
     res.json({
       contracts,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
+      totalPages: Math.ceil(total / Number(limit)),
+      currentPage: Number(page),
       total
     });
   } catch (err) {
     console.error("Error fetching contracts:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Approve and assign staff in one step (Manager only)
+const approveAndAssign = async (req, res) => {
+  try {
+    const { contractId, staffId, notes } = req.body;
+    const managerId = req.userId;
+
+    if (!contractId || !staffId) {
+      return res.status(400).json({ message: 'contractId and staffId are required' });
+    }
+
+    const [contract, staff] = await Promise.all([
+      Contract.findById(contractId),
+      Staff.findById(staffId)
+    ]);
+
+    if (!contract) {
+      return res.status(404).json({ message: 'Contract not found' });
+    }
+    if (!staff) {
+      return res.status(404).json({ message: 'Staff not found' });
+    }
+
+    // Approve contract
+    contract.status = 'approved';
+    contract.approval = {
+      approvedBy: managerId,
+      approvedAt: new Date(),
+      notes: notes || ''
+    };
+
+    // Assign staff (avoid duplicate assignment)
+    const alreadyAssigned = contract.assignedStaff.some(a => a.staffId.toString() === staffId);
+    if (!alreadyAssigned) {
+      contract.assignedStaff.push({
+        staffId,
+        assignedBy: managerId,
+        assignedAt: new Date(),
+        status: 'pending',
+        notes: ''
+      });
+    }
+
+    await contract.save();
+
+    await contract.populate([
+      { path: 'customerId', select: 'name email phone' },
+      { path: 'managerId', select: 'userId' },
+      { path: 'serviceId', select: 'name price' },
+      {
+        path: 'assignedStaff.staffId',
+        select: 'employeeId role',
+        populate: { path: 'userId', select: 'name email phone' }
+      }
+    ]);
+
+    return res.status(200).json({
+      message: 'Contract approved and staff assigned successfully',
+      contract
+    });
+  } catch (err) {
+    console.error('Error approving and assigning contract:', err);
+    return res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -564,5 +672,6 @@ module.exports = {
   getAvailableStaff,
   acceptAssignment,
   rejectAssignment,
-  getAssignedContracts
+  getAssignedContracts,
+  approveAndAssign
 };

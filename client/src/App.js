@@ -18,7 +18,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import About from "./pages/About";
 import ContractForm from "./pages/ContractForm";
 import ContractApproval from "./pages/ContractApproval";
-import CustomerContractView from "./pages/CustomerContractView";
+import ContractDetailView from "./pages/ContractDetailView";
 import './App.css';
 import './components/Navigation.css';
 import './components/Breadcrumb.css';
@@ -47,7 +47,9 @@ function App() {
             {/* Role-specific dashboards */}
             <Route element={<RoleProtectedRoute allowedRoles={['customer']} />}>
               <Route path="/customer-dashboard" element={<CustomerDashboard />} />
-              <Route path="/contracts/:id" element={<CustomerContractView />} />
+            </Route>
+            <Route element={<ProtectedRoute />}>
+              <Route path="/contracts/:id" element={<ContractDetailView />} />
             </Route>
             <Route element={<RoleProtectedRoute allowedRoles={['manager']} />}>
               <Route path="/manager-dashboard" element={<ManagerDashboard />} />

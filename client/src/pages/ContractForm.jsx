@@ -135,8 +135,13 @@ const ContractForm = () => {
     setError('');
 
     try {
-      await createContractFromRequest(requestId, formData);
-      navigate('/manager/dashboard');
+      const res = await createContractFromRequest(requestId, formData);
+      const newId = res?.data?.contract?.id;
+      if (newId) {
+        navigate(`/contracts/${newId}`);
+      } else {
+        navigate('/manager-dashboard');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create contract');
     } finally {

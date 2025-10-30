@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createRequest, getMyRequests } from '../api/requestApi';
 import { updateProfile, changePassword } from '../api/userApi';
-import { getContractsForApproval } from '../api/contractApi';
+import { getAllContracts } from '../api/contractApi';
 import BackButton from '../components/BackButton';
 import './Home.css';
 
@@ -56,9 +56,7 @@ export default function CustomerDashboard() {
   const loadContracts = async () => {
     try {
       setLoading(true);
-      // This would need to be implemented in the API
-      // For now, we'll use a mock approach
-      const response = await getContractsForApproval();
+      const response = await getAllContracts();
       setContracts(response.data.contracts || []);
     } catch (err) {
       console.error('Error loading contracts:', err);

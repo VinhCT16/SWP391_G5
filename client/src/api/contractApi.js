@@ -32,6 +32,12 @@ export const approveContract = (id, data) => {
   return api.put(`/api/contracts/${id}/approve`, data);
 };
 
+// Approve and assign staff in one step (Manager)
+export const approveAndAssignContract = (payload) => {
+  // payload: { contractId, staffId, notes }
+  return api.post('/api/contracts/approve', payload);
+};
+
 // Reject contract
 export const rejectContract = (id, data) => {
   return api.put(`/api/contracts/${id}/reject`, data);
