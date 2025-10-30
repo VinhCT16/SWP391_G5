@@ -1,12 +1,10 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useTranslation } from 'react-i18next';
 
 export default function Navigation() {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const { t } = useTranslation();
 
   const handleLogout = async () => {
     try {
@@ -26,8 +24,8 @@ export default function Navigation() {
       <div className="nav-container">
         <div className="nav-brand">
           <Link to="/" className="brand-link">
-            <h2>{t('app.name')}</h2>
-            <span>{t('app.tagline')}</span>
+            <h2>Moving Service</h2>
+            <span>Fast. Safe. Reliable.</span>
           </Link>
         </div>
 

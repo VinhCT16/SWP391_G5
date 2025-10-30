@@ -1,22 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useTranslation } from 'react-i18next';
 import './Auth.css';
 
 export default function Login() {
   const { login, user, logout } = useAuth();
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const t = (s) => s; // placeholder no-op
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const toggleLanguage = () => {
-    const next = i18n.language === 'vi' ? 'en' : 'vi';
-    i18n.changeLanguage(next);
-  };
+  const toggleLanguage = null;
 
   const handleLogout = async () => {
     try {
@@ -83,39 +79,34 @@ export default function Login() {
           <div className="auth-card">
             <div className="auth-header">
               <div className="logo">
-                <h1>{t('app.name')}</h1>
-                <span>{t('app.tagline')}</span>
+                <h1>Moving Service</h1>
+                <span>Fast. Safe. Reliable.</span>
               </div>
-              <h2>{t('login.title')}</h2>
-              <p>{t('login.subtitle')}</p>
-              <div style={{ marginTop: '0.5rem' }}>
-                <button type="button" className="btn btn-outline" onClick={toggleLanguage}>
-                  {t('lang.toggle')}: {i18n.language === 'vi' ? t('lang.vi') : t('lang.en')}
-                </button>
-              </div>
+              <h2>Sign in</h2>
+              <p>Access your dashboard</p>
             </div>
 
             <form onSubmit={handleSubmit} className="auth-form">
               <div className="form-group">
-                <label htmlFor="email">{t('login.email')}</label>
+                <label htmlFor="email">Email</label>
                 <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={t('login.email.placeholder')}
+                  placeholder="your@email.com"
                   required
                 />
               </div>
 
               <div className="form-group">
-                <label htmlFor="password">{t('login.password')}</label>
+                <label htmlFor="password">Password</label>
                 <input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t('login.password.placeholder')}
+                  placeholder="••••••••"
                   required
                 />
               </div>
