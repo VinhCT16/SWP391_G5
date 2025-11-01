@@ -152,8 +152,9 @@ router.patch("/requests/:id", async (req, res, next) => {
   try {
     const r = await Request.findById(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
-    if (r.status !== "PENDING_REVIEW") {
-      return res.status(409).json({ error: "Chỉ được sửa khi đang chờ duyệt" });
+    // Cho phép sửa khi PENDING_CONFIRMATION hoặc PENDING_REVIEW (backward compat)
+    if (!["PENDING_CONFIRMATION", "PENDING_REVIEW"].includes(r.status)) {
+      return res.status(409).json({ error: "Chỉ được sửa khi đang chờ xác nhận" });
     }
 
     // ✅ Cho phép đổi họ tên / SĐT (kèm validate)
@@ -222,7 +223,16 @@ router.post("/requests/:id/cancel", async (req, res, next) => {
     const r = await Request.findById(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
 
-    if (!["PENDING_REVIEW", "APPROVED"].includes(r.status)) {
+    // Cho phép hủy khi chưa thanh toán hoặc chưa vận chuyển
+    const canCancelStatuses = [
+      "PENDING_CONFIRMATION",
+      "UNDER_SURVEY",
+      "WAITING_PAYMENT",
+      // Backward compat
+      "PENDING_REVIEW",
+      "APPROVED",
+    ];
+    if (!canCancelStatuses.includes(r.status)) {
       return res.status(409).json({ error: "Không thể hủy ở giai đoạn này" });
     }
 

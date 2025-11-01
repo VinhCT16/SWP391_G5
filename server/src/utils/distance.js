@@ -1,66 +1,90 @@
-// server/src/utils/distance.js
+// server/src/utils/distance.js - OpenStreetMap OSRM (miễn phí, không cần API key)
 import fetch from "node-fetch";
-import dotenv from "dotenv";
-dotenv.config();
 
-const ORS_KEY = process.env.ORS_API_KEY;
-
-/** Gọi ORS để lấy khoảng cách lái xe (đơn vị km) + geometry nếu có */
+/**
+ * Gọi OSRM để lấy khoảng cách lái xe (đơn vị km) + geometry
+ * OSRM public server: router.project-osrm.org (miễn phí)
+ */
 export async function calcDistanceFromORS(origin, dest) {
-  if (!ORS_KEY) {
-    console.warn("⚠️ Không có ORS_API_KEY, sử dụng haversine fallback");
-    // Fallback to haversine if no ORS key
-    const distanceKm = haversineDistance(origin, dest);
-    return {
-      distanceKm,
-      durationMin: distanceKm * 2, // 2 minutes per km estimate
-      geojson: toLineGeoJSON(origin, dest),
-    };
-  }
-
   try {
-    const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_KEY}`;
+    // OSRM public server - không cần API key
+    const coords = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=false`;
+    
     const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        coordinates: [
-          [origin.lng, origin.lat],
-          [dest.lng, dest.lat],
-        ],
-      }),
+      headers: {
+        "User-Agent": "SWP391_G5_MovingService/1.0",
+      },
     });
+
     if (!res.ok) {
-      console.warn("❌ ORS distance failed:", res.status);
+      console.warn("❌ OSRM route failed:", res.status);
       // Fallback to haversine on API failure
-      const distanceKm = haversineDistance(origin, dest);
-      return {
-        distanceKm,
-        durationMin: distanceKm * 2,
-        geojson: toLineGeoJSON(origin, dest),
-      };
+      return fallbackDistance(origin, dest);
     }
 
     const data = await res.json();
-    const summary = data?.features?.[0]?.properties?.summary;
+    
+    if (data.code !== "Ok" || !data.routes || data.routes.length === 0) {
+      console.warn("❌ OSRM route returned no route");
+      return fallbackDistance(origin, dest);
+    }
+
+    const route = data.routes[0];
+    const distance = route.distance || 0; // meters
+    const duration = route.duration || 0; // seconds
+    const geometry = route.geometry;
+
+    console.log(`✅ OSRM: ${(distance / 1000).toFixed(2)} km • ${(duration / 60).toFixed(1)} phút`);
+
+    // Convert to GeoJSON FeatureCollection
+    const geojson = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {
+            summary: {
+              distance,
+              duration,
+            },
+          },
+          geometry: {
+            type: "LineString",
+            coordinates: geometry.coordinates || [],
+          },
+        },
+      ],
+    };
+
     return {
-      distanceKm: summary?.distance / 1000,
-      durationMin: summary?.duration / 60,
-      geojson: data, // trả về nguyên GeoJSON để client vẽ
+      distanceKm: distance / 1000,
+      durationMin: duration / 60,
+      geojson,
     };
   } catch (e) {
     console.error("calcDistanceFromORS error:", e);
     // Fallback to haversine on error
-    const distanceKm = haversineDistance(origin, dest);
-    return {
-      distanceKm,
-      durationMin: distanceKm * 2,
-      geojson: toLineGeoJSON(origin, dest),
-    };
+    return fallbackDistance(origin, dest);
   }
 }
 
-/** Fallback: khoảng cách đường chim bay */
+/**
+ * Fallback: tính khoảng cách đường chim bay khi OSRM không có route
+ */
+function fallbackDistance(origin, dest) {
+  const distanceKm = haversineDistance(origin, dest);
+  // Estimate: ~40 km/h average speed
+  const durationMin = (distanceKm / 40) * 60;
+  
+  return {
+    distanceKm,
+    durationMin,
+    geojson: toLineGeoJSON(origin, dest),
+  };
+}
+
+/** Fallback: khoảng cách đường chim bay (Haversine) */
 export function haversineDistance(a, b) {
   const R = 6371; // bán kính trái đất (km)
   const toRad = (deg) => (deg * Math.PI) / 180;

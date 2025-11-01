@@ -1,19 +1,14 @@
-import { useRef, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { fileToBase64 } from "../utils/toBase64";
 import { isValidVNMobile, normalizeVNPhone, validateMovingTime } from "../utils/validation";
 import { nowForDatetimeLocal } from "../utils/datetime";
 import AddressPicker from "../components/AddressPicker";
 import RouteMapLibre from "../components/RouteMapLibre";
-import { orsGeocode, joinAddress, isAddressComplete } from "../utils/ors";
-import { estimateQuote } from "../api/quoteApi";
-
-const MAX_IMAGES = 4;
-const MAX_FILE_MB = 1.5;
+import { osmGeocode, osrmRoute, joinAddress, isAddressComplete } from "../utils/ors";
+import { createRequest } from "../api/requestApi";
 
 export default function CreateRequestPage() {
   const nav = useNavigate();
-  const fileRef = useRef(null);
 
   const [form, setForm] = useState({
     customerName: "",
@@ -23,9 +18,7 @@ export default function CreateRequestPage() {
     deliveryAddress: { province: null, district: null, ward: null, street: "" },
     deliveryLocation: null,
     movingTime: "",
-    serviceType: "STANDARD",
-    notes: "",
-    images: [],
+    requestType: null, // "SELF_SERVICE" hoặc "STAFF_SURVEY"
   });
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -55,7 +48,7 @@ export default function CreateRequestPage() {
           return;
         }
         const focus = resolveFocus(form.pickupAddress);
-        const r = await orsGeocode(joinAddress(form.pickupAddress), ctrl.signal, { focus });
+        const r = await osmGeocode(joinAddress(form.pickupAddress), ctrl.signal, { focus });
         setForm((s) => ({ ...s, pickupLocation: r ? { lat: r.lat, lng: r.lng } : null }));
       } catch (e) {
         if (e?.name !== "AbortError") console.warn("pickup geocode error", e);
@@ -77,7 +70,7 @@ export default function CreateRequestPage() {
           return;
         }
         const focus = resolveFocus(form.deliveryAddress);
-        const r = await orsGeocode(joinAddress(form.deliveryAddress), ctrl.signal, { focus });
+        const r = await osmGeocode(joinAddress(form.deliveryAddress), ctrl.signal, { focus });
         setForm((s) => ({ ...s, deliveryLocation: r ? { lat: r.lat, lng: r.lng } : null }));
       } catch (e) {
         if (e?.name !== "AbortError") console.warn("delivery geocode error", e);
@@ -89,7 +82,7 @@ export default function CreateRequestPage() {
     };
   }, [JSON.stringify(form.deliveryAddress)]);
 
-  /** ====== Khi có đủ 2 tọa độ → lấy tuyến đường ====== */
+  /** ====== Khi có đủ 2 tọa độ → lấy tuyến đường bằng OSRM ====== */
   useEffect(() => {
     const ctrl = new AbortController();
     (async () => {
@@ -101,12 +94,12 @@ export default function CreateRequestPage() {
           setRouteSummary(null);
           return;
         }
-        // gọi backend để tránh CORS và lấy route chính xác từ server
-        const r = await estimateQuote({ pickupLocation: o, deliveryLocation: d });
-        setRouteGeo(r?.routeGeojson || null);
-        setRouteSummary(r?.distanceKm && r?.durationMin ? { distance: r.distanceKm * 1000, duration: r.durationMin * 60 } : null);
+        // Gọi OSRM trực tiếp (public server, không cần API key)
+        const r = await osrmRoute(o, d, ctrl.signal);
+        setRouteGeo(r?.geojson || null);
+        setRouteSummary(r?.summary || null);
       } catch (e) {
-        if (e?.name !== "AbortError") console.warn("directions error", e);
+        if (e?.name !== "AbortError") console.warn("OSRM route error", e);
         setRouteGeo(null);
         setRouteSummary(null);
       }
@@ -125,47 +118,31 @@ export default function CreateRequestPage() {
     setForm((s) => ({ ...s, [name]: value }));
   };
 
-  /** ====== Upload ảnh ====== */
-  const addFiles = async (filesList) => {
-    const files = Array.from(filesList || []);
-    if (!files.length) return;
-    const remain = MAX_IMAGES - form.images.length;
-    if (remain <= 0) {
-      setMsg(`Bạn chỉ được thêm tối đa ${MAX_IMAGES} ảnh.`);
-      if (fileRef.current) fileRef.current.value = "";
+  /** ====== Submit → 2 option ====== */
+  const submit = async (e) => {
+    e.preventDefault();
+    setMsg("");
+    
+    if (!form.requestType) {
+      setMsg("❌ Vui lòng chọn một trong hai hình thức dịch vụ");
       return;
     }
-    const arr = [];
-    for (const f of files.slice(0, remain)) {
-      const sizeMB = f.size / (1024 * 1024);
-      if (sizeMB > MAX_FILE_MB) {
-        setMsg(`Ảnh ${f.name} vượt ${MAX_FILE_MB}MB`);
-        if (fileRef.current) fileRef.current.value = "";
-        return;
-      }
-      arr.push(await fileToBase64(f));
+
+    // Validate chung
+    try {
+      if (!form.customerName.trim()) throw new Error("Thiếu họ tên");
+      if (!isValidVNMobile(form.customerPhone)) throw new Error("SĐT không hợp lệ");
+      if (!isAddressComplete(form.pickupAddress)) throw new Error("Thiếu địa chỉ LẤY HÀNG");
+      if (!isAddressComplete(form.deliveryAddress)) throw new Error("Thiếu địa chỉ GIAO HÀNG");
+      if (!validateMovingTime(form.movingTime)) throw new Error("Thời gian phải ở tương lai");
+      if (!form.pickupLocation || !form.deliveryLocation)
+        throw new Error("Không xác định được tọa độ từ địa chỉ. Vui lòng kiểm tra lại.");
+    } catch (err) {
+      setMsg("❌ " + err.message);
+      return;
     }
-    setForm((s) => ({ ...s, images: s.images.concat(arr) }));
-    if (fileRef.current) fileRef.current.value = "";
-  };
 
-  /** ====== Submit → chuyển sang màn báo giá ====== */
-
-const submit = async (e) => {
-  e.preventDefault();
-  setMsg("");
-  setLoading(true);
-  try {
-    if (!form.customerName.trim()) throw new Error("Thiếu họ tên");
-    if (!isValidVNMobile(form.customerPhone)) throw new Error("SĐT không hợp lệ");
-    if (!isAddressComplete(form.pickupAddress)) throw new Error("Thiếu địa chỉ LẤY HÀNG");
-    if (!isAddressComplete(form.deliveryAddress)) throw new Error("Thiếu địa chỉ GIAO HÀNG");
-    if (!validateMovingTime(form.movingTime)) throw new Error("Thời gian phải ở tương lai");
-    if (!form.pickupLocation || !form.deliveryLocation)
-      throw new Error("Không xác định được tọa độ từ địa chỉ. Vui lòng kiểm tra lại.");
-
-    // ✅ Tạo payload chuẩn để truyền sang QuotePage
-    const payload = {
+    const basePayload = {
       customerName: form.customerName.trim(),
       customerPhone: normalizeVNPhone(form.customerPhone),
       pickupAddress: form.pickupAddress,
@@ -175,23 +152,34 @@ const submit = async (e) => {
       pickupAddressText: joinAddress(form.pickupAddress),
       deliveryAddressText: joinAddress(form.deliveryAddress),
       movingTime: form.movingTime,
-      serviceType: form.serviceType,
-      notes: form.notes,
-      images: form.images,
     };
 
-    // ✅ Lưu tạm vào localStorage (phòng reload)
-    localStorage.setItem("pendingRequest", JSON.stringify(payload));
-
-    // ✅ Điều hướng sang trang báo giá
-    setMsg("➡️ Đang chuyển sang màn Báo giá…");
-    setTimeout(() => nav("/quote", { state: payload }), 500);
-  } catch (err) {
-    setMsg("❌ " + (err.message || "Có lỗi xảy ra"));
-  } finally {
-    setLoading(false);
-  }
-};
+    if (form.requestType === "SELF_SERVICE") {
+      // Option 1: Tự chọn dịch vụ → chuyển sang màn thêm đồ dùng
+      localStorage.setItem("pendingRequest", JSON.stringify(basePayload));
+      nav("/quote/items", { state: basePayload });
+    } else if (form.requestType === "STAFF_SURVEY") {
+      // Option 2: Gọi staff khảo sát → tạo request với status đang đánh giá
+      setLoading(true);
+      try {
+        const requestData = {
+          ...basePayload,
+          status: "UNDER_SURVEY", // Đang khảo sát
+          serviceType: "STANDARD",
+          notes: "Yêu cầu staff khảo sát trước khi báo giá",
+          surveyFee: 15000, // Phí khảo sát 15k
+        };
+        
+        const createdRequest = await createRequest(requestData);
+        setMsg("✅ Đã tạo yêu cầu khảo sát. Staff sẽ liên hệ trong vòng 24h.");
+        setTimeout(() => nav("/my-requests"), 1500);
+      } catch (err) {
+        setMsg("❌ " + (err.message || "Có lỗi khi tạo yêu cầu"));
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
 
   /** ====== Render ====== */
@@ -269,72 +257,45 @@ const submit = async (e) => {
           />
         </label>
 
-        <label>
-          Dịch vụ
-          <select
-            name="serviceType"
-            value={form.serviceType}
-            onChange={onChange}
-            style={ipt}
-          >
-            <option value="STANDARD">Thường</option>
-            <option value="EXPRESS">Hoả tốc</option>
-          </select>
-        </label>
-
-        <label>
-          Ghi chú
-          <textarea
-            name="notes"
-            value={form.notes}
-            onChange={onChange}
-            rows={3}
-            style={ipt}
-          />
-        </label>
-
-        <div style={{ display: "grid", gap: 8 }}>
-          <div>Ảnh (tối đa {MAX_IMAGES})</div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => addFiles(e.target.files)}
-          />
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            {form.images.map((b64, idx) => (
-              <div key={idx} style={{ position: "relative" }}>
-                <img
-                  src={b64}
-                  alt="preview"
-                  style={{
-                    width: 120,
-                    height: 90,
-                    objectFit: "cover",
-                    borderRadius: 6,
-                    border: "1px solid #ddd",
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setForm((s) => ({
-                      ...s,
-                      images: s.images.filter((_, i) => i !== idx),
-                    }))
-                  }
-                  style={removeBtn}
-                >
-                  ×
-                </button>
+        <fieldset style={fs}>
+          <legend>Chọn hình thức dịch vụ</legend>
+          <div style={{ display: "grid", gap: 12 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="requestType"
+                value="SELF_SERVICE"
+                checked={form.requestType === "SELF_SERVICE"}
+                onChange={(e) => setForm((s) => ({ ...s, requestType: e.target.value }))}
+              />
+              <div>
+                <strong>Tự chọn dịch vụ và thêm đồ dùng</strong>
+                <div style={{ fontSize: "0.9em", color: "#666", marginTop: 4 }}>
+                  Bạn sẽ tự chọn loại xe, nhân công và thêm đồ dùng cần vận chuyển
+                </div>
               </div>
-            ))}
+            </label>
+            
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="requestType"
+                value="STAFF_SURVEY"
+                checked={form.requestType === "STAFF_SURVEY"}
+                onChange={(e) => setForm((s) => ({ ...s, requestType: e.target.value }))}
+              />
+              <div>
+                <strong>Gọi staff khảo sát nhà</strong>
+                <div style={{ fontSize: "0.9em", color: "#666", marginTop: 4 }}>
+                  Staff sẽ đến khảo sát 1 ngày trước và làm việc trực tiếp với bạn (Phí khảo sát: +15.000₫)
+                </div>
+              </div>
+            </label>
           </div>
-        </div>
+        </fieldset>
 
-        <button disabled={loading} style={btn}>
-          {loading ? "Đang chuyển…" : "Tiếp tục báo giá"}
+        <button disabled={loading} style={btn} type="submit">
+          {loading ? "Đang xử lý…" : "Tiếp tục"}
         </button>
       </form>
 

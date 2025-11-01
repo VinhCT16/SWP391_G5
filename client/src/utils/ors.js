@@ -1,225 +1,214 @@
-// client/src/utils/ors.js
-const ORS_KEY = process.env.REACT_APP_ORS_API_KEY;
-const MAPTILER_KEY = process.env.REACT_APP_MAPTILER_KEY;
-
-// Debug API keys
-console.log("🔑 API Keys check:", {
-  ORS_KEY: ORS_KEY ? "✅ Set" : "❌ Missing",
-  MAPTILER_KEY: MAPTILER_KEY ? "✅ Set" : "❌ Missing"
-});
+// client/src/utils/osm.js - OpenStreetMap services (miễn phí, không cần API key)
 
 /**
- * 🗺️ Geocode (ổn định tại Việt Nam)
- * Ưu tiên MapTiler → fallback sang ORS.
+ * 🗺️ Geocode với OSM Nominatim (miễn phí)
+ * Tìm tọa độ từ địa chỉ - thử nhiều format và có fallback
  */
-export async function orsGeocode(text, signal, opts = {}) {
+export async function osmGeocode(text, signal, opts = {}) {
   if (!text) return null;
 
-  // --- MapTiler (ưu tiên cho Việt Nam, độ chính xác cao) ---
-  if (MAPTILER_KEY) {
-    try {
-      const mtUrl = new URL(
-        "https://api.maptiler.com/geocoding/" + encodeURIComponent(text) + ".json"
-      );
-      mtUrl.searchParams.set("key", MAPTILER_KEY);
-      mtUrl.searchParams.set("country", "VN");
-      if (opts.focus?.lng && opts.focus?.lat)
-        mtUrl.searchParams.set("proximity", `${opts.focus.lng},${opts.focus.lat}`);
+  // Parse địa chỉ để thử nhiều format
+  const addressParts = text.split(",").map(s => s.trim());
+  const street = addressParts[0] || "";
+  const ward = addressParts[1] || "";
+  const district = addressParts[2] || "";
+  const province = addressParts[3] || "";
 
-      const res = await fetch(mtUrl, { signal });
-      if (!res.ok) throw new Error("MapTiler geocode failed " + res.status);
+  // Thử các format khác nhau từ cụ thể đến chung
+  const queries = [
+    text, // Format đầy đủ
+    `${ward}, ${district}, ${province}`, // Bỏ số nhà
+    `${district}, ${province}`, // Chỉ quận/huyện + tỉnh
+    `${province}`, // Chỉ tỉnh
+  ].filter(Boolean);
+
+  for (const query of queries) {
+    try {
+      const url = new URL("https://nominatim.openstreetmap.org/search");
+      url.searchParams.set("q", query);
+      url.searchParams.set("format", "json");
+      url.searchParams.set("limit", "3"); // Lấy nhiều kết quả hơn
+      url.searchParams.set("countrycodes", "vn");
+      url.searchParams.set("addressdetails", "1");
+      
+      if (opts.focus?.lng && opts.focus?.lat) {
+        url.searchParams.set("viewbox", `${opts.focus.lng - 0.2},${opts.focus.lat - 0.2},${opts.focus.lng + 0.2},${opts.focus.lat + 0.2}`);
+        url.searchParams.set("bounded", "1");
+      }
+
+      const res = await fetch(url.toString(), {
+        signal,
+        headers: {
+          "User-Agent": "SWP391_G5_MovingService/1.0",
+          "Accept-Language": "vi",
+        },
+      });
+
+      if (!res.ok) continue;
 
       const data = await res.json();
-      const feat = data?.features?.[0];
-      if (!feat) throw new Error("No MapTiler result");
-      const [lng, lat] = feat.geometry.coordinates;
-      return { lat, lng, label: feat.place_name || feat.text };
+      if (!Array.isArray(data) || data.length === 0) continue;
+
+      // Ưu tiên kết quả có type phù hợp (residential, building, etc.)
+      const result = data.find(r => 
+        r.type === "residential" || 
+        r.type === "building" || 
+        r.type === "house" ||
+        r.type === "commercial"
+      ) || data[0];
+
+      const lat = parseFloat(result.lat);
+      const lng = parseFloat(result.lon);
+      
+      if (!isNaN(lat) && !isNaN(lng)) {
+        console.log(`✅ Geocoded: ${query} → [${lat}, ${lng}]`);
+        return {
+          lat,
+          lng,
+          label: result.display_name || query,
+        };
+      }
     } catch (e) {
-      if (e?.name !== "AbortError")
-        console.warn("MapTiler geocode error → fallback to ORS:", e.message);
+      if (e?.name !== "AbortError") {
+        console.warn("Nominatim geocode error for:", query, e.message);
+      }
+      continue;
     }
-  } else {
-    console.warn("⚠️ MapTiler key missing, skipping MapTiler geocoding");
   }
 
-  // --- Fallback sang OpenRouteService ---
-  if (ORS_KEY) {
-    try {
-      const url = new URL("https://api.openrouteservice.org/geocode/search");
-      url.searchParams.set("api_key", ORS_KEY);
-      url.searchParams.set("text", text);
-      url.searchParams.set("boundary.country", "VN");
-      url.searchParams.set("size", "1");
-      url.searchParams.set("sources", "osm");
-
-      const res = await fetch(url.toString(), { signal });
-      if (!res.ok) throw new Error("ORS geocode failed " + res.status);
-
-      const data = await res.json();
-      const feat = data?.features?.[0];
-      if (!feat) return null;
-      const [lng, lat] = feat.geometry.coordinates;
-      return { lat, lng, label: feat.properties?.label };
-    } catch (e) {
-      if (e?.name !== "AbortError") console.warn("ORS geocode error:", e.message);
-    }
-  } else {
-    console.warn("⚠️ ORS key missing, cannot geocode");
+  // Fallback: trả về tọa độ trung tâm của tỉnh nếu có
+  if (opts.focus?.lat && opts.focus?.lng) {
+    console.warn(`⚠️ Không tìm được địa chỉ "${text}", dùng tọa độ trung tâm`);
+    return {
+      lat: opts.focus.lat,
+      lng: opts.focus.lng,
+      label: `${province || "Địa điểm"} (ước tính)`,
+    };
   }
 
-  // Fallback: return mock coordinates for Hanoi if no API keys
-  console.warn("⚠️ No API keys available, using mock coordinates");
-  return { lat: 21.0278, lng: 105.8342, label: "Mock location" };
+  console.warn("❌ Không thể geocode:", text);
+  return null;
 }
 
 /**
- * 🚗 Directions (ORS)
- * Tính tuyến đường lái xe giữa 2 điểm (trả về khoảng cách & thời gian)
+ * 🚗 Routing với OSRM (miễn phí, public server)
+ * Tính tuyến đường lái xe giữa 2 điểm
+ * Trả về khoảng cách, thời gian và GeoJSON route
  */
-export async function orsDirections(origin, dest, signal) {
+export async function osrmRoute(origin, dest, signal) {
   if (!origin || !dest) {
-    console.warn("❌ orsDirections thiếu dữ liệu");
+    console.warn("❌ osrmRoute thiếu dữ liệu");
     return null;
   }
 
-  if (!ORS_KEY) {
-    console.warn("⚠️ ORS key missing, using mock route");
-    // Mock route data for testing
-    const mockDistance = Math.sqrt(
-      Math.pow(origin.lng - dest.lng, 2) + Math.pow(origin.lat - dest.lat, 2)
-    ) * 111; // Rough km conversion
-    const mockDuration = mockDistance * 2; // 2 minutes per km
-    
-    return {
-      geojson: {
-        type: "FeatureCollection",
-        features: [{
-          type: "Feature",
-          geometry: {
-            type: "LineString",
-            coordinates: [[origin.lng, origin.lat], [dest.lng, dest.lat]]
-          },
-          properties: {
-            summary: {
-              distance: mockDistance * 1000, // meters
-              duration: mockDuration * 60 // seconds
-            }
-          }
-        }]
-      },
-      summary: { 
-        distance: mockDistance * 1000, 
-        duration: mockDuration * 60 
-      },
-    };
-  }
-
   try {
-    // ✅ Key bắt buộc nằm trong query string, body cần đúng format
-    const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_KEY}`;
-
-    // Trước khi gọi directions, snap 2 điểm về đường gần nhất để tránh lỗi 2010
-    const snap = async (pt) => {
-      try {
-        const snapUrl = `https://api.openrouteservice.org/v2/snap/driving-car?api_key=${ORS_KEY}`;
-        const r = await fetch(snapUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal,
-          body: JSON.stringify({ coordinates: [[pt.lng, pt.lat]] }),
-        });
-        if (!r.ok) throw new Error("snap failed " + r.status);
-        const data = await r.json();
-        const coord = data?.features?.[0]?.geometry?.coordinates;
-        if (Array.isArray(coord) && coord.length === 2) {
-          return { lng: coord[0], lat: coord[1] };
-        }
-      } catch (e) {
-        console.warn("snap error", e.message);
-      }
-      return pt; // fallback không snap
-    };
-
-    const o2 = await snap(origin);
-    const d2 = await snap(dest);
-
+    // OSRM public server: route-service.router.project-osrm.org
+    // Format: /route/v1/{profile}/{coordinates}?overview=full&geometries=geojson
+    const coords = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=false`;
+    
     const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
       signal,
-      body: JSON.stringify({
-        coordinates: [
-          [o2.lng, o2.lat],
-          [d2.lng, d2.lat],
-        ],
-        language: "vi",
-        preference: "recommended",
-        units: "m",
-        instructions: false,
-      }),
+      headers: {
+        "User-Agent": "SWP391_G5_MovingService/1.0",
+      },
     });
 
     if (!res.ok) {
       const msg = await res.text();
-      console.warn("ORS directions failed:", res.status, msg);
-      // Fallback to straight line mock when ORS cannot find routable point
-      const mockDistance = Math.sqrt(
-        Math.pow(origin.lng - dest.lng, 2) + Math.pow(origin.lat - dest.lat, 2)
-      ) * 111;
-      const mockDuration = mockDistance * 2;
-      return {
-        geojson: {
-          type: "FeatureCollection",
-          features: [{
-            type: "Feature",
-            geometry: {
-              type: "LineString",
-              coordinates: [[origin.lng, origin.lat], [dest.lng, dest.lat]]
-            },
-            properties: {
-              summary: {
-                distance: mockDistance * 1000,
-                duration: mockDuration * 60
-              }
-            }
-          }]
-        },
-        summary: { distance: mockDistance * 1000, duration: mockDuration * 60 },
-      };
+      console.warn("OSRM route failed:", res.status, msg);
+      // Fallback: tính khoảng cách đường chim bay
+      return fallbackRoute(origin, dest);
     }
 
     const data = await res.json();
-    const feature = data?.features?.[0];
-    const summary = feature?.properties?.summary || {};
+    
+    if (data.code !== "Ok" || !data.routes || data.routes.length === 0) {
+      console.warn("OSRM route returned no route");
+      return fallbackRoute(origin, dest);
+    }
 
-    const distance = summary.distance || 0;
-    const duration = summary.duration || 0;
+    const route = data.routes[0];
+    const distance = route.distance || 0; // meters
+    const duration = route.duration || 0; // seconds
+    const geometry = route.geometry;
 
-    console.log(`✅ ORS: ${(distance / 1000).toFixed(2)} km • ${(duration / 60).toFixed(1)} phút`);
+    console.log(`✅ OSRM: ${(distance / 1000).toFixed(2)} km • ${(duration / 60).toFixed(1)} phút`);
+
+    // Convert OSRM geometry to GeoJSON FeatureCollection
+    const geojson = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {
+            summary: {
+              distance,
+              duration,
+            },
+          },
+          geometry: {
+            type: "LineString",
+            coordinates: geometry.coordinates || [],
+          },
+        },
+      ],
+    };
 
     return {
-      geojson: data,
-      summary: { distance, duration },
+      geojson,
+      summary: {
+        distance, // meters
+        duration, // seconds
+      },
     };
   } catch (e) {
-    if (e?.name !== "AbortError") console.warn("orsDirections error:", e.message);
-    // Fallback straight line on error
-    const mockDistance = Math.sqrt(
-      Math.pow(origin.lng - dest.lng, 2) + Math.pow(origin.lat - dest.lat, 2)
-    ) * 111;
-    const mockDuration = mockDistance * 2;
-    return {
-      geojson: {
-        type: "FeatureCollection",
-        features: [{
-          type: "Feature",
-          geometry: { type: "LineString", coordinates: [[origin.lng, origin.lat], [dest.lng, dest.lat]] },
-          properties: { summary: { distance: mockDistance * 1000, duration: mockDuration * 60 } }
-        }]
-      },
-      summary: { distance: mockDistance * 1000, duration: mockDuration * 60 },
-    };
+    if (e?.name !== "AbortError") {
+      console.warn("OSRM route error:", e.message);
+    }
+    return fallbackRoute(origin, dest);
   }
+}
+
+/**
+ * Fallback: tính khoảng cách đường chim bay khi OSRM không có route
+ */
+function fallbackRoute(origin, dest) {
+  // Haversine distance
+  const R = 6371e3; // Earth radius in meters
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(dest.lat - origin.lat);
+  const dLon = toRad(dest.lng - origin.lng);
+  const lat1 = toRad(origin.lat);
+  const lat2 = toRad(dest.lat);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // meters
+
+  // Estimate duration: ~30 km/h average in city, ~60 km/h on highway
+  // Use weighted average: 40 km/h
+  const duration = (distance / 1000 / 40) * 3600; // seconds
+
+  return {
+    geojson: {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          properties: {
+            summary: { distance, duration },
+          },
+          geometry: {
+            type: "LineString",
+            coordinates: [[origin.lng, origin.lat], [dest.lng, dest.lat]],
+          },
+        },
+      ],
+    },
+    summary: { distance, duration },
+  };
 }
 
 /**
@@ -249,3 +238,7 @@ export function isAddressComplete(a) {
     String(a?.street || "").trim()
   );
 }
+
+// Export để backward compatibility (tên cũ)
+export const orsGeocode = osmGeocode;
+export const orsDirections = osrmRoute;

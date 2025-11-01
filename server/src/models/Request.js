@@ -70,14 +70,18 @@ const RequestSchema = new Schema(
     status: {
       type: String,
       enum: [
-        "PENDING_REVIEW",
-        "APPROVED",
-        "REJECTED",
-        "IN_PROGRESS",
-        "DONE",
-        "CANCELLED",
+        "PENDING_CONFIRMATION",    // Đang chờ xác nhận (mới tạo)
+        "UNDER_SURVEY",            // Đang khảo sát (staff đang khảo sát)
+        "WAITING_PAYMENT",         // Chờ thanh toán (đã báo giá, chờ thanh toán)
+        "IN_PROGRESS",             // Đang vận chuyển (đã thanh toán, đang chuyển)
+        "DONE",                    // Đã hoàn thành
+        "CANCELLED",               // Đã hủy
+        "REJECTED",                // Bị từ chối
+        // Backward compat
+        "PENDING_REVIEW",          // Cũ, tự động map sang PENDING_CONFIRMATION
+        "APPROVED",                // Cũ, tự động map sang WAITING_PAYMENT
       ],
-      default: "PENDING_REVIEW",
+      default: "PENDING_CONFIRMATION",
     },
 
     notes: String,

@@ -3,30 +3,41 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 
 /**
- * Hiển thị MapLibre + vẽ tuyến đường GeoJSON (không có marker).
+ * Hiển thị MapLibre + vẽ tuyến đường GeoJSON với OpenStreetMap tiles.
  * props:
- *  - routeGeojson: GeoJSON trả về từ ORS (nullable)
+ *  - routeGeojson: GeoJSON trả về từ OSRM (nullable)
  *  - height: số px cho chiều cao map (mặc định 320)
- *  - (Các prop khác truyền vào sẽ bị bỏ qua)
+ *  - pickup: {lat, lng} - điểm lấy hàng (optional, để hiển thị marker)
+ *  - delivery: {lat, lng} - điểm giao hàng (optional, để hiển thị marker)
  */
-export default function RouteMapLibre({ routeGeojson, height = 320 }) {
+export default function RouteMapLibre({ routeGeojson, height = 320, pickup, delivery }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const lastFitKeyRef = useRef(""); // tránh fitBounds lặp lại
-  const mtKey = process.env.REACT_APP_MAPTILER_KEY;
 
   // Khởi tạo map (luôn hiển thị)
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    let styleUrl;
-    if (mtKey) {
-      styleUrl = `https://api.maptiler.com/maps/streets/style.json?key=${mtKey}`;
-    } else {
-      // Fallback to OpenStreetMap style when no MapTiler key
-      console.warn("⚠️ MapTiler key missing, using OpenStreetMap style");
-      styleUrl = "https://demotiles.maplibre.org/style.json";
-    }
+    // Sử dụng OpenStreetMap tiles (miễn phí, không cần API key)
+    const styleUrl = {
+      version: 8,
+      sources: {
+        "osm-tiles": {
+          type: "raster",
+          tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+          tileSize: 256,
+          attribution: "© OpenStreetMap contributors",
+        },
+      },
+      layers: [
+        {
+          id: "osm-tiles",
+          type: "raster",
+          source: "osm-tiles",
+        },
+      ],
+    };
 
     const map = new maplibregl.Map({
       container: containerRef.current,
@@ -40,6 +51,7 @@ export default function RouteMapLibre({ routeGeojson, height = 320 }) {
     map.on("load", () => {
       mapRef.current = map;
       updateRoute(map, routeGeojson, lastFitKeyRef);
+      updateMarkers(map, pickup, delivery);
     });
 
     map.on("error", (e) => {
@@ -55,11 +67,15 @@ export default function RouteMapLibre({ routeGeojson, height = 320 }) {
     const map = mapRef.current;
     if (!map) return;
     if (!map.isStyleLoaded()) {
-      map.once("load", () => updateRoute(map, routeGeojson, lastFitKeyRef));
+      map.once("load", () => {
+        updateRoute(map, routeGeojson, lastFitKeyRef);
+        updateMarkers(map, pickup, delivery);
+      });
     } else {
       updateRoute(map, routeGeojson, lastFitKeyRef);
+      updateMarkers(map, pickup, delivery);
     }
-  }, [routeGeojson]);
+  }, [routeGeojson, pickup, delivery]);
 
   return (
     <div
@@ -107,4 +123,62 @@ function updateRoute(map, geo, lastFitKeyRef) {
 function hashCoords(arr) {
   // tạo key nhẹ để nhận biết tuyến đã fit rồi (độ chính xác 1e-3)
   return arr.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`).join("|");
+}
+
+function updateMarkers(map, pickup, delivery) {
+  // Xóa markers cũ
+  if (map.getLayer("pickup-marker")) map.removeLayer("pickup-marker");
+  if (map.getSource("pickup-marker")) map.removeSource("pickup-marker");
+  if (map.getLayer("delivery-marker")) map.removeLayer("delivery-marker");
+  if (map.getSource("delivery-marker")) map.removeSource("delivery-marker");
+
+  // Thêm pickup marker
+  if (pickup?.lat && pickup?.lng) {
+    map.addSource("pickup-marker", {
+      type: "geojson",
+      data: {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [pickup.lng, pickup.lat],
+        },
+      },
+    });
+    map.addLayer({
+      id: "pickup-marker",
+      type: "circle",
+      source: "pickup-marker",
+      paint: {
+        "circle-radius": 8,
+        "circle-color": "#00ff00",
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#ffffff",
+      },
+    });
+  }
+
+  // Thêm delivery marker
+  if (delivery?.lat && delivery?.lng) {
+    map.addSource("delivery-marker", {
+      type: "geojson",
+      data: {
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [delivery.lng, delivery.lat],
+        },
+      },
+    });
+    map.addLayer({
+      id: "delivery-marker",
+      type: "circle",
+      source: "delivery-marker",
+      paint: {
+        "circle-radius": 8,
+        "circle-color": "#ff0000",
+        "circle-stroke-width": 2,
+        "circle-stroke-color": "#ffffff",
+      },
+    });
+  }
 }

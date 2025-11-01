@@ -24,13 +24,21 @@ function toLatLng(geo) {
   return null;
 }
 
-const VN_STATUS = {
-  PENDING_REVIEW: "Đang chờ duyệt",
-  APPROVED: "Đã duyệt",
-  REJECTED: "Bị từ chối",
-  IN_PROGRESS: "Đang thực hiện",
-  DONE: "Hoàn tất",
-  CANCELLED: "Đã hủy",
+// Import từ ManageRequestsPage hoặc dùng chung
+const getStatusLabel = (status) => {
+  const statusMap = {
+    PENDING_CONFIRMATION: "Đang chờ xác nhận",
+    UNDER_SURVEY: "Đang khảo sát",
+    WAITING_PAYMENT: "Chờ thanh toán",
+    IN_PROGRESS: "Đang vận chuyển",
+    DONE: "Đã hoàn thành",
+    CANCELLED: "Đã hủy",
+    REJECTED: "Bị từ chối",
+    // Backward compat
+    PENDING_REVIEW: "Đang chờ xác nhận",
+    APPROVED: "Chờ thanh toán",
+  };
+  return statusMap[status] || status;
 };
 
 const MAX_IMAGES = 4;
@@ -73,7 +81,9 @@ export default function EditRequestPage() {
     if (!form) return;
     setMsg(""); setSaving(true);
     try {
-      if (form.status !== "PENDING_REVIEW") throw new Error("Chỉ sửa khi đang chờ duyệt");
+      if (!["PENDING_CONFIRMATION", "PENDING_REVIEW"].includes(form.status)) {
+        throw new Error("Chỉ sửa khi đang chờ xác nhận");
+      }
       if (!form.customerName.trim()) throw new Error("Thiếu họ tên");
       if (!isValidVNMobile(form.customerPhone)) throw new Error("SĐT không hợp lệ");
       if (!validateMovingTime(form.movingTime)) throw new Error("Thời gian phải ở tương lai");
@@ -106,7 +116,7 @@ export default function EditRequestPage() {
   return (
     <div style={{ padding: 24, display: "grid", gap: 18, maxWidth: 860 }}>
       <h1>Sửa Request</h1>
-      <div>Trạng thái: <b>{VN_STATUS[form.status] || form.status}</b></div>
+      <div>Trạng thái: <b>{getStatusLabel(form.status)}</b></div>
 
       <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
         <label>Họ và tên
