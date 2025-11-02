@@ -24,6 +24,7 @@ export default function QuoteSummaryPage() {
           extras: state.extras || [],
           items: state.items || [],
           climbFloors: state.climbFloors || 0,
+          storageMonths: state.storageMonths || 0,
           serviceType: "STANDARD",
         };
         
@@ -179,7 +180,7 @@ export default function QuoteSummaryPage() {
                           disassemble: "Tháo/lắp nội thất",
                           climb: `Vận chuyển tầng cao (${state.climbFloors || 0} tầng)`,
                           clean: "Vệ sinh",
-                          storage: "Lưu kho",
+                          storage: `Lưu kho${state.storageMonths > 0 ? ` (${state.storageMonths} tháng)` : ""}`,
                         };
                         return names[e] || e;
                       }).filter(Boolean).join(", ")}
@@ -221,9 +222,18 @@ export default function QuoteSummaryPage() {
       </div>
 
       {/* Nút hành động */}
-      <div style={{ display: "flex", gap: 12 }}>
-        <button onClick={() => nav(-1)} style={{ ...btnStyle, background: "#999" }}>
+      <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+        <button onClick={() => nav(-1)} style={{ ...btnStyle, background: "#999", flex: 1 }}>
           ← Quay lại
+        </button>
+        <button 
+          onClick={() => {
+            // Tạm thời chỉ hiển thị thông báo, sau này sẽ tích hợp payment
+            alert(`Tổng tiền: ${finalTotal.toLocaleString()}₫\n\nTính năng thanh toán đang được phát triển. Vui lòng liên hệ với chúng tôi để thanh toán.`);
+          }}
+          style={{ ...btnStyle, background: "#4caf50", flex: 1 }}
+        >
+          💳 Tính tiền
         </button>
         <button 
           onClick={handleSubmit} 

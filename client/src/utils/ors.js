@@ -27,7 +27,7 @@ export async function osmGeocode(text, signal, opts = {}) {
       const url = new URL("https://nominatim.openstreetmap.org/search");
       url.searchParams.set("q", query);
       url.searchParams.set("format", "json");
-      url.searchParams.set("limit", "3"); // Lấy nhiều kết quả hơn
+      url.searchParams.set("limit", "3");
       url.searchParams.set("countrycodes", "vn");
       url.searchParams.set("addressdetails", "1");
       
@@ -49,7 +49,7 @@ export async function osmGeocode(text, signal, opts = {}) {
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) continue;
 
-      // Ưu tiên kết quả có type phù hợp (residential, building, etc.)
+      // Ưu tiên kết quả có type phù hợp
       const result = data.find(r => 
         r.type === "residential" || 
         r.type === "building" || 
@@ -106,7 +106,7 @@ export async function osrmRoute(origin, dest, signal) {
     // Format: /route/v1/{profile}/{coordinates}?overview=full&geometries=geojson
     const coords = `${origin.lng},${origin.lat};${dest.lng},${dest.lat}`;
     const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&alternatives=false`;
-    
+
     const res = await fetch(url, {
       signal,
       headers: {

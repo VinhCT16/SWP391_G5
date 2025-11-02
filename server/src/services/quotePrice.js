@@ -11,6 +11,7 @@ export function calcQuote(input) {
     addons = extras, // Alias
     items = [],
     climbFloors = 0,
+    storageMonths = 0, // Số tháng lưu kho
   } = input;
 
   // Map vehicleType từ frontend format (0.5T, 1T, 1.25T, 2T, 3.5T) sang internal format
@@ -47,7 +48,7 @@ export function calcQuote(input) {
     disassemble: 80000,    // Tháo/lắp nội thất
     climb: 10000,          // Vận chuyển tầng cao (per floor, xử lý riêng)
     clean: 100000,         // Vệ sinh
-    storage: 200000,       // Lưu kho
+    storage: 300000,       // Lưu kho (per month, xử lý riêng)
   };
 
   // Tính phí vận chuyển theo km
@@ -64,7 +65,9 @@ export function calcQuote(input) {
   for (const extra of extras) {
     if (extra === "climb" && climbFloors > 0) {
       extrasFee += extraFees.climb * climbFloors; // 10k × số tầng
-    } else if (extraFees[extra]) {
+    } else if (extra === "storage" && storageMonths > 0) {
+      extrasFee += extraFees.storage * storageMonths; // 300k × số tháng
+    } else if (extra !== "storage" && extraFees[extra]) {
       extrasFee += extraFees[extra];
     }
   }

@@ -18,7 +18,7 @@ const EXTRA_SERVICES = {
   disassemble: { name: "Tháo/lắp nội thất", price: 80000 },
   climb: { name: "Vận chuyển tầng cao", price: 10000, perFloor: true }, // 10k/tầng
   clean: { name: "Vệ sinh sau chuyển", price: 100000 },
-  storage: { name: "Lưu kho tạm", price: 200000 },
+  storage: { name: "Lưu kho tạm", price: 300000, perMonth: true }, // 300k/tháng (tham khảo giá thị trường)
 };
 
 export default function QuoteServicePage() {
@@ -29,15 +29,55 @@ export default function QuoteServicePage() {
   const [extraLabor, setExtraLabor] = useState(0); // Số người thêm (mặc định đã có 2)
   const [selectedExtras, setSelectedExtras] = useState({});
   const [climbFloors, setClimbFloors] = useState(0); // Số tầng nếu chọn climb
+  const [storageType, setStorageType] = useState("none"); // "none", "months", "date"
+  const [storageMonths, setStorageMonths] = useState(1); // Số tháng lưu kho
+  const [storageEndDate, setStorageEndDate] = useState(""); // Ngày kết thúc lưu kho
 
   const toggleExtra = (key) => {
+    const newValue = !selectedExtras[key];
     setSelectedExtras(prev => ({
       ...prev,
-      [key]: !prev[key]
+      [key]: newValue
     }));
-    if (key === "climb" && !selectedExtras[key]) {
-      setClimbFloors(0);
+    if (key === "climb") {
+      if (newValue && climbFloors === 0) {
+        setClimbFloors(1); // Mặc định 1 tầng khi chọn
+      } else if (!newValue) {
+        setClimbFloors(0);
+      }
     }
+    if (key === "storage") {
+      if (newValue) {
+        setStorageType("months"); // Mặc định chọn theo tháng khi bật
+        setStorageMonths(1);
+      } else {
+        setStorageType("none");
+        setStorageMonths(1);
+        setStorageEndDate("");
+      }
+    }
+  };
+
+  // Tính số ngày lưu kho từ ngày kết thúc
+  const getStorageDays = () => {
+    if (storageType === "date" && storageEndDate) {
+      const end = new Date(storageEndDate);
+      const start = new Date(state.movingTime || new Date());
+      const diffTime = end - start;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return Math.max(0, diffDays);
+    }
+    return 0;
+  };
+
+  // Tính số tháng lưu kho (làm tròn lên)
+  const getStorageMonthsCalculated = () => {
+    if (storageType === "months") return storageMonths;
+    if (storageType === "date") {
+      const days = getStorageDays();
+      return Math.ceil(days / 30); // Làm tròn lên theo tháng
+    }
+    return 0;
   };
 
   const handleNext = () => {
@@ -47,6 +87,9 @@ export default function QuoteServicePage() {
       helpers: 2 + extraLabor, // 2 người mặc định + thêm
       extras: Object.keys(selectedExtras).filter(k => selectedExtras[k]),
       climbFloors: selectedExtras.climb ? climbFloors : 0,
+      storageType: selectedExtras.storage ? storageType : "none",
+      storageMonths: selectedExtras.storage ? getStorageMonthsCalculated() : 0,
+      storageEndDate: selectedExtras.storage && storageType === "date" ? storageEndDate : null,
     };
     
     nav("/quote/summary", { state: payload });
@@ -61,6 +104,10 @@ export default function QuoteServicePage() {
       const service = EXTRA_SERVICES[key];
       if (key === "climb" && climbFloors > 0) {
         return sum + (service.price * climbFloors);
+      }
+      if (key === "storage" && service.perMonth) {
+        const months = getStorageMonthsCalculated();
+        return sum + (service.price * months);
       }
       return sum + (service.price || 0);
     }, 0);
@@ -112,7 +159,7 @@ export default function QuoteServicePage() {
         <legend>Nhân công</legend>
         <div style={{ marginBottom: 12 }}>
           <div style={{ marginBottom: 8 }}>
-            Mặc định: <strong>2 người</strong> (1 lái xe + 1 staff) - Đã bao gồm
+            Mặc định: <strong>2 người</strong> (1 lái xe + 1 nhân công) - Đã bao gồm
           </div>
           <label>
             Thêm nhân công (150.000₫/người):
@@ -138,52 +185,108 @@ export default function QuoteServicePage() {
         <legend>Dịch vụ thêm</legend>
         <div style={{ display: "grid", gap: 12 }}>
           {Object.entries(EXTRA_SERVICES).map(([key, service]) => (
-            <label
-              key={key}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: 12,
-                border: "1px solid #ddd",
-                borderRadius: 6,
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={selectedExtras[key] || false}
-                onChange={() => toggleExtra(key)}
-              />
-              <div style={{ flex: 1 }}>
-                <strong>{service.name}</strong>
-                {service.perFloor ? (
-                  <div style={{ fontSize: "0.9em", color: "#666", marginTop: 4 }}>
-                    {service.price.toLocaleString()}₫/tầng
-                  </div>
-                ) : (
-                  <div style={{ fontSize: "0.9em", color: "#666", marginTop: 4 }}>
-                    {service.price.toLocaleString()}₫
+            <div key={key}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: 12,
+                  border: "1px solid #ddd",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedExtras[key] || false}
+                  onChange={() => toggleExtra(key)}
+                />
+                <div style={{ flex: 1 }}>
+                  <strong>{service.name}</strong>
+                  {service.perFloor ? (
+                    <div style={{ fontSize: "0.9em", color: "#666", marginTop: 4 }}>
+                      {service.price.toLocaleString()}₫/tầng
+                    </div>
+                  ) : service.perMonth ? (
+                    <div style={{ fontSize: "0.9em", color: "#666", marginTop: 4 }}>
+                      {service.price.toLocaleString()}₫/tháng
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "0.9em", color: "#666", marginTop: 4 }}>
+                      {service.price.toLocaleString()}₫
+                    </div>
+                  )}
+                </div>
+                {selectedExtras[key] && service.perFloor && (
+                  <div>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={climbFloors || 1}
+                      onChange={(e) => setClimbFloors(Math.max(1, parseInt(e.target.value) || 1))}
+                      style={{ ...inputStyle, width: 80 }}
+                      placeholder="Tầng"
+                    />
+                    <div style={{ fontSize: "0.8em", color: "#666", marginTop: 4 }}>
+                      = {(service.price * (climbFloors || 1)).toLocaleString()}₫
+                    </div>
                   </div>
                 )}
-              </div>
-              {selectedExtras[key] && service.perFloor && (
-                <div>
-                  <input
-                    type="number"
-                    min="1"
-                    max="20"
-                    value={climbFloors || 1}
-                    onChange={(e) => setClimbFloors(Math.max(1, parseInt(e.target.value) || 1))}
-                    style={{ ...inputStyle, width: 80 }}
-                    placeholder="Tầng"
-                  />
-                  <div style={{ fontSize: "0.8em", color: "#666", marginTop: 4 }}>
-                    = {(service.price * (climbFloors || 1)).toLocaleString()}₫
+              </label>
+              {/* Option lưu kho */}
+              {selectedExtras[key] && key === "storage" && service.perMonth && (
+                <div style={{ marginTop: 12, marginLeft: 32, padding: 12, background: "#f5f5f5", borderRadius: 6 }}>
+                  <div style={{ marginBottom: 12, fontSize: "0.9em", fontWeight: 500 }}>Chọn cách tính lưu kho:</div>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="storageType"
+                        value="months"
+                        checked={storageType === "months"}
+                        onChange={(e) => setStorageType(e.target.value)}
+                      />
+                      <span>Lưu kho theo số tháng:</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="12"
+                        value={storageMonths}
+                        onChange={(e) => setStorageMonths(Math.max(1, parseInt(e.target.value) || 1))}
+                        style={{ ...inputStyle, width: 80 }}
+                        disabled={storageType !== "months"}
+                      />
+                      <span>tháng</span>
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                      <input
+                        type="radio"
+                        name="storageType"
+                        value="date"
+                        checked={storageType === "date"}
+                        onChange={(e) => setStorageType(e.target.value)}
+                      />
+                      <span>Lưu kho đến ngày:</span>
+                      <input
+                        type="date"
+                        value={storageEndDate}
+                        onChange={(e) => setStorageEndDate(e.target.value)}
+                        min={state.movingTime ? new Date(state.movingTime).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]}
+                        style={{ ...inputStyle, width: 160 }}
+                        disabled={storageType !== "date"}
+                      />
+                    </label>
                   </div>
+                  {storageType !== "none" && (
+                    <div style={{ marginTop: 8, padding: 8, background: "#fff", borderRadius: 4, fontSize: "0.9em" }}>
+                      <strong>Tính phí:</strong> {getStorageMonthsCalculated()} tháng × {service.price.toLocaleString()}₫ = <strong>{(service.price * getStorageMonthsCalculated()).toLocaleString()}₫</strong>
+                    </div>
+                  )}
                 </div>
               )}
-            </label>
+            </div>
           ))}
         </div>
       </fieldset>

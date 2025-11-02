@@ -11,13 +11,13 @@ const STATUS_CONFIG = {
     label: "Đang chờ xác nhận",
     color: "#ff9800",
     bg: "#fff3e0",
-    description: "Yêu cầu mới, đang chờ staff xác nhận",
+    description: "Yêu cầu mới, đang chờ nhân viên xác nhận",
   },
   UNDER_SURVEY: {
     label: "Đang khảo sát",
     color: "#2196f3",
     bg: "#e3f2fd",
-    description: "Staff đang khảo sát nhà",
+    description: "Nhân viên đang khảo sát nhà",
   },
   WAITING_PAYMENT: {
     label: "Chờ thanh toán",
@@ -54,7 +54,7 @@ const STATUS_CONFIG = {
     label: "Đang chờ xác nhận",
     color: "#ff9800",
     bg: "#fff3e0",
-    description: "Yêu cầu mới, đang chờ staff xác nhận",
+    description: "Yêu cầu mới, đang chờ nhân viên xác nhận",
   },
   APPROVED: {
     label: "Chờ thanh toán",

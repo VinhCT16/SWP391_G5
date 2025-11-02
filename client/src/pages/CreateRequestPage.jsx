@@ -49,9 +49,19 @@ export default function CreateRequestPage() {
         }
         const focus = resolveFocus(form.pickupAddress);
         const r = await osmGeocode(joinAddress(form.pickupAddress), ctrl.signal, { focus });
-        setForm((s) => ({ ...s, pickupLocation: r ? { lat: r.lat, lng: r.lng } : null }));
+        if (r && r.lat && r.lng) {
+          setForm((s) => ({ ...s, pickupLocation: { lat: r.lat, lng: r.lng } }));
+        } else {
+          // Fallback: dùng tọa độ trung tâm
+          console.warn("Geocoding failed, using fallback");
+          setForm((s) => ({ ...s, pickupLocation: focus }));
+        }
       } catch (e) {
-        if (e?.name !== "AbortError") console.warn("pickup geocode error", e);
+        if (e?.name !== "AbortError") {
+          console.warn("pickup geocode error", e);
+          const focus = resolveFocus(form.pickupAddress);
+          setForm((s) => ({ ...s, pickupLocation: focus }));
+        }
       }
     }, 500);
     return () => {
@@ -71,9 +81,19 @@ export default function CreateRequestPage() {
         }
         const focus = resolveFocus(form.deliveryAddress);
         const r = await osmGeocode(joinAddress(form.deliveryAddress), ctrl.signal, { focus });
-        setForm((s) => ({ ...s, deliveryLocation: r ? { lat: r.lat, lng: r.lng } : null }));
+        if (r && r.lat && r.lng) {
+          setForm((s) => ({ ...s, deliveryLocation: { lat: r.lat, lng: r.lng } }));
+        } else {
+          // Fallback: dùng tọa độ trung tâm
+          console.warn("Geocoding failed, using fallback");
+          setForm((s) => ({ ...s, deliveryLocation: focus }));
+        }
       } catch (e) {
-        if (e?.name !== "AbortError") console.warn("delivery geocode error", e);
+        if (e?.name !== "AbortError") {
+          console.warn("delivery geocode error", e);
+          const focus = resolveFocus(form.deliveryAddress);
+          setForm((s) => ({ ...s, deliveryLocation: focus }));
+        }
       }
     }, 500);
     return () => {
@@ -166,7 +186,7 @@ export default function CreateRequestPage() {
           ...basePayload,
           status: "UNDER_SURVEY", // Đang khảo sát
           serviceType: "STANDARD",
-          notes: "Yêu cầu staff khảo sát trước khi báo giá",
+          notes: "Yêu cầu nhân viên khảo sát trước khi báo giá",
           surveyFee: 15000, // Phí khảo sát 15k
         };
         
