@@ -221,7 +221,9 @@ router.patch("/requests/:id", async (req, res, next) => {
 router.post("/requests/:id/cancel", async (req, res, next) => {
   try {
     const r = await Request.findById(req.params.id);
-    if (!r) return res.status(404).json({ error: "Not found" });
+    if (!r) {
+      return res.status(404).json({ error: "Không tìm thấy request" });
+    }
 
     // Cho phép hủy khi chưa thanh toán hoặc chưa vận chuyển
     const canCancelStatuses = [
@@ -233,14 +235,17 @@ router.post("/requests/:id/cancel", async (req, res, next) => {
       "APPROVED",
     ];
     if (!canCancelStatuses.includes(r.status)) {
-      return res.status(409).json({ error: "Không thể hủy ở giai đoạn này" });
+      return res.status(409).json({ 
+        error: `Không thể hủy ở giai đoạn này. Trạng thái hiện tại: ${r.status}` 
+      });
     }
 
     r.status = "CANCELLED";
     await r.save();
     return res.json(r);
   } catch (e) {
-    next(e);
+    console.error("Cancel request error:", e);
+    return res.status(500).json({ error: e.message || "Lỗi khi hủy request" });
   }
 });
 

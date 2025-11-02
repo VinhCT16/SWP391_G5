@@ -63,9 +63,6 @@ export default function EditRequestPage() {
           deliveryAddress: data.deliveryAddress || data.address || { province: null, district: null, ward: null, street: "" },
           deliveryLocation: toLatLng(data.deliveryLocation || data.location) || { lat: 21.0278, lng: 105.8342 },
           movingTime: toInputLocal(data.movingTime),
-          serviceType: data.serviceType || "STANDARD",
-          notes: data.notes || "",
-          images: Array.isArray(data.images) ? data.images.slice(0, MAX_IMAGES) : [],
           status: data.status
         });
       } catch (e) {
@@ -95,10 +92,7 @@ export default function EditRequestPage() {
         pickupLocation: { type: "Point", coordinates: [form.pickupLocation.lng, form.pickupLocation.lat] },
         deliveryAddress: form.deliveryAddress,
         deliveryLocation: { type: "Point", coordinates: [form.deliveryLocation.lng, form.deliveryLocation.lat] },
-        movingTime: new Date(form.movingTime),
-        serviceType: form.serviceType,
-        notes: form.notes,
-        images: form.images
+        movingTime: new Date(form.movingTime)
       };
 
       await updateRequest(id, payload);
@@ -161,32 +155,18 @@ export default function EditRequestPage() {
             value={form.movingTime}
             onChange={(e) => setForm((s)=>({ ...s, movingTime: e.target.value }))}
             style={ipt}
+            min={new Date().toISOString().slice(0, 16)}
           />
         </label>
 
-        <label>Dịch vụ
-          <select
-            name="serviceType"
-            value={form.serviceType}
-            onChange={(e)=>setForm((s)=>({ ...s, serviceType: e.target.value }))}
-            style={ipt}
-          >
-            <option value="STANDARD">Thường</option>
-            <option value="EXPRESS">Hoả tốc</option>
-          </select>
-        </label>
-
-        <label>Ghi chú
-          <textarea
-            name="notes"
-            value={form.notes}
-            onChange={(e)=>setForm((s)=>({ ...s, notes: e.target.value }))}
-            rows={3}
-            style={ipt}
-          />
-        </label>
-
-        <button disabled={saving} style={btn}>{saving ? "Đang lưu…" : "Lưu thay đổi"}</button>
+        <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+          <button onClick={() => nav("/my-requests")} style={{ ...btn, background: "#999", flex: 1 }}>
+            Quay lại
+          </button>
+          <button disabled={saving} type="submit" style={{ ...btn, flex: 1 }}>
+            {saving ? "Đang lưu…" : "Lưu thay đổi"}
+          </button>
+        </div>
       </form>
 
       {msg && <div>{msg}</div>}

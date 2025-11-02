@@ -171,7 +171,7 @@ export default function CreateRequestPage() {
         };
         
         const createdRequest = await createRequest(requestData);
-        setMsg("✅ Đã tạo yêu cầu khảo sát. Staff sẽ liên hệ trong vòng 24h.");
+        setMsg("✅ Đã tạo yêu cầu khảo sát. Chúng tôi sẽ liên hệ bạn trong vòng 24h.");
         setTimeout(() => nav("/my-requests"), 1500);
       } catch (err) {
         setMsg("❌ " + (err.message || "Có lỗi khi tạo yêu cầu"));
@@ -285,9 +285,9 @@ export default function CreateRequestPage() {
                 onChange={(e) => setForm((s) => ({ ...s, requestType: e.target.value }))}
               />
               <div>
-                <strong>Gọi staff khảo sát nhà</strong>
+                <strong>Gọi nhân viên khảo sát nhà</strong>
                 <div style={{ fontSize: "0.9em", color: "#666", marginTop: 4 }}>
-                  Staff sẽ đến khảo sát 1 ngày trước và làm việc trực tiếp với bạn (Phí khảo sát: +15.000₫)
+                  Nhân viên sẽ đến khảo sát 1 ngày trước và làm việc trực tiếp với bạn (Phí khảo sát: +15.000₫)
                 </div>
               </div>
             </label>

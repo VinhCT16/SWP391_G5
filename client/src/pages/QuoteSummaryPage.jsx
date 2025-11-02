@@ -22,6 +22,8 @@ export default function QuoteSummaryPage() {
           vehicleType: state.vehicleType || "1T",
           helpers: state.helpers || 2,
           extras: state.extras || [],
+          items: state.items || [],
+          climbFloors: state.climbFloors || 0,
           serviceType: "STANDARD",
         };
         
@@ -95,20 +97,15 @@ export default function QuoteSummaryPage() {
     );
   }
 
-  // Tính các khoản chi tiết
-  const baseDistanceFee = quote.distanceKm * (quote.perKm || 0);
-  const laborFee = (state.helpers || 2) * 150000;
-  const extrasFee = (state.extras || []).reduce((sum, key) => {
-    // Tính phí dịch vụ thêm (tạm thời đơn giản)
-    const prices = {
-      wrap: 50000,
-      disassemble: 80000,
-      climb: 10000 * (state.climbFloors || 0),
-      clean: 100000,
-      storage: 200000,
-    };
-    return sum + (prices[key] || 0);
-  }, 0);
+  // Lấy các khoản từ quote breakdown (đã tính chính xác từ backend)
+  const vehicleFee = quote.vehicleFee || 0;
+  const laborFee = quote.laborFee || 0;
+  const extrasFee = quote.extrasFee || 0;
+  const itemFee = quote.itemFee || 0;
+  const calculatedTotal = vehicleFee + laborFee + extrasFee + itemFee;
+  
+  // Sử dụng total từ backend (đã apply minTripFee và express multiplier nếu có)
+  const finalTotal = quote.total || calculatedTotal;
 
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: "auto" }}>
@@ -155,10 +152,11 @@ export default function QuoteSummaryPage() {
           <tbody>
             <tr>
               <td style={{ padding: 12 }}>
-                Vận chuyển ({quote.distanceKm?.toFixed(1)} km × {quote.perKm?.toLocaleString()}₫/km)
+                Vận chuyển ({quote.distanceKm?.toFixed(1)} km × {quote.perKm?.toLocaleString()}₫/km
+                {quote.minTripFee && vehicleFee >= quote.minTripFee ? `, tối thiểu ${quote.minTripFee?.toLocaleString()}₫` : ""})
               </td>
               <td style={{ textAlign: "right", padding: 12 }}>
-                {baseDistanceFee?.toLocaleString()}₫
+                {vehicleFee.toLocaleString()}₫
               </td>
             </tr>
             <tr>
@@ -171,16 +169,47 @@ export default function QuoteSummaryPage() {
             </tr>
             {extrasFee > 0 && (
               <tr>
-                <td style={{ padding: 12 }}>Dịch vụ thêm</td>
+                <td style={{ padding: 12 }}>
+                  Dịch vụ thêm
+                  {state.extras && state.extras.length > 0 && (
+                    <div style={{ fontSize: "0.85em", color: "#666", marginTop: 4 }}>
+                      {state.extras.map((e, i) => {
+                        const names = {
+                          wrap: "Gói đồ kỹ",
+                          disassemble: "Tháo/lắp nội thất",
+                          climb: `Vận chuyển tầng cao (${state.climbFloors || 0} tầng)`,
+                          clean: "Vệ sinh",
+                          storage: "Lưu kho",
+                        };
+                        return names[e] || e;
+                      }).filter(Boolean).join(", ")}
+                    </div>
+                  )}
+                </td>
                 <td style={{ textAlign: "right", padding: 12 }}>
                   {extrasFee.toLocaleString()}₫
+                </td>
+              </tr>
+            )}
+            {itemFee > 0 && (
+              <tr>
+                <td style={{ padding: 12 }}>
+                  Phí theo thể tích đồ dùng
+                  {state.items && state.items.length > 0 && (
+                    <div style={{ fontSize: "0.85em", color: "#666", marginTop: 4 }}>
+                      {state.items.length} món đồ
+                    </div>
+                  )}
+                </td>
+                <td style={{ textAlign: "right", padding: 12 }}>
+                  {itemFee.toLocaleString()}₫
                 </td>
               </tr>
             )}
             <tr style={{ borderTop: "2px solid #111", fontWeight: "bold", fontSize: "1.2em" }}>
               <td style={{ padding: 12 }}>TỔNG CỘNG</td>
               <td style={{ textAlign: "right", padding: 12 }}>
-                {quote.total?.toLocaleString()}₫
+                {finalTotal.toLocaleString()}₫
               </td>
             </tr>
           </tbody>
