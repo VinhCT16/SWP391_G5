@@ -13,24 +13,25 @@
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
-    "glob": "^10.4.5",
     "axios": "^1.12.2",
     "bootstrap": "^5.3.8",
+    "glob": "^10.4.5",
+    "leaflet": "^1.9.4",
+    "maplibre-gl": "^5.9.0",
     "mongoose": "^8.19.1",
     "react": "^18.3.1",
     "react-bootstrap": "^2.10.10",
     "react-dom": "^18.3.1",
-    "maplibre-gl": "^5.9.0",
     "react-leaflet": "^4.2.1",
     "react-router-dom": "6.23.1",
-    "leaflet": "^1.9.4",
     "react-scripts": "5.0.1",
     "rimraf": "^5.0.10",
     "svgo": "^3.3.2",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "set PORT=3001&&set DANGEROUSLY_DISABLE_HOST_CHECK=true&&react-scripts start",
+    "start:unix": "PORT=3001 DANGEROUSLY_DISABLE_HOST_CHECK=true react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
@@ -52,6 +53,5 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  },
-  "proxy": "http://localhost:5000"
+  }
 }

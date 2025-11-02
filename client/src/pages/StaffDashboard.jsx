@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { getStaffTasks, updateTaskStatus } from '../api/taskApi';
 import { updateProfile, changePassword } from '../api/userApi';
 import BackButton from '../components/BackButton';
-import './StaffDashboard.css';
 
 export default function StaffDashboard() {
   const { user } = useAuth();

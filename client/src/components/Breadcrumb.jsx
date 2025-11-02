@@ -26,30 +26,33 @@ const Breadcrumb = () => {
   };
 
   return (
-    <nav className="breadcrumb-nav" style={{
+    <nav style={{
       padding: '10px 20px',
       backgroundColor: '#f8f9fa',
       borderBottom: '1px solid #dee2e6'
     }}>
-      <div className="breadcrumb-container" style={{
+      <div style={{
+        maxWidth: '1200px',
+        margin: '0 auto',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px'
+        gap: '8px',
+        fontSize: '14px'
       }}>
-        <Link to="/" style={{ textDecoration: 'none', color: '#007bff' }}>
+        <Link to="/" style={{ textDecoration: 'none', color: '#007bff', fontWeight: 500 }}>
           Home
         </Link>
         {pathSegments.map((segment, index) => (
           <React.Fragment key={index}>
             <span style={{ color: '#6c757d' }}>/</span>
             {index === pathSegments.length - 1 ? (
-              <span style={{ color: '#6c757d' }}>
+              <span style={{ color: '#6c757d', fontWeight: 500 }}>
                 {getBreadcrumbName(segment, index)}
               </span>
             ) : (
               <Link 
                 to={`/${pathSegments.slice(0, index + 1).join('/')}`}
-                style={{ textDecoration: 'none', color: '#007bff' }}
+                style={{ textDecoration: 'none', color: '#007bff', fontWeight: 500 }}
               >
                 {getBreadcrumbName(segment, index)}
               </Link>

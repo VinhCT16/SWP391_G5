@@ -2,32 +2,32 @@ import apiClient from '../apiClient';
 
 // Get current user profile
 export const getProfile = () => {
-  return apiClient.get('/api/auth/me');
+  return apiClient.get('/auth/me');
 };
 
 // Update user profile
 export const updateProfile = (profileData) => {
-  return apiClient.put('/api/auth/profile', profileData);
+  return apiClient.put('/auth/profile', profileData);
 };
 
 // Change password
 export const changePassword = (passwordData) => {
-  return apiClient.put('/api/auth/password', passwordData);
+  return apiClient.put('/auth/password', passwordData);
 };
 
 // Create manager profile
 export const createManagerProfile = (managerData) => {
-  return apiClient.post('/api/auth/create-manager', managerData);
+  return apiClient.post('/auth/create-manager', managerData);
 };
 
 // Create staff profile
 export const createStaffProfile = (staffData) => {
-  return apiClient.post('/api/auth/create-staff', staffData);
+  return apiClient.post('/auth/create-staff', staffData);
 };
 
 // Create admin profile
 export const createAdminProfile = (adminData) => {
-  return apiClient.post('/api/auth/create-admin', adminData);
+  return apiClient.post('/auth/create-admin', adminData);
 };
 
 // Default export for backward compatibility

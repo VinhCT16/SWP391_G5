@@ -73,3 +73,8 @@ export const rejectAssignment = (contractId, data) => {
 export const getAssignedContracts = () => {
   return api.get('/contracts/staff/assigned');
 };
+
+// Approve and assign staff in one call
+export const approveAndAssignContract = (data) => {
+  return api.post('/contracts/approve', data);
+};

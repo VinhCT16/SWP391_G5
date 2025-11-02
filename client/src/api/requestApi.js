@@ -1,5 +1,5 @@
 // API base khớp server: /api
-const BASE = process.env.REACT_APP_API_URL || "http://localhost:3001/api";
+const BASE = process.env.REACT_APP_API_URL || "http://localhost:3000/api";
 
 // ----- CREATE (JSON body, images là mảng base64 nếu có) -----
 export async function createRequest(payload) {
@@ -86,4 +86,27 @@ export async function updateRequestStatus(requestId, statusData) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
+}
+
+// Get available staff for a request
+export async function getAvailableStaffForRequest(requestId) {
+  const res = await fetch(`${BASE}/requests/${requestId}/available-staff`, {
+    credentials: 'include'
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+// Assign staff to request
+export async function assignStaffToRequest(requestId, data) {
+  const res = await fetch(`${BASE}/requests/${requestId}/assign-staff`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data)
+  });
+  const responseData = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(responseData.error || res.statusText);
+  return responseData;
 }

@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await apiClient.get('/api/auth/me');
+      const response = await apiClient.get('/auth/me');
       setUser(response.data.user);
     } catch (error) {
       setUser(null);
@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await apiClient.post('/api/auth/login', {
+      const response = await apiClient.post('/auth/login', {
         email,
         password
       });
@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await apiClient.post('/api/auth/register', userData);
+      const response = await apiClient.post('/auth/register', userData);
       setUser(response.data.user);
       return { success: true };
     } catch (error) {
@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await apiClient.post('/api/auth/logout', {});
+      await apiClient.post('/auth/logout', {});
       setUser(null);
       return { success: true };
     } catch (error) {
@@ -75,7 +75,7 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = async (profileData) => {
     try {
-      const response = await apiClient.put('/api/auth/profile', profileData);
+      const response = await apiClient.put('/auth/profile', profileData);
       setUser(response.data.user);
       return { success: true };
     } catch (error) {
@@ -88,7 +88,7 @@ export const AuthProvider = ({ children }) => {
 
   const changePassword = async (passwordData) => {
     try {
-      await apiClient.put('/api/auth/password', passwordData);
+      await apiClient.put('/auth/password', passwordData);
       return { success: true };
     } catch (error) {
       return { 

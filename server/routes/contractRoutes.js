@@ -6,7 +6,9 @@ const {
   approveContract,
   rejectContract,
   getCustomerContracts,
-  getContractProgress
+  getContractProgress,
+  getAllContracts,
+  approveAndAssign
 } = require("../controllers/contractController");
 const auth = require("../utils/authMiddleware");
 const { requireManager, requireCustomer } = require("../utils/authMiddleware");
@@ -18,14 +20,12 @@ router.post("/from-request/:requestId", auth, requireManager, createContractFrom
 // Role-based listing is handled in controller; allow all authenticated users
 router.get("/", auth, getAllContracts);
 router.get("/approval", auth, requireManager, getContractsForApproval);
-router.put("/:id/status", auth, requireManager, updateContractStatus);
 router.put("/:id/approve", auth, requireManager, approveContract);
 router.put("/:id/reject", auth, requireManager, rejectContract);
-// New combined approval endpoint (POST /contracts/approve)
-router.post("/approve", auth, requireManager, require("../controllers/contractController").approveAndAssign);
-router.get("/approval", auth, requireManager, getContractsForApproval);
 router.put("/:contractId/approve", auth, requireManager, approveContract);
 router.put("/:contractId/reject", auth, requireManager, rejectContract);
+// New combined approval endpoint (POST /contracts/approve)
+router.post("/approve", auth, requireManager, approveAndAssign);
 
 // Customer routes
 router.get("/customer", auth, requireCustomer, getCustomerContracts);

@@ -5,7 +5,6 @@ import { getAllRequests, updateRequestStatus, getAvailableStaffForRequest, assig
 import { createTasksFromContract } from '../api/taskApi';
 import { getContractsForApproval, approveContract, rejectContract, createContractFromRequest } from '../api/contractApi';
 import BackButton from '../components/BackButton';
-import './ManagerDashboard.css';
 
 export default function ManagerDashboard() {
   const { user } = useAuth();

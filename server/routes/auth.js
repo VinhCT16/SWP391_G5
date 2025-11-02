@@ -77,11 +77,19 @@ router.post("/login", async (req, res) => {
     });
 
     const isProd = process.env.NODE_ENV === "production";
+    
+    // Clear any existing cookies first to avoid accumulation
+    res.clearCookie(COOKIE_NAME);
+    res.clearCookie(COOKIE_NAME, { domain: undefined });
+    res.clearCookie(COOKIE_NAME, { path: '/' });
+    
+    // Set new cookie with minimal size
     res.cookie(COOKIE_NAME, token, {
       httpOnly: true,
       secure: isProd,
-      sameSite: "strict",
+      sameSite: "lax", // Changed from "strict" to "lax" for better compatibility
       maxAge: 15 * 60 * 1000,
+      path: '/'
     });
 
     const safeUser = { 

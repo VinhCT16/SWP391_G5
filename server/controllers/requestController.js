@@ -1,5 +1,6 @@
 // server/controllers/requestController.js
 const Request = require("../models/Request");
+const Staff = require("../models/Staff");
 const { v4: uuidv4 } = require('uuid');
 
 // Get all requests (manager view)
@@ -55,40 +56,6 @@ const getMyRequests = async (req, res) => {
     res.json({ requests });
   } catch (err) {
     console.error("Error fetching customer requests:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Update request status (manager)
-const updateRequestStatus = async (req, res) => {
-  try {
-    const { requestId } = req.params;
-    const { status, rejectionReason, notes } = req.body;
-    const managerId = req.userId;
-
-    const request = await Request.findById(requestId);
-    if (!request) {
-      return res.status(404).json({ message: "Request not found" });
-    }
-
-    // Update request status
-    request.status = status;
-    request.approval = {
-      reviewedBy: managerId,
-      reviewedAt: new Date(),
-      approved: status === 'approved',
-      rejectionReason: rejectionReason || '',
-      notes: notes || ''
-    };
-
-    await request.save();
-
-    res.json({
-      message: `Request ${status} successfully`,
-      request: request
-    });
-  } catch (err) {
-    console.error("Error updating request status:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -165,12 +132,15 @@ const getRequestById = async (req, res) => {
 };
 
 // Update request status (for managers)
+// Handles both requestId and id parameters
 const updateRequestStatus = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { requestId, id } = req.params;
     const { status, rejectionReason, notes } = req.body;
+    const managerId = req.userId;
 
-    const request = await Request.findById(id);
+    // Support both requestId and id parameter names
+    const request = await Request.findById(requestId || id);
     if (!request) {
       return res.status(404).json({ message: "Request not found" });
     }
@@ -180,25 +150,34 @@ const updateRequestStatus = async (req, res) => {
     
     if (status === 'rejected' && rejectionReason) {
       request.approval = {
-        reviewedBy: req.userId,
+        reviewedBy: managerId,
         reviewedAt: new Date(),
         approved: false,
         rejectionReason,
-        notes
+        notes: notes || ''
       };
     } else if (status === 'approved') {
       request.approval = {
-        reviewedBy: req.userId,
+        reviewedBy: managerId,
         reviewedAt: new Date(),
         approved: true,
-        notes
+        notes: notes || ''
+      };
+    } else {
+      // For other statuses, update approval if provided
+      request.approval = {
+        reviewedBy: managerId,
+        reviewedAt: new Date(),
+        approved: status === 'approved',
+        rejectionReason: rejectionReason || '',
+        notes: notes || ''
       };
     }
 
     await request.save();
     
     res.json({
-      message: "Request status updated successfully",
+      message: `Request ${status} successfully`,
       request: {
         id: request._id,
         requestId: request.requestId,
@@ -208,36 +187,6 @@ const updateRequestStatus = async (req, res) => {
     });
   } catch (err) {
     console.error("Error updating request:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Get all requests (for managers)
-const getAllRequests = async (req, res) => {
-  try {
-    const { status, page = 1, limit = 10 } = req.query;
-    
-    const filter = {};
-    if (status) {
-      filter.status = status;
-    }
-
-    const requests = await Request.find(filter)
-      .populate('customerId', 'name email phone')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const total = await Request.countDocuments(filter);
-
-    res.json({
-      requests,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
-      total
-    });
-  } catch (err) {
-    console.error("Error fetching requests:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -301,9 +250,10 @@ module.exports = {
   getAllRequests,
   getMyRequests,
   updateRequestStatus,
-  getAllRequests,
+  createRequest,
+  getCustomerRequests,
+  getRequestById,
   getAvailableStaffForRequest,
   assignStaffToRequest
-
 };
 

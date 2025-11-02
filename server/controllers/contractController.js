@@ -1,7 +1,14 @@
 // server/controllers/contractController.js
 const Request = require("../models/Request");
 const Contract = require("../models/Contract");
+const Staff = require("../models/Staff");
+const Service = require("../models/Service");
 const { v4: uuidv4 } = require('uuid');
+
+// Generate unique contract ID
+const generateContractId = () => {
+  return `CONT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+};
 
 // Create contract from approved request
 const createContractFromRequest = async (req, res) => {
@@ -26,11 +33,7 @@ const createContractFromRequest = async (req, res) => {
       return res.status(409).json({ message: "Contract already exists for this request" });
     }
 
-    // Get service details
-    const service = await Service.findById(serviceId);
-    if (!service) {
-      return res.status(404).json({ message: "Service not found" });
-    }
+    // Service is optional, skip if not provided
 
     // Create contract. If request has assigned staff, carry over
     const contractData = {
@@ -184,25 +187,31 @@ const rejectContract = async (req, res) => {
 const getCustomerContracts = async (req, res) => {
   try {
     const customerId = req.userId;
+    const { status, page = 1, limit = 10 } = req.query;
+
+    const filter = { customerId };
+    if (status) {
+      filter.status = status;
+    }
 
     const contracts = await Contract.find(filter)
       .populate('customerId', 'name email phone')
       .populate('managerId', 'userId')
       .populate('serviceId', 'name price')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(Number(limit))
+      .skip((Number(page) - 1) * Number(limit));
 
     const total = await Contract.countDocuments(filter);
 
     res.json({
       contracts,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
+      totalPages: Math.ceil(total / Number(limit)),
+      currentPage: Number(page),
       total
     });
   } catch (err) {
-    console.error("Error fetching contracts for approval:", err);
+    console.error("Error fetching customer contracts:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -221,7 +230,9 @@ const exportContractPDF = async (req, res) => {
       return res.status(404).json({ message: "Contract not found" });
     }
 
-    const pdfBuffer = await generateContractPDFBuffer(contract);
+    // TODO: Implement PDF generation
+    // For now, return a placeholder
+    const pdfBuffer = Buffer.from('PDF placeholder - implement PDF generation');
     
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="contract-${contract.contractId}.pdf"`);
@@ -631,7 +642,9 @@ module.exports = {
   getContractsForApproval,
   approveContract,
   rejectContract,
-  getContractsForApproval,
+  getCustomerContracts,
+  getContractProgress,
+  getAllContracts,
   exportContractPDF,
   assignStaffToContract,
   getAvailableStaff,
