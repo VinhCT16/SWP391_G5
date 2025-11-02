@@ -37,7 +37,7 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await register(name, email, password, phone, role);
+      await register({ name, email, password, phone, role });
       navigate('/login');
     } catch (err) {
       setError(err?.response?.data?.message || 'Registration failed');

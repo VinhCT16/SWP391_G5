@@ -1,95 +1,65 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 
-export default function Breadcrumb() {
+const Breadcrumb = () => {
   const location = useLocation();
-
-  // Don't show breadcrumbs on landing page
-  if (location.pathname === '/') {
+  
+  // Don't show breadcrumb on landing, login, or register pages
+  if (['/', '/login', '/register'].includes(location.pathname)) {
     return null;
   }
 
-  const getBreadcrumbItems = () => {
-    const pathSegments = location.pathname.split('/').filter(segment => segment !== '');
-    const items = [{ name: 'Home', path: '/' }];
-
-    let currentPath = '';
-    pathSegments.forEach((segment, index) => {
-      currentPath += `/${segment}`;
-      
-      let displayName = segment;
-      
-      // Convert path segments to readable names
-      switch (segment) {
-        case 'dashboard':
-          displayName = 'Dashboard';
-          break;
-        case 'customer-dashboard':
-          displayName = 'My Moves';
-          break;
-        case 'manager-dashboard':
-          displayName = 'Manager Panel';
-          break;
-        case 'staff-dashboard':
-          displayName = 'Staff Panel';
-          break;
-        case 'login':
-          displayName = 'Login';
-          break;
-        case 'register':
-          displayName = 'Register';
-          break;
-        case 'about':
-          displayName = 'About';
-          break;
-        case 'customer-review':
-          displayName = 'Customer Reviews';
-          break;
-        case 'manager-review':
-          displayName = 'Manager Reviews';
-          break;
-        default:
-          // Convert kebab-case to Title Case
-          displayName = segment
-            .split('-')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(' ');
-      }
-
-      items.push({
-        name: displayName,
-        path: currentPath,
-        isLast: index === pathSegments.length - 1
-      });
-    });
-
-    return items;
+  const pathSegments = location.pathname.split('/').filter(segment => segment);
+  
+  const getBreadcrumbName = (segment, index) => {
+    const pathMap = {
+      'dashboard': 'Dashboard',
+      'customer-dashboard': 'Customer Dashboard',
+      'manager-dashboard': 'Manager Dashboard',
+      'staff-dashboard': 'Staff Dashboard',
+      'admin-dashboard': 'Admin Dashboard',
+      'contracts': 'Contracts',
+      'about': 'About'
+    };
+    
+    return pathMap[segment] || segment.charAt(0).toUpperCase() + segment.slice(1);
   };
 
-  const breadcrumbItems = getBreadcrumbItems();
-
   return (
-    <nav className="breadcrumb" aria-label="Breadcrumb">
-      <ol className="breadcrumb-list">
-        {breadcrumbItems.map((item, index) => (
-          <li key={item.path} className="breadcrumb-item">
-            {item.isLast ? (
-              <span className="breadcrumb-current" aria-current="page">
-                {item.name}
+    <nav className="breadcrumb-nav" style={{
+      padding: '10px 20px',
+      backgroundColor: '#f8f9fa',
+      borderBottom: '1px solid #dee2e6'
+    }}>
+      <div className="breadcrumb-container" style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+      }}>
+        <Link to="/" style={{ textDecoration: 'none', color: '#007bff' }}>
+          Home
+        </Link>
+        {pathSegments.map((segment, index) => (
+          <React.Fragment key={index}>
+            <span style={{ color: '#6c757d' }}>/</span>
+            {index === pathSegments.length - 1 ? (
+              <span style={{ color: '#6c757d' }}>
+                {getBreadcrumbName(segment, index)}
               </span>
             ) : (
-              <>
-                <Link to={item.path} className="breadcrumb-link">
-                  {item.name}
-                </Link>
-                <span className="breadcrumb-separator" aria-hidden="true">
-                  /
-                </span>
-              </>
+              <Link 
+                to={`/${pathSegments.slice(0, index + 1).join('/')}`}
+                style={{ textDecoration: 'none', color: '#007bff' }}
+              >
+                {getBreadcrumbName(segment, index)}
+              </Link>
             )}
-          </li>
+          </React.Fragment>
         ))}
-      </ol>
+      </div>
     </nav>
   );
-}
+};
+
+export default Breadcrumb;
+

@@ -1,19 +1,13 @@
-const Contract = require("../models/Contract");
+// server/controllers/contractController.js
 const Request = require("../models/Request");
-const Service = require("../models/Service");
-const Staff = require("../models/Staff");
-const User = require("../models/User");
+const Contract = require("../models/Contract");
 const { v4: uuidv4 } = require('uuid');
-const { generateContractPDFBuffer } = require('../utils/pdfGenerator');
-
-// Generate unique contract ID
-const generateContractId = () => `CON-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
 // Create contract from approved request
 const createContractFromRequest = async (req, res) => {
   try {
     const { requestId } = req.params;
-    const { serviceId, pricing, paymentMethod } = req.body;
+    const { pricing, paymentMethod, terms } = req.body;
     const managerId = req.userId;
 
     // Find the request
@@ -43,18 +37,23 @@ const createContractFromRequest = async (req, res) => {
       contractId: generateContractId(),
       requestId: request._id,
       customerId: request.customerId,
-      managerId,
-      serviceId,
-      moveDetails: request.moveDetails,
+      managerId: managerId,
+      serviceId: request.serviceId || null,
+      moveDetails: {
+        fromAddress: request.moveDetails.fromAddress,
+        toAddress: request.moveDetails.toAddress,
+        moveDate: request.moveDetails.moveDate,
+        serviceType: request.moveDetails.serviceType
+      },
       pricing: {
-        basePrice: pricing.basePrice || service.price,
+        basePrice: pricing.basePrice,
         additionalServices: pricing.additionalServices || [],
-        totalPrice: pricing.totalPrice || service.price,
+        totalPrice: pricing.totalPrice,
         deposit: pricing.deposit || 0,
-        balance: (pricing.totalPrice || service.price) - (pricing.deposit || 0)
+        balance: pricing.totalPrice - (pricing.deposit || 0)
       },
       paymentMethod: {
-        type: paymentMethod.type || 'cash',
+        type: paymentMethod.type,
         details: paymentMethod.details || {}
       },
       assignedStaff: (request.assignedStaff || []).map(a => ({
@@ -79,24 +78,9 @@ const createContractFromRequest = async (req, res) => {
     request.status = 'contract_created';
     await request.save();
 
-    // Populate contract details
-    await contract.populate([
-      { path: 'customerId', select: 'name email phone' },
-      { path: 'managerId', select: 'userId' },
-      { path: 'serviceId', select: 'name price' }
-    ]);
-
     res.status(201).json({
       message: "Contract created successfully",
-      contract: {
-        id: contract._id,
-        contractId: contract.contractId,
-        status: contract.status,
-        moveDetails: contract.moveDetails,
-        pricing: contract.pricing,
-        paymentMethod: contract.paymentMethod,
-        createdAt: contract.createdAt
-      }
+      contract: contract
     });
   } catch (err) {
     console.error("Error creating contract:", err);
@@ -104,82 +88,35 @@ const createContractFromRequest = async (req, res) => {
   }
 };
 
-// Get contract by ID
-const getContractById = async (req, res) => {
+// Get contracts for approval (manager view)
+const getContractsForApproval = async (req, res) => {
   try {
-    const { id } = req.params;
-    const contract = await Contract.findById(id)
+    const contracts = await Contract.find({ status: 'draft' })
+      .populate('requestId', 'requestId moveDetails customerId')
       .populate('customerId', 'name email phone')
-      .populate('managerId', 'userId')
-      .populate('serviceId', 'name price')
-      .populate({
-        path: 'assignedStaff.staffId',
-        select: 'employeeId role',
-        populate: { path: 'userId', select: 'name email phone' }
-      });
+      .populate('managerId', 'name email')
+      .sort({ createdAt: -1 });
 
-    if (!contract) {
-      return res.status(404).json({ message: "Contract not found" });
-    }
-
-    res.json({ contract });
+    res.json({ contracts });
   } catch (err) {
-    console.error("Error fetching contract:", err);
+    console.error("Error fetching contracts:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// Update contract status
-const updateContractStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status, notes } = req.body;
-
-    const contract = await Contract.findById(id);
-    if (!contract) {
-      return res.status(404).json({ message: "Contract not found" });
-    }
-
-    contract.status = status;
-    if (notes) {
-      contract.approval.notes = notes;
-    }
-
-    if (status === 'signed') {
-      contract.signatures.customerSigned = true;
-      contract.signatures.managerSigned = true;
-      contract.signatures.signedAt = new Date();
-    }
-
-    await contract.save();
-
-    res.json({
-      message: "Contract status updated successfully",
-      contract: {
-        id: contract._id,
-        contractId: contract.contractId,
-        status: contract.status,
-        signatures: contract.signatures
-      }
-    });
-  } catch (err) {
-    console.error("Error updating contract:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Approve contract (Manager only)
+// Approve contract
 const approveContract = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { contractId } = req.params;
     const { notes } = req.body;
     const managerId = req.userId;
 
-    const contract = await Contract.findById(id);
+    const contract = await Contract.findById(contractId);
     if (!contract) {
       return res.status(404).json({ message: "Contract not found" });
     }
 
+    // Update contract status
     contract.status = 'approved';
     contract.approval = {
       approvedBy: managerId,
@@ -189,22 +126,14 @@ const approveContract = async (req, res) => {
 
     await contract.save();
 
-    // Populate contract details for response
-    await contract.populate([
-      { path: 'customerId', select: 'name email phone' },
-      { path: 'managerId', select: 'userId' },
-      { path: 'serviceId', select: 'name price' }
-    ]);
+    // Update request status
+    await Request.findByIdAndUpdate(contract.requestId, {
+      status: 'contract_created'
+    });
 
     res.json({
       message: "Contract approved successfully",
-      contract: {
-        id: contract._id,
-        contractId: contract.contractId,
-        status: contract.status,
-        approval: contract.approval,
-        createdAt: contract.createdAt
-      }
+      contract: contract
     });
   } catch (err) {
     console.error("Error approving contract:", err);
@@ -212,23 +141,20 @@ const approveContract = async (req, res) => {
   }
 };
 
-// Reject contract (Manager only)
+// Reject contract
 const rejectContract = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { contractId } = req.params;
     const { rejectionReason, notes } = req.body;
     const managerId = req.userId;
 
-    const contract = await Contract.findById(id);
+    const contract = await Contract.findById(contractId);
     if (!contract) {
       return res.status(404).json({ message: "Contract not found" });
     }
 
-    if (!rejectionReason) {
-      return res.status(400).json({ message: "Rejection reason is required" });
-    }
-
-    contract.status = 'cancelled';
+    // Update contract status
+    contract.status = 'rejected';
     contract.approval = {
       approvedBy: managerId,
       approvedAt: new Date(),
@@ -238,14 +164,15 @@ const rejectContract = async (req, res) => {
 
     await contract.save();
 
+    // Update request status back to approved (so manager can create new contract)
+    await Request.findByIdAndUpdate(contract.requestId, {
+      status: 'approved',
+      contractId: null
+    });
+
     res.json({
       message: "Contract rejected successfully",
-      contract: {
-        id: contract._id,
-        contractId: contract.contractId,
-        status: contract.status,
-        approval: contract.approval
-      }
+      contract: contract
     });
   } catch (err) {
     console.error("Error rejecting contract:", err);
@@ -253,15 +180,10 @@ const rejectContract = async (req, res) => {
   }
 };
 
-// Get contracts for manager approval
-const getContractsForApproval = async (req, res) => {
+// Get customer contracts
+const getCustomerContracts = async (req, res) => {
   try {
-    const { status = 'pending_approval', page = 1, limit = 10 } = req.query;
-    
-    const filter = { status };
-    if (status === 'pending_approval') {
-      filter.status = { $in: ['draft', 'pending_approval'] };
-    }
+    const customerId = req.userId;
 
     const contracts = await Contract.find(filter)
       .populate('customerId', 'name email phone')
@@ -654,16 +576,59 @@ const getAssignedContracts = async (req, res) => {
 
     res.json({ contracts });
   } catch (err) {
-    console.error("Error fetching assigned contracts:", err);
+    console.error("Error fetching customer contracts:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get contract progress (for customer)
+const getContractProgress = async (req, res) => {
+  try {
+    const { contractId } = req.params;
+    const customerId = req.userId;
+
+    const contract = await Contract.findById(contractId)
+      .populate('requestId')
+      .populate('managerId', 'name email');
+
+    if (!contract) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    // Check if customer owns this contract
+    if (contract.customerId.toString() !== customerId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Get request with tasks
+    const request = await Request.findById(contract.requestId)
+      .populate('tasks.assignedStaff', 'name email')
+      .populate('tasks.transporter', 'name email');
+
+    // Calculate progress
+    const totalTasks = request.tasks.length;
+    const completedTasks = request.tasks.filter(task => task.status === 'completed').length;
+    const progressPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+    res.json({
+      contract: contract,
+      request: request,
+      progress: {
+        totalTasks,
+        completedTasks,
+        progressPercentage: Math.round(progressPercentage),
+        status: request.status
+      }
+    });
+  } catch (err) {
+    console.error("Error fetching contract progress:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
 module.exports = {
   createContractFromRequest,
-  getContractById,
-  updateContractStatus,
-  getAllContracts,
+  getContractsForApproval,
   approveContract,
   rejectContract,
   getContractsForApproval,

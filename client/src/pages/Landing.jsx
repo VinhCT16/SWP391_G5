@@ -1,165 +1,145 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import './Landing.css';
 
-export default function Landing() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/');
-    } catch (err) {
-      console.error('Logout failed:', err);
-    }
-  };
+const Landing = () => {
+  const { user } = useAuth();
 
   return (
-    <div className="landing-container">
-      <header className="landing-header">
-        <div className="header-content">
-          <div className="logo">
-            <h1>MoveEase</h1>
-            <span>Professional Moving Services</span>
+    <div className="landing-page" style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'white',
+      textAlign: 'center',
+      padding: '20px'
+    }}>
+      <div className="landing-content" style={{ maxWidth: '800px' }}>
+        <h1 style={{ 
+          fontSize: '3.5rem', 
+          marginBottom: '20px',
+          fontWeight: 'bold'
+        }}>
+          MoveEase
+        </h1>
+        <p style={{ 
+          fontSize: '1.5rem', 
+          marginBottom: '30px',
+          opacity: 0.9
+        }}>
+          Professional Moving Services Made Simple
+        </p>
+        <p style={{ 
+          fontSize: '1.1rem', 
+          marginBottom: '40px',
+          opacity: 0.8,
+          lineHeight: '1.6'
+        }}>
+          Experience seamless moving with our comprehensive platform. 
+          From booking to completion, we handle everything with care and professionalism.
+        </p>
+        
+        <div className="landing-features" style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '30px',
+          marginBottom: '40px'
+        }}>
+          <div className="feature-card" style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            padding: '30px',
+            borderRadius: '10px',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <h3 style={{ marginBottom: '15px' }}>Easy Booking</h3>
+            <p>Simple online booking process with real-time availability</p>
           </div>
-          <nav className="header-nav">
-            {user ? (
-              <>
-                <span className="welcome-text">Welcome, {user.name}</span>
-                <Link to="/dashboard" className="nav-link">Dashboard</Link>
-                {user.role === 'manager' && (
-                  <Link to="/manager-dashboard" className="nav-link">Manager Panel</Link>
-                )}
-                {user.role === 'staff' && (
-                  <Link to="/staff-dashboard" className="nav-link">Staff Panel</Link>
-                )}
-                <button onClick={handleLogout} className="nav-link logout-btn">Logout</button>
-              </>
-            ) : (
-              <>
-                <Link to="/login" className="nav-link">Sign In</Link>
-                <Link to="/register" className="nav-link btn-primary">Get Started</Link>
-              </>
-            )}
-          </nav>
-        </div>
-      </header>
-
-      <main className="landing-main">
-        <section className="hero-section">
-          <div className="hero-content">
-            <h1>Moving Made Simple</h1>
-            <p>Professional, reliable, and affordable moving services. Let us handle your next move with care and precision.</p>
-            <div className="hero-buttons">
-              {user ? (
-                <>
-                  <Link to="/dashboard" className="btn btn-primary btn-large">Go to Dashboard</Link>
-                  {user.role === 'customer' && (
-                    <Link to="/customer-dashboard" className="btn btn-outline btn-large">Book Your Move</Link>
-                  )}
-                  {user.role === 'manager' && (
-                    <Link to="/manager-dashboard" className="btn btn-outline btn-large">Manager Panel</Link>
-                  )}
-                  {user.role === 'staff' && (
-                    <Link to="/staff-dashboard" className="btn btn-outline btn-large">Staff Panel</Link>
-                  )}
-                </>
-              ) : (
-                <>
-                  <Link to="/register" className="btn btn-primary btn-large">Book Your Move</Link>
-                  <Link to="/login" className="btn btn-outline btn-large">Sign In</Link>
-                </>
-              )}
-            </div>
+          <div className="feature-card" style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            padding: '30px',
+            borderRadius: '10px',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <h3 style={{ marginBottom: '15px' }}>Professional Service</h3>
+            <p>Experienced staff and quality equipment for safe moves</p>
           </div>
-          <div className="hero-image">
-            <div className="moving-truck">🚚</div>
-          </div>
-        </section>
-
-        <section className="features-section">
-          <div className="container">
-            <h2>Why Choose MoveEase?</h2>
-            <div className="features-grid">
-              <div className="feature-card">
-                <div className="feature-icon">🚚</div>
-                <h3>Professional Movers</h3>
-                <p>Experienced and trained professionals who handle your belongings with the utmost care.</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">📦</div>
-                <h3>Safe & Secure</h3>
-                <p>Your belongings are protected with comprehensive insurance and secure handling.</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">💰</div>
-                <h3>Best Prices</h3>
-                <p>Competitive pricing with transparent quotes. No hidden fees or surprises.</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">⏰</div>
-                <h3>On Time</h3>
-                <p>Punctual service with real-time tracking. We respect your time and schedule.</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">🛡️</div>
-                <h3>Fully Insured</h3>
-                <p>Complete coverage for your peace of mind during the entire moving process.</p>
-              </div>
-              <div className="feature-card">
-                <div className="feature-icon">📞</div>
-                <h3>24/7 Support</h3>
-                <p>Round-the-clock customer support to assist you whenever you need help.</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="cta-section">
-          <div className="container">
-            <div className="cta-content">
-              <h2>Ready to Move?</h2>
-              <p>Join thousands of satisfied customers who trust MoveEase for their moving needs.</p>
-              <Link to="/register" className="btn btn-primary btn-large">Get Started Today</Link>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer className="landing-footer">
-        <div className="container">
-          <div className="footer-content">
-            <div className="footer-section">
-              <h3>MoveEase</h3>
-              <p>Professional moving services you can trust.</p>
-            </div>
-            <div className="footer-section">
-              <h4>Services</h4>
-              <ul>
-                <li>Local Moving</li>
-                <li>Long Distance</li>
-                <li>Commercial Moving</li>
-                <li>Packing Services</li>
-              </ul>
-            </div>
-            <div className="footer-section">
-              <h4>Support</h4>
-              <ul>
-                <li>Contact Us</li>
-                <li>FAQ</li>
-                <li>Customer Service</li>
-                <li>Track Your Move</li>
-              </ul>
-            </div>
-          </div>
-          <div className="footer-bottom">
-            <p>&copy; 2024 MoveEase. All rights reserved.</p>
+          <div className="feature-card" style={{
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            padding: '30px',
+            borderRadius: '10px',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <h3 style={{ marginBottom: '15px' }}>Real-time Tracking</h3>
+            <p>Track your move progress and stay updated throughout</p>
           </div>
         </div>
-      </footer>
+
+        <div className="landing-actions">
+          {user ? (
+            <Link 
+              to="/dashboard" 
+              style={{
+                display: 'inline-block',
+                padding: '15px 30px',
+                backgroundColor: 'white',
+                color: '#667eea',
+                textDecoration: 'none',
+                borderRadius: '50px',
+                fontSize: '1.2rem',
+                fontWeight: 'bold',
+                margin: '0 10px',
+                transition: 'transform 0.3s ease'
+              }}
+            >
+              Go to Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link 
+                to="/register" 
+                style={{
+                  display: 'inline-block',
+                  padding: '15px 30px',
+                  backgroundColor: 'white',
+                  color: '#667eea',
+                  textDecoration: 'none',
+                  borderRadius: '50px',
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  margin: '0 10px',
+                  transition: 'transform 0.3s ease'
+                }}
+              >
+                Get Started
+              </Link>
+              <Link 
+                to="/login" 
+                style={{
+                  display: 'inline-block',
+                  padding: '15px 30px',
+                  backgroundColor: 'transparent',
+                  color: 'white',
+                  textDecoration: 'none',
+                  borderRadius: '50px',
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  margin: '0 10px',
+                  border: '2px solid white',
+                  transition: 'transform 0.3s ease'
+                }}
+              >
+                Login
+              </Link>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default Landing;
 
