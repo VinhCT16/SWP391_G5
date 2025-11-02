@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createRequest, getMyRequests } from '../api/requestApi';
 import { updateProfile, changePassword } from '../api/userApi';
-import { getContractsForApproval } from '../api/contractApi';
+import { getContractsForApproval, getCustomerContracts } from '../api/contractApi';
 import BackButton from '../components/BackButton';
+import CustomerProgressTracking from '../components/CustomerProgressTracking';
 import './Home.css';
 
 export default function CustomerDashboard() {
@@ -238,6 +239,12 @@ export default function CustomerDashboard() {
           onClick={() => setActiveTab('contracts')}
         >
           Contracts
+        </button>
+        <button 
+          className={activeTab === 'progress' ? 'nav-btn active' : 'nav-btn'}
+          onClick={() => setActiveTab('progress')}
+        >
+          Track Progress
         </button>
         <button 
           className={activeTab === 'profile' ? 'nav-btn active' : 'nav-btn'}
@@ -481,6 +488,10 @@ export default function CustomerDashboard() {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'progress' && (
+          <CustomerProgressTracking />
         )}
 
         {activeTab === 'profile' && (

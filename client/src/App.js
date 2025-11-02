@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleProtectedRoute from './components/RoleProtectedRoute';
@@ -29,52 +29,42 @@ import QuoteBuilderPage from "./pages/QuoteBuilderPage.jsx";
 
 export default function App() {
   return (
-    // <Routes>
-    //   <Route path="/" element={<Navigate to="/requests/new" />} />
-    //   <Route path="/requests/new" element={<CreateRequestPage />} />
-    //   <Route path="/my-requests" element={<ManageRequestsPage />} />
-    //   <Route path="/requests/:id/edit" element={<EditRequestPage />} />
-    //   <Route path="/requests/:id/quote" element={<QuoteBuilderPage />} />
-    //   <Route path="*" element={<div style={{ padding: 16 }}>404 Not Found</div>} />
-    // </Routes>
     <div className="App">
-      <BrowserRouter>
-        <AuthProvider>
-          <Navigation />
-          <Breadcrumb />
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/customer-review" element={<CustomerReview />} />
-            <Route path="/manager-review" element={<ManagerReview />} />
-            <Route path="/about" element={<About />} />
-            
-            {/* Dashboard redirect - redirects to appropriate dashboard based on role */}
-            <Route element={<ProtectedRoute />}> 
-              <Route path="/dashboard" element={<DashboardRedirect />} />
-            </Route>
-            
-            {/* Role-specific dashboards */}
-            <Route element={<RoleProtectedRoute allowedRoles={['customer']} />}>
-              <Route path="/customer-dashboard" element={<CustomerDashboard />} />
-              <Route path="/contracts/:id" element={<CustomerContractView />} />
-            </Route>
-            <Route element={<RoleProtectedRoute allowedRoles={['manager']} />}>
-              <Route path="/manager-dashboard" element={<ManagerDashboard />} />
-              <Route path="/contract-form/:requestId" element={<ContractForm />} />
-              <Route path="/contract-approval" element={<ContractApproval />} />
-            </Route>
-            <Route element={<RoleProtectedRoute allowedRoles={['staff']} />}>
-              <Route path="/staff-dashboard" element={<StaffDashboard />} />
-            </Route>
-            <Route element={<RoleProtectedRoute allowedRoles={['admin']} />}>
-              <Route path="/admin-dashboard" element={<AdminDashboard />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
+      <AuthProvider>
+        <Navigation />
+        <Breadcrumb />
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/customer-review" element={<CustomerReview />} />
+          <Route path="/manager-review" element={<ManagerReview />} />
+          <Route path="/about" element={<About />} />
+          
+          {/* Dashboard redirect - redirects to appropriate dashboard based on role */}
+          <Route element={<ProtectedRoute />}> 
+            <Route path="/dashboard" element={<DashboardRedirect />} />
+          </Route>
+          
+          {/* Role-specific dashboards */}
+          <Route element={<RoleProtectedRoute allowedRoles={['customer']} />}>
+            <Route path="/customer-dashboard" element={<CustomerDashboard />} />
+            <Route path="/contracts/:id" element={<CustomerContractView />} />
+          </Route>
+          <Route element={<RoleProtectedRoute allowedRoles={['manager']} />}>
+            <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+            <Route path="/contract-form/:requestId" element={<ContractForm />} />
+            <Route path="/contract-approval" element={<ContractApproval />} />
+          </Route>
+          <Route element={<RoleProtectedRoute allowedRoles={['staff']} />}>
+            <Route path="/staff-dashboard" element={<StaffDashboard />} />
+          </Route>
+          <Route element={<RoleProtectedRoute allowedRoles={['admin']} />}>
+            <Route path="/admin-dashboard" element={<AdminDashboard />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
     </div>
   );
 }

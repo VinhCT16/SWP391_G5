@@ -3,14 +3,14 @@ const mongoose = require("mongoose");
 exports.connectDB = async () => {
   try {
     console.log("🔍 Database: Attempting to connect to MongoDB");
-    console.log("🔍 Database: MONGODB_URI configured:", process.env.MONGODB_URI ? "Yes" : "No");
+    console.log("🔍 Database: MONGO_URI configured:", process.env.MONGO_URI ? "Yes" : "No");
     
-    if (!process.env.MONGODB_URI) {
-      console.error("❌ Database: MONGODB_URI is not configured!");
-      throw new Error("MONGODB_URI is not configured");
+    if (!process.env.MONGO_URI) {
+      console.error("❌ Database: MONGO_URI is not configured!");
+      throw new Error("MONGO_URI is not configured");
     }
     
-    await mongoose.connect(process.env.MONGODB_URI, {
+    await mongoose.connect(process.env.MONGO_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });

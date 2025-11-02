@@ -52,7 +52,38 @@ export async function cancelRequest(id) {
   return data;
 }
 
-/* (tùy chọn) nếu còn nơi nào gọi listRequests / deleteRequest cũ:
+// Additional exports for compatibility
 export async function listRequests() { return listRequestsByPhone(""); }
 export async function deleteRequest(id) { return cancelRequest(id); }
-*/
+
+// Manager-specific functions
+export async function getAllRequests(params = {}) {
+  const queryParams = new URLSearchParams(params).toString();
+  const res = await fetch(`${BASE}/requests/all?${queryParams}`, {
+    credentials: 'include'
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+export async function getMyRequests() {
+  const res = await fetch(`${BASE}/requests/my`, {
+    credentials: 'include'
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+export async function updateRequestStatus(requestId, statusData) {
+  const res = await fetch(`${BASE}/requests/${requestId}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(statusData)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
