@@ -1,14 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getContractById, exportContractPDF } from '../api/contractApi';
+import { getContractById, exportContractPDF, customerSignContract } from '../api/contractApi';
+import { useAuth } from '../context/AuthContext';
+import ContractDocumentForm from '../components/ContractDocumentForm';
 import './CustomerContractView.css';
 
 const CustomerContractView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [signModalOpen, setSignModalOpen] = useState(false);
+  const [signing, setSigning] = useState(false);
 
   const loadContract = useCallback(async () => {
     try {
@@ -76,6 +81,20 @@ const CustomerContractView = () => {
     }).format(amount);
   };
 
+  const handleCustomerSign = async () => {
+    try {
+      setSigning(true);
+      await customerSignContract(id);
+      setSignModalOpen(false);
+      await loadContract();
+      setError('');
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to sign contract');
+    } finally {
+      setSigning(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="contract-view-container">
@@ -123,7 +142,15 @@ const CustomerContractView = () => {
         </div>
       </div>
 
-      <div className="contract-content">
+      {/* Contract Document Form */}
+      <ContractDocumentForm 
+        contract={contract}
+        onManagerSign={() => {}}
+        onCustomerSign={() => setSignModalOpen(true)}
+        userRole={user?.role}
+      />
+
+      <div className="contract-content" style={{ marginTop: '30px', display: 'none' }}>
         {/* Contract Information */}
         <div className="contract-section">
           <h2>Contract Information</h2>
@@ -333,11 +360,37 @@ const CustomerContractView = () => {
           Back to Dashboard
         </button>
         {contract.status === 'approved' && !contract.signatures?.customerSigned && (
-          <button className="sign-btn">
+          <button className="sign-btn" onClick={() => setSignModalOpen(true)}>
             Sign Contract
           </button>
         )}
       </div>
+
+      {/* Sign Contract Modal */}
+      {signModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Sign Contract</h3>
+            <p>Are you sure you want to sign this contract? By signing, you agree to the terms and conditions.</p>
+            <div className="modal-actions">
+              <button 
+                className="cancel-btn" 
+                onClick={() => setSignModalOpen(false)}
+                disabled={signing}
+              >
+                Cancel
+              </button>
+              <button 
+                className="sign-btn" 
+                onClick={handleCustomerSign}
+                disabled={signing}
+              >
+                {signing ? 'Signing...' : 'Confirm Sign'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

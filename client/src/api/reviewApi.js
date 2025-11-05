@@ -1,18 +1,16 @@
-import axios from "axios";
-
-const API_URL = "http://localhost:3000/reviews";
+import api from '../apiClient';
 
 // Lấy toàn bộ reviews
-export const getReviews = () => axios.get(`${API_URL}`);
+export const getReviews = () => api.get('/api/reviews');
 
 // Lấy review theo id
-export const getReview = (id) => axios.get(`${API_URL}/${id}`);
+export const getReview = (id) => api.get(`/api/reviews/${id}`);
 
 // Thêm review
-export const createReview = (data) => axios.post(API_URL, data);
+export const createReview = (data) => api.post('/api/reviews', data);
 
 // Update review
-export const updateReview = (id, data) => axios.put(`${API_URL}/${id}`, data);
+export const updateReview = (id, data) => api.put(`/api/reviews/${id}`, data);
 
 // Xóa review
-export const deleteReview = (id) => axios.delete(`${API_URL}/${id}`);
+export const deleteReview = (id) => api.delete(`/api/reviews/${id}`);

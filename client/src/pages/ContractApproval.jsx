@@ -27,15 +27,19 @@ const ContractApproval = () => {
   const [approvalNotes, setApprovalNotes] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [rejectionNotes, setRejectionNotes] = useState('');
+  const [viewMode, setViewMode] = useState('pending'); // 'pending' or 'signed'
 
   useEffect(() => {
     loadContracts();
-  }, []);
+  }, [viewMode]);
 
   const loadContracts = async () => {
     try {
       setLoading(true);
-      const response = await getContractsForApproval();
+      const params = viewMode === 'signed' 
+        ? { showSigned: true } 
+        : { status: 'pending_approval' };
+      const response = await getContractsForApproval(params);
       setContracts(response.data.contracts || []);
     } catch (err) {
       setError('Failed to load contracts');
@@ -175,7 +179,41 @@ const ContractApproval = () => {
     <div className="contract-approval-container">
       <div className="contract-approval-header">
         <h1>Contract Approval</h1>
-        <p>Review and approve/reject pending contracts</p>
+        <p>
+          {viewMode === 'signed' 
+            ? 'View contracts that have been signed by both manager and customer' 
+            : 'Review and approve/reject pending contracts'}
+        </p>
+        <div className="view-mode-toggle" style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+          <button 
+            className={viewMode === 'pending' ? 'active' : ''}
+            onClick={() => setViewMode('pending')}
+            style={{
+              padding: '10px 20px',
+              border: '1px solid #ddd',
+              borderRadius: '5px',
+              backgroundColor: viewMode === 'pending' ? '#007bff' : '#fff',
+              color: viewMode === 'pending' ? '#fff' : '#000',
+              cursor: 'pointer'
+            }}
+          >
+            Pending Approval
+          </button>
+          <button 
+            className={viewMode === 'signed' ? 'active' : ''}
+            onClick={() => setViewMode('signed')}
+            style={{
+              padding: '10px 20px',
+              border: '1px solid #ddd',
+              borderRadius: '5px',
+              backgroundColor: viewMode === 'signed' ? '#007bff' : '#fff',
+              color: viewMode === 'signed' ? '#fff' : '#000',
+              cursor: 'pointer'
+            }}
+          >
+            Signed Contracts
+          </button>
+        </div>
       </div>
 
       {error && <div className="error-message">{error}</div>}
@@ -183,7 +221,11 @@ const ContractApproval = () => {
       <div className="contracts-list">
         {contracts.length === 0 ? (
           <div className="no-contracts">
-            <p>No contracts pending approval</p>
+            <p>
+              {viewMode === 'signed' 
+                ? 'No contracts signed by both parties yet' 
+                : 'No contracts pending approval'}
+            </p>
           </div>
         ) : (
           contracts.map(contract => (
@@ -222,25 +264,51 @@ const ContractApproval = () => {
                 </div>
               </div>
 
+              {/* Signatures Status */}
+              {contract.signatures && (
+                <div className="detail-section">
+                  <h4>Signature Status</h4>
+                  <p>
+                    <strong>Customer:</strong>{' '}
+                    <span className={contract.signatures.customerSigned ? 'signed' : 'not-signed'}>
+                      {contract.signatures.customerSigned ? '✓ Signed' : '✗ Not Signed'}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Manager:</strong>{' '}
+                    <span className={contract.signatures.managerSigned ? 'signed' : 'not-signed'}>
+                      {contract.signatures.managerSigned ? '✓ Signed' : '✗ Not Signed'}
+                    </span>
+                  </p>
+                  {contract.signatures.signedAt && (
+                    <p><strong>Signed Date:</strong> {formatDate(contract.signatures.signedAt)}</p>
+                  )}
+                </div>
+              )}
+
               <div className="contract-actions">
-                <button
-                  onClick={() => openApprovalModal(contract)}
-                  className="approve-btn"
-                >
-                  Approve
-                </button>
-                <button
-                  onClick={() => openRejectionModal(contract)}
-                  className="reject-btn"
-                >
-                  Reject
-                </button>
-                <button
-                  onClick={() => openAssignStaffModal(contract)}
-                  className="assign-btn"
-                >
-                  Assign Staff
-                </button>
+                {viewMode === 'pending' ? (
+                  <>
+                    <button
+                      onClick={() => openApprovalModal(contract)}
+                      className="approve-btn"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => openRejectionModal(contract)}
+                      className="reject-btn"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      onClick={() => openAssignStaffModal(contract)}
+                      className="assign-btn"
+                    >
+                      Assign Staff
+                    </button>
+                  </>
+                ) : null}
                 <button
                   onClick={() => navigate(`/contracts/${contract._id}`)}
                   className="view-btn"

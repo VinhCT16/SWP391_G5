@@ -80,7 +80,7 @@ router.post("/login", async (req, res) => {
     res.cookie(COOKIE_NAME, token, {
       httpOnly: true,
       secure: isProd,
-      sameSite: "strict",
+      sameSite: isProd ? "strict" : "lax",
       maxAge: 15 * 60 * 1000,
     });
 
@@ -102,7 +102,7 @@ router.post("/logout", (req, res) => {
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
     secure: isProd,
-    sameSite: "strict",
+    sameSite: isProd ? "strict" : "lax",
   });
   return res.json({ message: "Logged out" });
 });

@@ -173,11 +173,12 @@ export default function ManagerDashboard() {
 
   const openContractDetail = async (request) => {
     try {
+      // If request has contractId directly, use it
       if (request.contractId) {
         navigate(`/contracts/${request.contractId}`);
         return;
       }
-      // Fallback: try to find contract by requestId
+      // Try to find contract by requestId
       const { getAllContracts } = await import('../api/contractApi');
       const res = await getAllContracts({ requestId: request._id, limit: 1 });
       const found = res.data.contracts && res.data.contracts[0];
@@ -187,6 +188,7 @@ export default function ManagerDashboard() {
         alert('No contract found for this request yet.');
       }
     } catch (e) {
+      console.error('Error opening contract details:', e);
       alert('Failed to open contract details.');
     }
   };
@@ -336,24 +338,27 @@ export default function ManagerDashboard() {
                   )}
                   {request.status === 'approved' && (
                     <>
-                      <button 
-                        className="contract-btn"
-                        onClick={() => navigate(`/contract-form/${request._id}`)}
-                        disabled={loading}
-                      >
-                        Create Contract
-                      </button>
+                      {!request.contractId ? (
+                        <button 
+                          className="contract-btn"
+                          onClick={() => navigate(`/contract-form/${request._id}`)}
+                          disabled={loading}
+                        >
+                          Create Contract
+                        </button>
+                      ) : (
+                        <button 
+                          className="view-btn"
+                          onClick={() => openContractDetail(request)}
+                        >
+                          View Details
+                        </button>
+                      )}
                       <button 
                         className="assign-btn"
                         onClick={() => openAssignStaffModal(request)}
                       >
                         Assign Staff
-                      </button>
-                      <button 
-                        className="view-btn"
-                        onClick={() => navigate(`/contract-form/${request._id}`)}
-                      >
-                        View Details
                       </button>
                     </>
                   )}

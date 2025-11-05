@@ -36,7 +36,7 @@ app.use("/api/contracts", require("./routes/contractRoutes"));
 app.use("/api/tasks", require("./routes/taskRoutes"));
 app.use("/api/admin", require("./routes/adminRoutes"));
 app.use("/api/accounts", require("./routes/accountRoutes"));
-app.use("/reviews", reviewRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 
 app.get("/", (req, res) => {
