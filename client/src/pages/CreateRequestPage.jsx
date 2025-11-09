@@ -191,10 +191,28 @@ export default function CreateRequestPage() {
           surveyFee: 15000, // Phí khảo sát 15k
         };
         
+        console.log("📤 [CreateRequestPage] Gửi request với data:", {
+          ...requestData,
+          pickupLocation: requestData.pickupLocation ? "✓" : "✗",
+          deliveryLocation: requestData.deliveryLocation ? "✓" : "✗",
+        });
+        
         const createdRequest = await createRequest(requestData);
+        
+        console.log("✅ [CreateRequestPage] Nhận được response:", {
+          id: createdRequest._id,
+          status: createdRequest.status,
+          surveyFee: createdRequest.surveyFee,
+        });
+        
+        if (createdRequest.status !== "UNDER_SURVEY") {
+          console.warn("⚠️ [CreateRequestPage] Warning: Status không đúng! Kỳ vọng: UNDER_SURVEY, Nhận được:", createdRequest.status);
+        }
+        
         setMsg("✅ Đã tạo yêu cầu khảo sát. Chúng tôi sẽ liên hệ bạn trong vòng 24h.");
         setTimeout(() => nav("/my-requests"), 1500);
       } catch (err) {
+        console.error("❌ [CreateRequestPage] Error:", err);
         setMsg("❌ " + (err.message || "Có lỗi khi tạo yêu cầu"));
       } finally {
         setLoading(false);

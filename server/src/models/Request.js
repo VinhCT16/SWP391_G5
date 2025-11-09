@@ -86,6 +86,8 @@ const RequestSchema = new Schema(
 
     notes: String,
 
+    surveyFee: { type: Number, default: undefined }, // Phí khảo sát (nếu có)
+
     requestDate:       { type: Date, default: Date.now },
     estimatedDelivery: { type: Date },
     actualDelivery:    { type: Date },

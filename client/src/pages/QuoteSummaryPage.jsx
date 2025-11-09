@@ -2,7 +2,17 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { estimateQuote } from "../api/quoteApi";
-import { createRequest } from "../api/requestApi";
+import { createRequest, getRequest } from "../api/requestApi";
+
+// Convert GeoJSON -> {lat, lng}
+function toLatLng(geo) {
+  if (!geo) return null;
+  if (geo.type === "Point" && Array.isArray(geo.coordinates) && geo.coordinates.length === 2) {
+    return { lat: geo.coordinates[1], lng: geo.coordinates[0] };
+  }
+  if (typeof geo.lat === "number" && typeof geo.lng === "number") return geo;
+  return null;
+}
 
 export default function QuoteSummaryPage() {
   const { state } = useLocation();
@@ -12,27 +22,92 @@ export default function QuoteSummaryPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState("");
+  const [requestData, setRequestData] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
+        let finalState = state;
+        
+        // Nếu state chỉ có requestId, load request từ API
+        if (state?.requestId && !state.pickupLocation) {
+          console.log("📥 [QuoteSummary] Loading request từ requestId:", state.requestId);
+          const request = await getRequest(state.requestId);
+          setRequestData(request);
+          
+          // Parse notes để lấy quote info
+          let quoteInfo = null;
+          try {
+            if (request.notes) {
+              quoteInfo = typeof request.notes === "string" ? JSON.parse(request.notes) : request.notes;
+            }
+          } catch (e) {
+            console.warn("Could not parse notes:", e);
+          }
+          
+          // Convert locations từ GeoJSON sang {lat, lng}
+          const pickupLoc = toLatLng(request.pickupLocation || request.location);
+          const deliveryLoc = toLatLng(request.deliveryLocation || request.location);
+          
+          // Tạo state từ request data
+          finalState = {
+            customerName: request.customerName,
+            customerPhone: request.customerPhone,
+            pickupAddress: request.pickupAddress || request.address,
+            deliveryAddress: request.deliveryAddress || request.address,
+            pickupAddressText: request.pickupAddressText || (request.pickupAddress ? 
+              `${request.pickupAddress.street}, ${request.pickupAddress.ward?.name}, ${request.pickupAddress.district?.name}, ${request.pickupAddress.province?.name}` : ""),
+            deliveryAddressText: request.deliveryAddressText || (request.deliveryAddress ? 
+              `${request.deliveryAddress.street}, ${request.deliveryAddress.ward?.name}, ${request.deliveryAddress.district?.name}, ${request.deliveryAddress.province?.name}` : ""),
+            pickupLocation: pickupLoc,
+            deliveryLocation: deliveryLoc,
+            movingTime: request.movingTime,
+            // Lấy từ quoteInfo nếu có
+            items: quoteInfo?.items || [],
+            vehicleType: quoteInfo?.vehicleType || "1T",
+            helpers: quoteInfo?.helpers || 2,
+            extras: quoteInfo?.extras || [],
+            climbFloors: quoteInfo?.climbFloors || 0,
+            storageMonths: quoteInfo?.storageMonths || 0,
+          };
+          
+          console.log("✅ [QuoteSummary] Đã load request, finalState:", {
+            ...finalState,
+            pickupLocation: finalState.pickupLocation ? "✓" : "✗",
+            deliveryLocation: finalState.deliveryLocation ? "✓" : "✗",
+            items: finalState.items?.length || 0,
+          });
+        }
+        
+        // Validate locations
+        if (!finalState.pickupLocation || !finalState.deliveryLocation) {
+          throw new Error("Thiếu thông tin địa chỉ. Không thể tính giá.");
+        }
+        
         const payload = {
-          pickupLocation: state.pickupLocation,
-          deliveryLocation: state.deliveryLocation,
-          vehicleType: state.vehicleType || "1T",
-          helpers: state.helpers || 2,
-          extras: state.extras || [],
-          items: state.items || [],
-          climbFloors: state.climbFloors || 0,
-          storageMonths: state.storageMonths || 0,
+          pickupLocation: finalState.pickupLocation,
+          deliveryLocation: finalState.deliveryLocation,
+          vehicleType: finalState.vehicleType || "1T",
+          helpers: finalState.helpers || 2,
+          extras: finalState.extras || [],
+          items: finalState.items || [],
+          climbFloors: finalState.climbFloors || 0,
+          storageMonths: finalState.storageMonths || 0,
           serviceType: "STANDARD",
         };
         
+        console.log("📤 [QuoteSummary] Gửi payload để tính quote:", {
+          ...payload,
+          pickupLocation: payload.pickupLocation ? "✓" : "✗",
+          deliveryLocation: payload.deliveryLocation ? "✓" : "✗",
+        });
+        
         const result = await estimateQuote(payload);
+        console.log("✅ [QuoteSummary] Nhận được quote:", result);
         setQuote(result);
       } catch (e) {
         setMsg("❌ Không thể tính giá. Vui lòng thử lại.");
-        console.error("Quote error:", e);
+        console.error("❌ [QuoteSummary] Quote error:", e);
       } finally {
         setLoading(false);
       }
@@ -115,18 +190,52 @@ export default function QuoteSummaryPage() {
       {/* Thông tin khách hàng */}
       <div style={{ marginBottom: 24, padding: 16, background: "#f5f5f5", borderRadius: 8 }}>
         <h3 style={{ marginTop: 0 }}>Thông tin khách hàng</h3>
-        <div><strong>Tên:</strong> {state.customerName}</div>
-        <div><strong>SĐT:</strong> {state.customerPhone}</div>
-        <div><strong>Lấy hàng:</strong> {state.pickupAddressText}</div>
-        <div><strong>Giao hàng:</strong> {state.deliveryAddressText}</div>
-        <div><strong>Thời gian:</strong> {new Date(state.movingTime).toLocaleString("vi-VN")}</div>
+        <div><strong>Tên:</strong> {state?.customerName || requestData?.customerName || "N/A"}</div>
+        <div><strong>SĐT:</strong> {state?.customerPhone || requestData?.customerPhone || "N/A"}</div>
+        <div><strong>Lấy hàng:</strong> {state?.pickupAddressText || (requestData?.pickupAddress ? 
+          `${requestData.pickupAddress.street}, ${requestData.pickupAddress.ward?.name}, ${requestData.pickupAddress.district?.name}, ${requestData.pickupAddress.province?.name}` : "N/A")}</div>
+        <div><strong>Giao hàng:</strong> {state?.deliveryAddressText || (requestData?.deliveryAddress ? 
+          `${requestData.deliveryAddress.street}, ${requestData.deliveryAddress.ward?.name}, ${requestData.deliveryAddress.district?.name}, ${requestData.deliveryAddress.province?.name}` : "N/A")}</div>
+        <div><strong>Thời gian:</strong> {new Date(state?.movingTime || requestData?.movingTime || Date.now()).toLocaleString("vi-VN")}</div>
       </div>
 
       {/* Đồ dùng */}
-      {state.items && state.items.length > 0 && (
+      {(state?.items || requestData) && (state?.items?.length > 0 || (() => {
+        try {
+          const notes = requestData?.notes;
+          if (notes) {
+            const quoteInfo = typeof notes === "string" ? JSON.parse(notes) : notes;
+            return quoteInfo?.items?.length > 0;
+          }
+        } catch (e) {}
+        return false;
+      })()) && (
         <div style={{ marginBottom: 24, padding: 16, background: "#f5f5f5", borderRadius: 8 }}>
-          <h3 style={{ marginTop: 0 }}>Đồ dùng ({state.items.length} món)</h3>
-          {state.items.map((item, idx) => (
+          <h3 style={{ marginTop: 0 }}>Đồ dùng ({(() => {
+            const items = state?.items || (() => {
+              try {
+                const notes = requestData?.notes;
+                if (notes) {
+                  const quoteInfo = typeof notes === "string" ? JSON.parse(notes) : notes;
+                  return quoteInfo?.items || [];
+                }
+              } catch (e) {}
+              return [];
+            })();
+            return items.length;
+          })()} món)</h3>
+          {(() => {
+            const items = state?.items || (() => {
+              try {
+                const notes = requestData?.notes;
+                if (notes) {
+                  const quoteInfo = typeof notes === "string" ? JSON.parse(notes) : notes;
+                  return quoteInfo?.items || [];
+                }
+              } catch (e) {}
+              return [];
+            })();
+            return items.map((item, idx) => (
             <div key={idx} style={{ marginBottom: 8, padding: 8, background: "#fff", borderRadius: 4 }}>
               <strong>{item.name}</strong>
               {item.weight && <span> • {item.weight}kg</span>}
@@ -135,7 +244,8 @@ export default function QuoteSummaryPage() {
               )}
               {item.isApartment && <span> • Nhà chung cư</span>}
             </div>
-          ))}
+            ));
+          })()}
         </div>
       )}
 
@@ -162,7 +272,16 @@ export default function QuoteSummaryPage() {
             </tr>
             <tr>
               <td style={{ padding: 12 }}>
-                Nhân công ({state.helpers || 2} người × 150.000₫)
+                Nhân công ({state?.helpers || (() => {
+                  try {
+                    const notes = requestData?.notes;
+                    if (notes) {
+                      const quoteInfo = typeof notes === "string" ? JSON.parse(notes) : notes;
+                      return quoteInfo?.helpers || 2;
+                    }
+                  } catch (e) {}
+                  return 2;
+                })()} người × 150.000₫)
               </td>
               <td style={{ textAlign: "right", padding: 12 }}>
                 {laborFee.toLocaleString()}₫
@@ -172,20 +291,52 @@ export default function QuoteSummaryPage() {
               <tr>
                 <td style={{ padding: 12 }}>
                   Dịch vụ thêm
-                  {state.extras && state.extras.length > 0 && (
-                    <div style={{ fontSize: "0.85em", color: "#666", marginTop: 4 }}>
-                      {state.extras.map((e, i) => {
-                        const names = {
-                          wrap: "Gói đồ kỹ",
-                          disassemble: "Tháo/lắp nội thất",
-                          climb: `Vận chuyển tầng cao (${state.climbFloors || 0} tầng)`,
-                          clean: "Vệ sinh",
-                          storage: `Lưu kho${state.storageMonths > 0 ? ` (${state.storageMonths} tháng)` : ""}`,
-                        };
-                        return names[e] || e;
-                      }).filter(Boolean).join(", ")}
-                    </div>
-                  )}
+                  {(() => {
+                    const extras = state?.extras || (() => {
+                      try {
+                        const notes = requestData?.notes;
+                        if (notes) {
+                          const quoteInfo = typeof notes === "string" ? JSON.parse(notes) : notes;
+                          return quoteInfo?.extras || [];
+                        }
+                      } catch (e) {}
+                      return [];
+                    })();
+                    const climbFloors = state?.climbFloors || (() => {
+                      try {
+                        const notes = requestData?.notes;
+                        if (notes) {
+                          const quoteInfo = typeof notes === "string" ? JSON.parse(notes) : notes;
+                          return quoteInfo?.climbFloors || 0;
+                        }
+                      } catch (e) {}
+                      return 0;
+                    })();
+                    const storageMonths = state?.storageMonths || (() => {
+                      try {
+                        const notes = requestData?.notes;
+                        if (notes) {
+                          const quoteInfo = typeof notes === "string" ? JSON.parse(notes) : notes;
+                          return quoteInfo?.storageMonths || 0;
+                        }
+                      } catch (e) {}
+                      return 0;
+                    })();
+                    return extras.length > 0 && (
+                      <div style={{ fontSize: "0.85em", color: "#666", marginTop: 4 }}>
+                        {extras.map((e, i) => {
+                          const names = {
+                            wrap: "Gói đồ kỹ",
+                            disassemble: "Tháo/lắp nội thất",
+                            climb: `Vận chuyển tầng cao (${climbFloors} tầng)`,
+                            clean: "Vệ sinh",
+                            storage: `Lưu kho${storageMonths > 0 ? ` (${storageMonths} tháng)` : ""}`,
+                          };
+                          return names[e] || e;
+                        }).filter(Boolean).join(", ")}
+                      </div>
+                    );
+                  })()}
                 </td>
                 <td style={{ textAlign: "right", padding: 12 }}>
                   {extrasFee.toLocaleString()}₫
@@ -196,11 +347,23 @@ export default function QuoteSummaryPage() {
               <tr>
                 <td style={{ padding: 12 }}>
                   Phí theo thể tích đồ dùng
-                  {state.items && state.items.length > 0 && (
-                    <div style={{ fontSize: "0.85em", color: "#666", marginTop: 4 }}>
-                      {state.items.length} món đồ
-                    </div>
-                  )}
+                  {(() => {
+                    const items = state?.items || (() => {
+                      try {
+                        const notes = requestData?.notes;
+                        if (notes) {
+                          const quoteInfo = typeof notes === "string" ? JSON.parse(notes) : notes;
+                          return quoteInfo?.items || [];
+                        }
+                      } catch (e) {}
+                      return [];
+                    })();
+                    return items.length > 0 && (
+                      <div style={{ fontSize: "0.85em", color: "#666", marginTop: 4 }}>
+                        {items.length} món đồ
+                      </div>
+                    );
+                  })()}
                 </td>
                 <td style={{ textAlign: "right", padding: 12 }}>
                   {itemFee.toLocaleString()}₫

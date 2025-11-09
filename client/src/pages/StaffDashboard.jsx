@@ -53,10 +53,17 @@ export default function StaffDashboard() {
   const loadRequests = async () => {
     setLoading(true);
     try {
+      console.log("🔄 Đang load staff tasks...");
       const data = await getStaffTasks();
+      console.log("✅ Nhận được data:", data);
+      console.log("📊 Số lượng requests:", Array.isArray(data) ? data.length : 0);
+      if (Array.isArray(data) && data.length > 0) {
+        console.log("📋 Status của requests:", data.map(r => ({ id: r._id?.slice(-8), status: r.status })));
+      }
       setRequests(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error("Error loading staff tasks:", err);
+      console.error("❌ Error loading staff tasks:", err);
+      console.error("Error details:", err.message, err.stack);
       setRequests([]);
     } finally {
       setLoading(false);

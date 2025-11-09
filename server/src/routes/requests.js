@@ -59,7 +59,16 @@ router.post("/requests", async (req, res, next) => {
       serviceType,
       notes,
       images,
+      status, // ✅ Nhận status từ body
+      surveyFee, // ✅ Nhận surveyFee từ body
     } = req.body || {};
+
+    console.log("📥 [Create Request] Nhận được body:", {
+      customerName,
+      customerPhone,
+      status: status || "PENDING_CONFIRMATION (default)",
+      surveyFee: surveyFee || "undefined",
+    });
 
     if (!customerName?.trim())
       return res.status(400).json({ error: "Thiếu họ tên" });
@@ -81,6 +90,18 @@ router.post("/requests", async (req, res, next) => {
       return res.status(400).json({ error: "Thời gian chuyển phải ở tương lai" });
     }
 
+    // ✅ Cho phép set status khi tạo (cho staff survey flow)
+    // Validate status nếu có
+    const validStatuses = [
+      "PENDING_CONFIRMATION", "UNDER_SURVEY", "WAITING_PAYMENT",
+      "IN_PROGRESS", "DONE", "CANCELLED", "REJECTED",
+      "PENDING_REVIEW", "APPROVED"
+    ];
+    const finalStatus = status && validStatuses.includes(status) ? status : "PENDING_CONFIRMATION";
+    const finalSurveyFee = surveyFee && typeof surveyFee === "number" ? surveyFee : undefined;
+
+    console.log(`🔧 [Create Request] Sử dụng status: ${finalStatus}, surveyFee: ${finalSurveyFee || "undefined"}`);
+
     const doc = await Request.create({
       customerName: customerName.trim(),
       customerPhone: normalizeVNPhone(customerPhone),
@@ -90,12 +111,17 @@ router.post("/requests", async (req, res, next) => {
       deliveryLocation: delivLoc,
       movingTime: mt,
       serviceType: serviceType || "STANDARD",
+      status: finalStatus, // ✅ Set status
+      surveyFee: finalSurveyFee, // ✅ Set surveyFee
       notes,
       images: Array.isArray(images) ? images.slice(0, 4) : []
     });
 
+    console.log(`✅ [Create Request] Đã tạo request với status: ${doc.status}, ID: ${doc._id.toString().slice(-8)}`);
+
     return res.status(201).json(doc);
   } catch (e) {
+    console.error("❌ [Create Request] Error:", e);
     next(e);
   }
 });
@@ -144,9 +170,16 @@ router.get("/requests/staff/tasks", async (req, res, next) => {
       query.status = statusFilter; // Override nếu có filter
     }
     
+    console.log("🔍 [Staff Tasks] Query:", JSON.stringify(query, null, 2));
+    
     const docs = await Request.find(query)
       .sort({ createdAt: -1 })
       .lean();
+
+    console.log(`📊 [Staff Tasks] Tìm thấy ${docs.length} requests`);
+    if (docs.length > 0) {
+      console.log("📋 [Staff Tasks] Status của requests:", docs.map(d => ({ id: d._id?.toString().slice(-8), status: d.status })));
+    }
 
     // Compat cho doc cũ
     const mapped = docs.map((d) => ({
@@ -159,6 +192,7 @@ router.get("/requests/staff/tasks", async (req, res, next) => {
 
     res.json(mapped);
   } catch (e) {
+    console.error("❌ [Staff Tasks] Error:", e);
     next(e);
   }
 });
