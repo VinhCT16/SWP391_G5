@@ -52,6 +52,17 @@ export async function cancelRequest(id) {
   return data;
 }
 
+// ----- GET STAFF TASKS -----
+// Lấy tất cả requests mà staff cần xử lý
+export async function getStaffTasks(status) {
+  const u = new URL(`${BASE}/requests/staff/tasks`);
+  if (status) u.searchParams.set("status", status);
+  const res = await fetch(u.toString());
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
 /* (tùy chọn) nếu còn nơi nào gọi listRequests / deleteRequest cũ:
 export async function listRequests() { return listRequestsByPhone(""); }
 export async function deleteRequest(id) { return cancelRequest(id); }

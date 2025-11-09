@@ -6,6 +6,10 @@ import RequestDetailPage from "./pages/RequestDetailPage";
 import QuoteItemsPage from "./pages/QuoteItemsPage";
 import QuoteServicePage from "./pages/QuoteServicePage";
 import QuoteSummaryPage from "./pages/QuoteSummaryPage";
+// Staff pages
+import StaffDashboard from "./pages/StaffDashboard";
+import StaffSurveyPage from "./pages/StaffSurveyPage";
+import StaffTaskDetailPage from "./pages/StaffTaskDetailPage";
 // QuotePage cũ - giữ để tương thích (có thể xóa sau)
 import QuotePage from "./pages/QuotePage";
 
@@ -22,6 +26,11 @@ export default function App() {
       <Route path="/quote/items" element={<QuoteItemsPage />} />
       <Route path="/quote/service" element={<QuoteServicePage />} />
       <Route path="/quote/summary" element={<QuoteSummaryPage />} />
+      
+      {/* Staff routes */}
+      <Route path="/staff/dashboard" element={<StaffDashboard />} />
+      <Route path="/staff/survey/:id" element={<StaffSurveyPage />} />
+      <Route path="/staff/task/:id" element={<StaffTaskDetailPage />} />
       
       {/* QuotePage cũ - giữ để tương thích */}
       <Route path="/quote" element={<QuotePage />} />

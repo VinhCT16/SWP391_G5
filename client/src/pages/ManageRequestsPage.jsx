@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { normalizeVNPhone } from "../utils/validation";
 import { fmtDateTime24 } from "../utils/datetime";
 import { fmtAddress } from "../utils/address";
+import "../styles/movingService.css";
 
 // Trạng thái đầy đủ với màu sắc và mô tả
 const STATUS_CONFIG = {
@@ -122,239 +123,192 @@ export default function ManageRequestsPage() {
   });
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Quản lý Request của tôi</h1>
+    <div className="moving-service-container">
+      <div className="content-wrapper">
+        <div className="page-header">
+          <h1>My Moves - Quản Lý Yêu Cầu</h1>
+          <p>Xem và quản lý tất cả các yêu cầu vận chuyển của bạn</p>
+        </div>
 
-      <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "12px 0", flexWrap: "wrap" }}>
-        <input
-          placeholder="Nhập số điện thoại đã dùng để tạo request"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          style={{ padding: 8, border: "1px solid #ccc", borderRadius: 6, width: 280 }}
-        />
-        <button onClick={load} style={btn}>
-          Tải
-        </button>
-        <button onClick={() => nav("/requests/new")} style={btnHollow}>
-          Tạo mới
-        </button>
-      </div>
-
-      {/* Bộ lọc trạng thái */}
-      {rows.length > 0 && (
-        <div style={{ marginBottom: 16, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <strong>Lọc theo trạng thái:</strong>
-          <button
-            onClick={() => setFilterStatus("")}
-            style={{
-              ...btnSmall,
-              background: filterStatus === "" ? "#111" : "#fff",
-              color: filterStatus === "" ? "#fff" : "#111",
-            }}
-          >
-            Tất cả ({rows.length})
-          </button>
-          {Object.keys(STATUS_CONFIG).filter(k => !["PENDING_REVIEW", "APPROVED"].includes(k)).map((key) => {
-            const count = rows.filter((r) => r.status === key).length;
-            if (count === 0) return null;
-            return (
-              <button
-                key={key}
-                onClick={() => setFilterStatus(filterStatus === key ? "" : key)}
-                style={{
-                  ...btnSmall,
-                  background: filterStatus === key ? STATUS_CONFIG[key].color : "#fff",
-                  color: filterStatus === key ? "#fff" : STATUS_CONFIG[key].color,
-                  borderColor: STATUS_CONFIG[key].color,
-                }}
-              >
-                {STATUS_CONFIG[key].label} ({count})
+        <div className="main-card">
+          <div style={{ marginBottom: "1.5rem" }}>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", marginBottom: "1rem" }}>
+              <input
+                placeholder="Nhập số điện thoại đã dùng để tạo request"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="form-group input-primary"
+                style={{ flex: 1, minWidth: "250px", maxWidth: "400px" }}
+              />
+              <button onClick={load} className="btn btn-primary">
+                Tải
               </button>
-            );
-          })}
-        </div>
-      )}
+              <button onClick={() => nav("/requests/new")} className="btn btn-secondary">
+                Tạo mới
+              </button>
+            </div>
 
-      {loading ? (
-        <div style={{ padding: 24, textAlign: "center" }}>Đang tải...</div>
-      ) : sortedRows.length === 0 ? (
-        <div style={{ padding: 24, textAlign: "center", color: "#777" }}>
-          {rows.length === 0
-            ? "Chưa có request nào. Hãy tạo mới."
-            : `Không có request nào với trạng thái "${filterStatus ? getStatusConfig(filterStatus).label : ""}"`}
-        </div>
-      ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1000 }}>
-            <thead>
-              <tr>
-                <th style={th}>Mã</th>
-                <th style={th}>Tên</th>
-                <th style={th}>SĐT</th>
-                <th style={th}>Lấy hàng</th>
-                <th style={th}>Giao hàng</th>
-                <th style={th}>Thời gian</th>
-                <th style={th}>Trạng thái</th>
-                <th style={th}>Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
+            {/* Bộ lọc trạng thái */}
+            {rows.length > 0 && (
+              <div className="filter-buttons">
+                <button
+                  onClick={() => setFilterStatus("")}
+                  className={`filter-btn ${filterStatus === "" ? "active" : ""}`}
+                >
+                  Tất cả ({rows.length})
+                </button>
+                {Object.keys(STATUS_CONFIG)
+                  .filter((k) => !["PENDING_REVIEW", "APPROVED"].includes(k))
+                  .map((key) => {
+                    const count = rows.filter((r) => r.status === key).length;
+                    if (count === 0) return null;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setFilterStatus(filterStatus === key ? "" : key)}
+                        className={`filter-btn ${filterStatus === key ? "active" : ""}`}
+                        style={{
+                          borderColor: STATUS_CONFIG[key].color,
+                        }}
+                      >
+                        {STATUS_CONFIG[key].label} ({count})
+                      </button>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+
+          {loading ? (
+            <div className="loading-state">
+              <div className="loading-spinner" />
+              <p>Đang tải...</p>
+            </div>
+          ) : sortedRows.length === 0 ? (
+            <div className="empty-state">
+              <h3>
+                {rows.length === 0
+                  ? "Chưa có request nào"
+                  : `Không có request nào với trạng thái "${filterStatus ? getStatusConfig(filterStatus).label : ""}"`}
+              </h3>
+              <p>
+                {rows.length === 0
+                  ? "Hãy tạo yêu cầu vận chuyển mới để bắt đầu"
+                  : "Thử chọn trạng thái khác hoặc tạo request mới"}
+              </p>
+              {rows.length === 0 && (
+                <button className="btn btn-primary" onClick={() => nav("/requests/new")}>
+                  Tạo Yêu Cầu Mới
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="moves-list">
               {sortedRows.map((r) => {
                 const statusConfig = getStatusConfig(r.status);
                 const shortId = r._id?.slice(-8) || "N/A";
+                const statusKey = r.status?.toLowerCase().replace("_", "-") || "unknown";
                 return (
-                  <tr key={r._id}>
-                    <td style={td}>
-                      <code style={{ fontSize: "0.85em", color: "#666" }}>#{shortId}</code>
-                    </td>
-                    <td style={td}>{r.customerName}</td>
-                    <td style={td}>{r.customerPhone}</td>
-                    <td style={td}>
-                      <div style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {fmtAddress(r.pickupAddress || r.address)}
-                      </div>
-                    </td>
-                    <td style={td}>
-                      <div style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {fmtAddress(r.deliveryAddress || r.address)}
-                      </div>
-                    </td>
-                    <td style={td}>{fmtDateTime24(r.movingTime)}</td>
-                    <td style={td}>
-                      <div
+                  <div key={r._id} className="move-card">
+                    <div className="move-header">
+                      <h3>Request #{shortId}</h3>
+                      <span
+                        className={`status-badge ${statusKey}`}
                         style={{
-                          display: "inline-block",
-                          padding: "4px 12px",
-                          borderRadius: 12,
-                          background: statusConfig.bg,
+                          backgroundColor: statusConfig.bg,
                           color: statusConfig.color,
-                          fontWeight: 500,
-                          fontSize: "0.9em",
-                          border: `1px solid ${statusConfig.color}`,
                         }}
                         title={statusConfig.description}
                       >
                         {statusConfig.label}
-                      </div>
-                    </td>
-                    <td style={td}>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        {/* Xem chi tiết - luôn hiển thị */}
-                        <button
-                          onClick={() => nav(`/requests/${r._id}/detail`)}
-                          style={{ ...btnTiny, background: "#2196f3", color: "#fff", borderColor: "#2196f3" }}
-                        >
-                          Chi tiết
-                        </button>
-
-                        {/* Sửa - chỉ khi PENDING_CONFIRMATION */}
-                        {(r.status === "PENDING_CONFIRMATION" || r.status === "PENDING_REVIEW") && (
-                          <button
-                            onClick={() => nav(`/requests/${r._id}/edit`)}
-                            style={btnTiny}
-                          >
-                            Sửa
-                          </button>
-                        )}
-
-                        {/* Hủy - chỉ khi chưa thanh toán hoặc chưa vận chuyển */}
-                        {["PENDING_CONFIRMATION", "UNDER_SURVEY", "WAITING_PAYMENT", "PENDING_REVIEW"].includes(r.status) && (
-                          <button
-                            onClick={() => onCancel(r._id)}
-                            style={{ ...btnTiny, color: "#f44336", borderColor: "#f44336" }}
-                          >
-                            Hủy
-                          </button>
-                        )}
-
-                        {/* Xem báo giá - nếu có */}
-                        {r.status === "WAITING_PAYMENT" && (
-                          <button
-                            onClick={() => nav(`/quote/summary`, { state: { requestId: r._id } })}
-                            style={{ ...btnTiny, background: "#9c27b0", color: "#fff", borderColor: "#9c27b0" }}
-                          >
-                            Xem báo giá
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Thống kê */}
-      {rows.length > 0 && (
-        <div style={{ marginTop: 24, padding: 16, background: "#f5f5f5", borderRadius: 8 }}>
-          <h3 style={{ marginTop: 0 }}>Thống kê</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-            {Object.keys(STATUS_CONFIG)
-              .filter((k) => !["PENDING_REVIEW", "APPROVED"].includes(k))
-              .map((key) => {
-                const count = rows.filter((r) => r.status === key).length;
-                if (count === 0) return null;
-                return (
-                  <div key={key} style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "1.5em", fontWeight: "bold", color: STATUS_CONFIG[key].color }}>
-                      {count}
+                      </span>
                     </div>
-                    <div style={{ fontSize: "0.9em", color: "#666" }}>{STATUS_CONFIG[key].label}</div>
+                    <div className="move-details">
+                      <p>
+                        <strong>Tên khách hàng:</strong> {r.customerName}
+                      </p>
+                      <p>
+                        <strong>Số điện thoại:</strong> {r.customerPhone}
+                      </p>
+                      <p>
+                        <strong>Lấy hàng:</strong> {fmtAddress(r.pickupAddress || r.address)}
+                      </p>
+                      <p>
+                        <strong>Giao hàng:</strong> {fmtAddress(r.deliveryAddress || r.address)}
+                      </p>
+                      <p>
+                        <strong>Thời gian chuyển:</strong> {fmtDateTime24(r.movingTime)}
+                      </p>
+                      <p>
+                        <strong>Tạo lúc:</strong> {new Date(r.createdAt || r.requestDate).toLocaleString("vi-VN")}
+                      </p>
+                    </div>
+                    <div className="move-actions">
+                      <button
+                        onClick={() => nav(`/requests/${r._id}/detail`)}
+                        className="btn btn-primary"
+                      >
+                        Chi tiết
+                      </button>
+                      {(r.status === "PENDING_CONFIRMATION" || r.status === "PENDING_REVIEW") && (
+                        <button
+                          onClick={() => nav(`/requests/${r._id}/edit`)}
+                          className="btn btn-secondary"
+                        >
+                          Sửa
+                        </button>
+                      )}
+                      {["PENDING_CONFIRMATION", "UNDER_SURVEY", "WAITING_PAYMENT", "PENDING_REVIEW"].includes(
+                        r.status
+                      ) && (
+                        <button onClick={() => onCancel(r._id)} className="btn btn-danger">
+                          Hủy
+                        </button>
+                      )}
+                      {r.status === "WAITING_PAYMENT" && (
+                        <button
+                          onClick={() => nav(`/quote/summary`, { state: { requestId: r._id } })}
+                          className="btn btn-success"
+                        >
+                          Xem báo giá
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
-          </div>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Thống kê */}
+        {rows.length > 0 && (
+          <div className="main-card">
+            <h2 style={{ marginTop: 0, marginBottom: "1rem", color: "#2c3e50" }}>Thống kê</h2>
+            <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "1rem" }}>
+              {Object.keys(STATUS_CONFIG)
+                .filter((k) => !["PENDING_REVIEW", "APPROVED"].includes(k))
+                .map((key) => {
+                  const count = rows.filter((r) => r.status === key).length;
+                  if (count === 0) return null;
+                  return (
+                    <div
+                      key={key}
+                      className="stat-card"
+                      style={{
+                        background: `linear-gradient(135deg, ${STATUS_CONFIG[key].color} 0%, ${STATUS_CONFIG[key].color}dd 100%)`,
+                      }}
+                    >
+                      <h3 style={{ color: "white", margin: 0 }}>{count}</h3>
+                      <p style={{ color: "white", opacity: 0.9, margin: 0 }}>{STATUS_CONFIG[key].label}</p>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-const th = {
-  textAlign: "left",
-  padding: 12,
-  borderBottom: "2px solid #ddd",
-  background: "#f5f5f5",
-  fontWeight: 600,
-};
-const td = {
-  padding: 12,
-  borderBottom: "1px solid #eee",
-  verticalAlign: "middle",
-};
-const btn = {
-  padding: "8px 16px",
-  border: "1px solid #111",
-  background: "#111",
-  color: "#fff",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontSize: 14,
-};
-const btnHollow = {
-  padding: "8px 16px",
-  border: "1px solid #111",
-  background: "#fff",
-  color: "#111",
-  borderRadius: 8,
-  cursor: "pointer",
-  fontSize: 14,
-};
-const btnSmall = {
-  padding: "6px 12px",
-  border: "1px solid #ccc",
-  background: "#fff",
-  borderRadius: 6,
-  cursor: "pointer",
-  fontSize: 13,
-};
-const btnTiny = {
-  padding: "4px 8px",
-  border: "1px solid #111",
-  background: "#fff",
-  borderRadius: 4,
-  cursor: "pointer",
-  fontSize: 12,
-};

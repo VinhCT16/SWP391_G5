@@ -6,6 +6,7 @@ import AddressPicker from "../components/AddressPicker";
 import RouteMapLibre from "../components/RouteMapLibre";
 import { osmGeocode, osrmRoute, joinAddress, isAddressComplete } from "../utils/ors";
 import { createRequest } from "../api/requestApi";
+import "../styles/movingService.css";
 
 export default function CreateRequestPage() {
   const nav = useNavigate();
@@ -204,145 +205,140 @@ export default function CreateRequestPage() {
 
   /** ====== Render ====== */
   return (
-    <div style={{ padding: 24, display: "grid", gap: 18, maxWidth: 860 }}>
-      <h1>Tạo Request</h1>
+    <div className="moving-service-container">
+      <div className="content-wrapper">
+        <div className="page-header">
+          <h1>Tạo Yêu Cầu Vận Chuyển</h1>
+          <p>Điền thông tin để tạo yêu cầu vận chuyển mới</p>
+        </div>
 
-      <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
-        <label>
-          Họ và tên
-          <input
-            name="customerName"
-            value={form.customerName}
-            onChange={onChange}
-            style={ipt}
-          />
-        </label>
-
-        <label>
-          Số điện thoại
-          <input
-            name="customerPhone"
-            value={form.customerPhone}
-            onChange={onChange}
-            style={ipt}
-            placeholder="0xxxxxxxxx"
-          />
-        </label>
-
-        <fieldset style={fs}>
-          <legend>Địa chỉ LẤY HÀNG</legend>
-          <AddressPicker
-            value={form.pickupAddress}
-            onChange={(v) => setForm((s) => ({ ...s, pickupAddress: v }))}
-          />
-        </fieldset>
-
-        <fieldset style={fs}>
-          <legend>Địa chỉ GIAO HÀNG</legend>
-          <AddressPicker
-            value={form.deliveryAddress}
-            onChange={(v) => setForm((s) => ({ ...s, deliveryAddress: v }))}
-          />
-        </fieldset>
-
-        <fieldset style={fs}>
-          <legend>Tuyến đường (xem trước)</legend>
-          <RouteMapLibre
-            pickup={form.pickupLocation}
-            delivery={form.deliveryLocation}
-            routeGeojson={routeGeo}
-            height={320}
-          />
-          {routeSummary ? (
-            <div style={{ marginTop: 8, color: "#444" }}>
-              Ước tính: {(routeSummary.distance / 1000).toFixed(1)} km •{" "}
-              {Math.round(routeSummary.duration / 60)} phút
-            </div>
-          ) : (
-            <div style={{ marginTop: 8, color: "#666" }}>
-              Nhập đủ địa chỉ LẤY & GIAO để hiển thị tuyến đường.
+        <div className="main-card">
+          {msg && (
+            <div className={`message ${msg.includes("✅") ? "success" : "error"}`}>
+              {msg}
             </div>
           )}
-        </fieldset>
 
-        <label>
-          Thời gian chuyển
-          <input
-            type="datetime-local"
-            name="movingTime"
-            value={form.movingTime}
-            onChange={onChange}
-            style={ipt}
-            min={nowForDatetimeLocal()}
-          />
-        </label>
-
-        <fieldset style={fs}>
-          <legend>Chọn hình thức dịch vụ</legend>
-          <div style={{ display: "grid", gap: 12 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input
-                type="radio"
-                name="requestType"
-                value="SELF_SERVICE"
-                checked={form.requestType === "SELF_SERVICE"}
-                onChange={(e) => setForm((s) => ({ ...s, requestType: e.target.value }))}
-              />
-              <div>
-                <strong>Tự chọn dịch vụ và thêm đồ dùng</strong>
-                <div style={{ fontSize: "0.9em", color: "#666", marginTop: 4 }}>
-                  Bạn sẽ tự chọn loại xe, nhân công và thêm đồ dùng cần vận chuyển
+          <form onSubmit={submit}>
+            <div className="form-section">
+              <h3>Thông tin khách hàng</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Họ và tên</label>
+                  <input
+                    name="customerName"
+                    value={form.customerName}
+                    onChange={onChange}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Số điện thoại</label>
+                  <input
+                    name="customerPhone"
+                    value={form.customerPhone}
+                    onChange={onChange}
+                    placeholder="0xxxxxxxxx"
+                    required
+                  />
                 </div>
               </div>
-            </label>
-            
-            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input
-                type="radio"
-                name="requestType"
-                value="STAFF_SURVEY"
-                checked={form.requestType === "STAFF_SURVEY"}
-                onChange={(e) => setForm((s) => ({ ...s, requestType: e.target.value }))}
+            </div>
+
+            <div className="form-section">
+              <h3>Địa chỉ lấy hàng</h3>
+              <AddressPicker
+                value={form.pickupAddress}
+                onChange={(v) => setForm((s) => ({ ...s, pickupAddress: v }))}
               />
-              <div>
-                <strong>Gọi nhân viên khảo sát nhà</strong>
-                <div style={{ fontSize: "0.9em", color: "#666", marginTop: 4 }}>
-                  Nhân viên sẽ đến khảo sát 1 ngày trước và làm việc trực tiếp với bạn (Phí khảo sát: +15.000₫)
+            </div>
+
+            <div className="form-section">
+              <h3>Địa chỉ giao hàng</h3>
+              <AddressPicker
+                value={form.deliveryAddress}
+                onChange={(v) => setForm((s) => ({ ...s, deliveryAddress: v }))}
+              />
+            </div>
+
+            <div className="form-section">
+              <h3>Tuyến đường (xem trước)</h3>
+              <RouteMapLibre
+                pickup={form.pickupLocation}
+                delivery={form.deliveryLocation}
+                routeGeojson={routeGeo}
+                height={320}
+              />
+              {routeSummary ? (
+                <div style={{ marginTop: "1rem", color: "#2c3e50", fontWeight: 500 }}>
+                  Ước tính: <strong>{(routeSummary.distance / 1000).toFixed(1)} km</strong> •{" "}
+                  <strong>{Math.round(routeSummary.duration / 60)} phút</strong>
                 </div>
+              ) : (
+                <div style={{ marginTop: "1rem", color: "#7f8c8d" }}>
+                  Nhập đủ địa chỉ LẤY & GIAO để hiển thị tuyến đường.
+                </div>
+              )}
+            </div>
+
+            <div className="form-section">
+              <h3>Thời gian chuyển</h3>
+              <div className="form-group">
+                <label>Ngày và giờ chuyển</label>
+                <input
+                  type="datetime-local"
+                  name="movingTime"
+                  value={form.movingTime}
+                  onChange={onChange}
+                  min={nowForDatetimeLocal()}
+                  required
+                />
               </div>
-            </label>
-          </div>
-        </fieldset>
+            </div>
 
-        <button disabled={loading} style={btn} type="submit">
-          {loading ? "Đang xử lý…" : "Tiếp tục"}
-        </button>
-      </form>
+            <div className="form-section">
+              <h3>Chọn hình thức dịch vụ</h3>
+              <div className="radio-group">
+                <label
+                  className={`radio-option ${form.requestType === "SELF_SERVICE" ? "selected" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="requestType"
+                    value="SELF_SERVICE"
+                    checked={form.requestType === "SELF_SERVICE"}
+                    onChange={(e) => setForm((s) => ({ ...s, requestType: e.target.value }))}
+                  />
+                  <div>
+                    <h4>Tự chọn dịch vụ và thêm đồ dùng</h4>
+                    <p>Bạn sẽ tự chọn loại xe, nhân công và thêm đồ dùng cần vận chuyển</p>
+                  </div>
+                </label>
+                
+                <label
+                  className={`radio-option ${form.requestType === "STAFF_SURVEY" ? "selected" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="requestType"
+                    value="STAFF_SURVEY"
+                    checked={form.requestType === "STAFF_SURVEY"}
+                    onChange={(e) => setForm((s) => ({ ...s, requestType: e.target.value }))}
+                  />
+                  <div>
+                    <h4>Gọi nhân viên khảo sát nhà</h4>
+                    <p>Nhân viên sẽ đến khảo sát 1 ngày trước và làm việc trực tiếp với bạn (Phí khảo sát: +15.000₫)</p>
+                  </div>
+                </label>
+              </div>
+            </div>
 
-      {msg && <div>{msg}</div>}
+            <button disabled={loading} className="btn btn-primary" type="submit" style={{ width: "100%", marginTop: "1rem" }}>
+              {loading ? "Đang xử lý…" : "Tiếp tục"}
+            </button>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
-
-const ipt = { padding: 8, border: "1px solid #ccc", borderRadius: 6, width: "100%" };
-const btn = {
-  padding: "10px 14px",
-  border: "1px solid #111",
-  background: "#111",
-  color: "#fff",
-  borderRadius: 8,
-};
-const removeBtn = {
-  position: "absolute",
-  top: -8,
-  right: -8,
-  width: 22,
-  height: 22,
-  borderRadius: "50%",
-  border: "1px solid #c00",
-  background: "#fff",
-  color: "#c00",
-  cursor: "pointer",
-  lineHeight: "18px",
-};
-const fs = { padding: 12, border: "1px dashed #aaa", borderRadius: 8 };

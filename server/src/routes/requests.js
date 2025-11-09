@@ -127,6 +127,42 @@ router.get("/requests", async (req, res, next) => {
   }
 });
 
+/* ================= LIST STAFF TASKS ================= */
+// GET /api/requests/staff/tasks
+// Lấy tất cả requests mà staff cần xử lý (UNDER_SURVEY, WAITING_PAYMENT, IN_PROGRESS, DONE)
+router.get("/requests/staff/tasks", async (req, res, next) => {
+  try {
+    const statusFilter = req.query.status; // Optional: filter theo status cụ thể
+    
+    const query = {
+      status: {
+        $in: ["UNDER_SURVEY", "WAITING_PAYMENT", "IN_PROGRESS", "DONE"]
+      }
+    };
+    
+    if (statusFilter) {
+      query.status = statusFilter; // Override nếu có filter
+    }
+    
+    const docs = await Request.find(query)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Compat cho doc cũ
+    const mapped = docs.map((d) => ({
+      ...d,
+      pickupAddress: d.pickupAddress || d.address || null,
+      deliveryAddress: d.deliveryAddress || d.address || null,
+      pickupLocation: d.pickupLocation || d.location || null,
+      deliveryLocation: d.deliveryLocation || d.location || null,
+    }));
+
+    res.json(mapped);
+  } catch (e) {
+    next(e);
+  }
+});
+
 /* ================= GET ONE (Edit) ================= */
 // GET /api/requests/:id
 router.get("/requests/:id", async (req, res, next) => {
@@ -147,14 +183,55 @@ router.get("/requests/:id", async (req, res, next) => {
 });
 
 /* ================= UPDATE (Edit) ================= */
-// Chỉ cho sửa khi đang chờ duyệt
+// Cho phép sửa thông tin và cập nhật status
 router.patch("/requests/:id", async (req, res, next) => {
   try {
     const r = await Request.findById(req.params.id);
     if (!r) return res.status(404).json({ error: "Not found" });
-    // Cho phép sửa khi PENDING_CONFIRMATION hoặc PENDING_REVIEW (backward compat)
-    if (!["PENDING_CONFIRMATION", "PENDING_REVIEW"].includes(r.status)) {
-      return res.status(409).json({ error: "Chỉ được sửa khi đang chờ xác nhận" });
+    
+    // ✅ Cho phép cập nhật status (cho staff)
+    if ("status" in req.body) {
+      const newStatus = req.body.status;
+      const validStatuses = [
+        "PENDING_CONFIRMATION", "UNDER_SURVEY", "WAITING_PAYMENT",
+        "IN_PROGRESS", "DONE", "CANCELLED", "REJECTED",
+        "PENDING_REVIEW", "APPROVED" // backward compat
+      ];
+      if (!validStatuses.includes(newStatus)) {
+        return res.status(400).json({ error: "Status không hợp lệ" });
+      }
+      
+      // Cho phép staff cập nhật status trong các trường hợp:
+      // - UNDER_SURVEY -> WAITING_PAYMENT (sau khi khảo sát xong)
+      // - WAITING_PAYMENT -> IN_PROGRESS (khi bắt đầu vận chuyển)
+      // - IN_PROGRESS -> DONE (khi hoàn thành)
+      const allowedStatusTransitions = {
+        "UNDER_SURVEY": ["WAITING_PAYMENT"],
+        "WAITING_PAYMENT": ["IN_PROGRESS"],
+        "IN_PROGRESS": ["DONE"],
+        "PENDING_CONFIRMATION": ["PENDING_CONFIRMATION", "UNDER_SURVEY", "CANCELLED"], // Customer có thể sửa
+        "PENDING_REVIEW": ["PENDING_CONFIRMATION", "UNDER_SURVEY", "CANCELLED"], // Backward compat
+      };
+      
+      const allowed = allowedStatusTransitions[r.status] || [];
+      if (!allowed.includes(newStatus) && r.status !== newStatus) {
+        return res.status(409).json({ 
+          error: `Không thể chuyển từ ${r.status} sang ${newStatus}. Chỉ cho phép: ${allowed.join(", ")}` 
+        });
+      }
+      
+      r.status = newStatus;
+    }
+    
+    // Cho phép sửa thông tin khi PENDING_CONFIRMATION hoặc PENDING_REVIEW (backward compat)
+    const canEditInfo = ["PENDING_CONFIRMATION", "PENDING_REVIEW"].includes(r.status);
+    if (!canEditInfo && Object.keys(req.body).some(k => 
+      ["customerName", "customerPhone", "pickupAddress", "deliveryAddress", "movingTime"].includes(k)
+    )) {
+      // Nếu chỉ cập nhật status hoặc notes thì OK, không cần check
+      if (!("status" in req.body) && !("notes" in req.body) && !("actualDelivery" in req.body)) {
+        return res.status(409).json({ error: "Chỉ được sửa thông tin khi đang chờ xác nhận" });
+      }
     }
 
     // ✅ Cho phép đổi họ tên / SĐT (kèm validate)
@@ -209,6 +286,14 @@ router.patch("/requests/:id", async (req, res, next) => {
     if ("serviceType" in req.body) r.serviceType = req.body.serviceType;
     if ("notes" in req.body)       r.notes = req.body.notes;
     if ("images" in req.body)      r.images = Array.isArray(req.body.images) ? req.body.images.slice(0,4) : [];
+    
+    // ✅ Cho phép cập nhật actualDelivery khi hoàn thành (cho staff)
+    if ("actualDelivery" in req.body) {
+      const ad = new Date(req.body.actualDelivery);
+      if (ad instanceof Date && !isNaN(ad.getTime())) {
+        r.actualDelivery = ad;
+      }
+    }
 
     await r.save();
     return res.json(r);
