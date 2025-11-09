@@ -15,24 +15,31 @@ export async function osmGeocode(text, signal, opts = {}) {
   const province = addressParts[3] || "";
 
   // Thử các format khác nhau từ cụ thể đến chung
+  // Thêm nhiều biến thể để tăng độ chính xác
   const queries = [
     text, // Format đầy đủ
-    `${ward}, ${district}, ${province}`, // Bỏ số nhà
-    `${district}, ${province}`, // Chỉ quận/huyện + tỉnh
-    `${province}`, // Chỉ tỉnh
+    `${street}, ${ward}, ${district}, ${province}, Việt Nam`, // Có thêm "Việt Nam"
+    `${ward}, ${district}, ${province}, Việt Nam`, // Bỏ số nhà, có "Việt Nam"
+    `${district}, ${province}, Việt Nam`, // Chỉ quận/huyện + tỉnh
+    `${province}, Việt Nam`, // Chỉ tỉnh
   ].filter(Boolean);
+
+  let bestResult = null;
+  let bestScore = 0;
 
   for (const query of queries) {
     try {
       const url = new URL("https://nominatim.openstreetmap.org/search");
       url.searchParams.set("q", query);
       url.searchParams.set("format", "json");
-      url.searchParams.set("limit", "3");
+      url.searchParams.set("limit", "5"); // Tăng limit để có nhiều lựa chọn hơn
       url.searchParams.set("countrycodes", "vn");
       url.searchParams.set("addressdetails", "1");
       
       if (opts.focus?.lng && opts.focus?.lat) {
-        url.searchParams.set("viewbox", `${opts.focus.lng - 0.2},${opts.focus.lat - 0.2},${opts.focus.lng + 0.2},${opts.focus.lat + 0.2}`);
+        // Tăng viewbox để tìm rộng hơn
+        const viewboxSize = 0.3; // Tăng từ 0.2 lên 0.3
+        url.searchParams.set("viewbox", `${opts.focus.lng - viewboxSize},${opts.focus.lat - viewboxSize},${opts.focus.lng + viewboxSize},${opts.focus.lat + viewboxSize}`);
         url.searchParams.set("bounded", "1");
       }
 
@@ -44,29 +51,57 @@ export async function osmGeocode(text, signal, opts = {}) {
         },
       });
 
-      if (!res.ok) continue;
+      if (!res.ok) {
+        if (res.status === 429) {
+          console.warn("⚠️ Nominatim rate limit, đợi 1 giây...");
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        continue;
+      }
 
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) continue;
 
-      // Ưu tiên kết quả có type phù hợp
-      const result = data.find(r => 
-        r.type === "residential" || 
-        r.type === "building" || 
-        r.type === "house" ||
-        r.type === "commercial"
-      ) || data[0];
+      // Đánh giá và chọn kết quả tốt nhất
+      for (const result of data) {
+        let score = 0;
+        
+        // Ưu tiên kết quả có type phù hợp
+        if (result.type === "house" || result.type === "residential") score += 10;
+        else if (result.type === "building" || result.type === "commercial") score += 8;
+        else if (result.type === "road" || result.type === "highway") score += 5;
+        else if (result.type === "administrative") score += 2;
+        
+        // Ưu tiên kết quả có importance cao
+        if (result.importance) score += result.importance * 5;
+        
+        // Kiểm tra xem có khớp với địa chỉ không
+        const displayName = (result.display_name || "").toLowerCase();
+        if (street && displayName.includes(street.toLowerCase())) score += 5;
+        if (ward && displayName.includes(ward.toLowerCase())) score += 3;
+        if (district && displayName.includes(district.toLowerCase())) score += 2;
+        if (province && displayName.includes(province.toLowerCase())) score += 1;
+        
+        if (score > bestScore) {
+          bestScore = score;
+          bestResult = result;
+        }
+      }
 
-      const lat = parseFloat(result.lat);
-      const lng = parseFloat(result.lon);
-      
-      if (!isNaN(lat) && !isNaN(lng)) {
-        console.log(`✅ Geocoded: ${query} → [${lat}, ${lng}]`);
-        return {
-          lat,
-          lng,
-          label: result.display_name || query,
-        };
+      // Nếu tìm được kết quả tốt (score > 5), dùng luôn
+      if (bestResult && bestScore > 5) {
+        const lat = parseFloat(bestResult.lat);
+        const lng = parseFloat(bestResult.lon);
+        
+        if (!isNaN(lat) && !isNaN(lng)) {
+          console.log(`✅ Geocoded (score: ${bestScore.toFixed(1)}): ${query} → [${lat}, ${lng}]`);
+          return {
+            lat,
+            lng,
+            label: bestResult.display_name || query,
+            isEstimated: bestScore < 10, // Đánh dấu nếu là ước tính
+          };
+        }
       }
     } catch (e) {
       if (e?.name !== "AbortError") {
@@ -76,13 +111,30 @@ export async function osmGeocode(text, signal, opts = {}) {
     }
   }
 
+  // Nếu có kết quả tốt nhất (dù score thấp), vẫn dùng
+  if (bestResult) {
+    const lat = parseFloat(bestResult.lat);
+    const lng = parseFloat(bestResult.lon);
+    
+    if (!isNaN(lat) && !isNaN(lng)) {
+      console.log(`⚠️ Geocoded (score thấp: ${bestScore.toFixed(1)}): → [${lat}, ${lng}]`);
+      return {
+        lat,
+        lng,
+        label: bestResult.display_name || text,
+        isEstimated: true,
+      };
+    }
+  }
+
   // Fallback: trả về tọa độ trung tâm của tỉnh nếu có
   if (opts.focus?.lat && opts.focus?.lng) {
-    console.warn(`⚠️ Không tìm được địa chỉ "${text}", dùng tọa độ trung tâm`);
+    console.warn(`⚠️ Không tìm được địa chỉ "${text}", dùng tọa độ trung tâm tỉnh/quận`);
     return {
       lat: opts.focus.lat,
       lng: opts.focus.lng,
-      label: `${province || "Địa điểm"} (ước tính)`,
+      label: `${province || district || "Địa điểm"} (ước tính - trung tâm)`,
+      isEstimated: true,
     };
   }
 
