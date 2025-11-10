@@ -1,5 +1,5 @@
 // API base khớp server: /api
-const BASE = process.env.REACT_APP_API_URL || "http://localhost:3001/api";
+const BASE = process.env.REACT_APP_API_URL || "http://localhost:3000/api";
 
 // ----- CREATE (JSON body, images là mảng base64 nếu có) -----
 export async function createRequest(payload) {
@@ -66,4 +66,58 @@ export async function getStaffTasks(status) {
 /* (tùy chọn) nếu còn nơi nào gọi listRequests / deleteRequest cũ:
 export async function listRequests() { return listRequestsByPhone(""); }
 export async function deleteRequest(id) { return cancelRequest(id); }
-*/
+
+// Manager-specific functions
+export async function getAllRequests(params = {}) {
+  const queryParams = new URLSearchParams(params).toString();
+  const res = await fetch(`${BASE}/requests/all?${queryParams}`, {
+    credentials: 'include'
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+export async function getMyRequests() {
+  const res = await fetch(`${BASE}/requests/my`, {
+    credentials: 'include'
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+export async function updateRequestStatus(requestId, statusData) {
+  const res = await fetch(`${BASE}/requests/${requestId}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(statusData)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+// Get available staff for a request
+export async function getAvailableStaffForRequest(requestId) {
+  const res = await fetch(`${BASE}/requests/${requestId}/available-staff`, {
+    credentials: 'include'
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+// Assign staff to request
+export async function assignStaffToRequest(requestId, data) {
+  const res = await fetch(`${BASE}/requests/${requestId}/assign-staff`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data)
+  });
+  const responseData = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(responseData.error || res.statusText);
+  return responseData;
+}

@@ -1,5 +1,5 @@
 // client/src/api/_base.js
-const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:3001/api";
+const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:3000/api";
 
 /** --- GET --- */
 export async function apiGet(path) {
