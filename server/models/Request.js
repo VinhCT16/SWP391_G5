@@ -51,12 +51,12 @@ const requestSchema = new mongoose.Schema({
   assignedStaff: [{
     staffId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Staff",
+      ref: "User",
       required: true
     },
     assignedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Manager"
+      ref: "User"
     },
     assignedAt: { type: Date, default: Date.now },
     notes: String
@@ -71,8 +71,8 @@ const requestSchema = new mongoose.Schema({
         enum: ["packing", "loading", "transporting", "unloading", "unpacking"],
         required: true 
       },
-      assignedStaff: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
-      transporter: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
+      assignedStaff: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      transporter: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       status: { 
         type: String, 
         enum: ["pending", "assigned", "in-progress", "blocked", "overdue", "completed", "cancelled"], 
@@ -115,7 +115,7 @@ const requestSchema = new mongoose.Schema({
   
   // Approval
   approval: {
-    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Manager" },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     reviewedAt: Date,
     approved: Boolean,
     rejectionReason: String,

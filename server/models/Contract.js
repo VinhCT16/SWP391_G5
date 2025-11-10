@@ -13,12 +13,12 @@ const contractSchema = new mongoose.Schema({
   },
   customerId: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: "Customer", 
+    ref: "User", 
     required: true 
   },
   managerId: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: "Manager", 
+    ref: "User", 
     required: true 
   },
   serviceId: { 
@@ -31,12 +31,12 @@ const contractSchema = new mongoose.Schema({
   assignedStaff: [{
     staffId: { 
       type: mongoose.Schema.Types.ObjectId, 
-      ref: "Staff", 
+      ref: "User", 
       required: true 
     },
     assignedBy: { 
       type: mongoose.Schema.Types.ObjectId, 
-      ref: "Manager" 
+      ref: "User" 
     },
     assignedAt: { 
       type: Date, 
@@ -94,7 +94,7 @@ const contractSchema = new mongoose.Schema({
   
   // Approval Process
   approval: {
-    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Manager" },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     approvedAt: Date,
     rejectionReason: String,
     notes: String

@@ -1,6 +1,6 @@
 // server/controllers/requestController.js
 const Request = require("../models/Request");
-const Staff = require("../models/Staff");
+const User = require("../models/User");
 const { v4: uuidv4 } = require('uuid');
 
 // Get all requests (manager view)
@@ -200,7 +200,7 @@ const getAvailableStaffForRequest = async (req, res) => {
       return res.status(404).json({ message: "Request not found" });
     }
 
-    const allStaff = await Staff.find({ isActive: true }).populate('userId', 'name email phone');
+    const allStaff = await User.find({ role: 'staff', isActive: true }).select('name email phone employeeId staffRole specialization');
     const assignedIds = (request.assignedStaff || []).map(a => a.staffId.toString());
     const availableStaff = allStaff.filter(s => !assignedIds.includes(s._id.toString()));
     return res.json({ availableStaff });
@@ -222,8 +222,8 @@ const assignStaffToRequest = async (req, res) => {
       return res.status(404).json({ message: 'Request not found' });
     }
 
-    const staff = await Staff.findById(staffId);
-    if (!staff) {
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: 'Staff not found' });
     }
 
@@ -235,8 +235,7 @@ const assignStaffToRequest = async (req, res) => {
 
     await request.populate({
       path: 'assignedStaff.staffId',
-      select: 'employeeId role',
-      populate: { path: 'userId', select: 'name email phone' }
+      select: 'name email phone employeeId staffRole specialization'
     });
 
     return res.json({ message: 'Staff assigned to request', request });

@@ -16,10 +16,12 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Name, email, and password are required" });
     }
 
-    // Validate role
-    const validRoles = ["customer", "manager", "staff", "admin"];
-    if (!validRoles.includes(role)) {
-      return res.status(400).json({ message: "Invalid role specified" });
+    // Public registration only allows customer role
+    // Manager, staff, and admin accounts must be created by admin with proper credentials
+    if (role !== "customer") {
+      return res.status(403).json({ 
+        message: "Only customer accounts can be created through public registration. Other roles must be created by an administrator." 
+      });
     }
 
     const existing = await User.findOne({ email: email.toLowerCase() });
@@ -206,102 +208,8 @@ router.put("/password", auth, async (req, res) => {
   }
 });
 
-// Create Manager Profile (requires manager role)
-router.post("/create-manager", auth, require("../utils/authMiddleware").requireManager, async (req, res) => {
-  try {
-    const Manager = require("../models/Manager");
-    const { employeeId, department, permissions } = req.body;
-    
-    // Check if manager profile already exists
-    const existingManager = await Manager.findOne({ userId: req.userId });
-    if (existingManager) {
-      return res.status(409).json({ message: "Manager profile already exists" });
-    }
-    
-    const manager = await Manager.create({
-      userId: req.userId,
-      employeeId,
-      department,
-      permissions: permissions || []
-    });
-    
-    return res.status(201).json({ manager });
-  } catch (err) {
-    return res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Create Staff Profile (requires staff role)
-router.post("/create-staff", auth, require("../utils/authMiddleware").requireStaff, async (req, res) => {
-  try {
-    const Staff = require("../models/Staff");
-    const { employeeId, role, specialization, availability } = req.body;
-    
-    // Check if staff profile already exists
-    const existingStaff = await Staff.findOne({ userId: req.userId });
-    if (existingStaff) {
-      return res.status(409).json({ message: "Staff profile already exists" });
-    }
-    
-    const staff = await Staff.create({
-      userId: req.userId,
-      employeeId,
-      role,
-      specialization: specialization || [],
-      availability: availability || {
-        isAvailable: true,
-        workingHours: { start: "08:00", end: "17:00" },
-        workDays: ["monday", "tuesday", "wednesday", "thursday", "friday"]
-      }
-    });
-    
-    return res.status(201).json({ staff });
-  } catch (err) {
-    return res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Create Admin Profile (requires admin role)
-router.post("/create-admin", auth, require("../utils/authMiddleware").requireAdmin, async (req, res) => {
-  try {
-    const Admin = require("../models/Admin");
-    const { adminId, department, permissions } = req.body;
-    
-    // Check if admin profile already exists
-    const existingAdmin = await Admin.findOne({ userId: req.userId });
-    if (existingAdmin) {
-      return res.status(409).json({ message: "Admin profile already exists" });
-    }
-    
-    const admin = await Admin.create({
-      userId: req.userId,
-      adminId,
-      department,
-      permissions: permissions || {
-        userManagement: {
-          canViewUsers: true,
-          canCreateUsers: true,
-          canUpdateUsers: true,
-          canDeleteUsers: true,
-          canLockUnlockUsers: true
-        },
-        staffManagement: {
-          canManageStaff: true,
-          canAssignRoles: true,
-          canViewStaffPerformance: true
-        },
-        systemManagement: {
-          canViewSystemLogs: true,
-          canManageSystemSettings: true
-        }
-      }
-    });
-    
-    return res.status(201).json({ admin });
-  } catch (err) {
-    return res.status(500).json({ message: "Server error" });
-  }
-});
+// Note: Profile creation endpoints removed - role-specific data is now stored directly in User model
+// Profile data should be set during user creation (by admin) or updated via profile update endpoint
 
 module.exports = router;
 

@@ -1,7 +1,7 @@
 // server/controllers/contractController.js
 const Request = require("../models/Request");
 const Contract = require("../models/Contract");
-const Staff = require("../models/Staff");
+const User = require("../models/User");
 const Service = require("../models/Service");
 const { v4: uuidv4 } = require('uuid');
 
@@ -196,7 +196,7 @@ const getCustomerContracts = async (req, res) => {
 
     const contracts = await Contract.find(filter)
       .populate('customerId', 'name email phone')
-      .populate('managerId', 'userId')
+      .populate('managerId', 'name email phone')
       .populate('serviceId', 'name price')
       .sort({ createdAt: -1 })
       .limit(Number(limit))
@@ -223,7 +223,7 @@ const exportContractPDF = async (req, res) => {
     
     const contract = await Contract.findById(id)
       .populate('customerId', 'name email phone')
-      .populate('managerId', 'userId')
+      .populate('managerId', 'name email phone')
       .populate('serviceId', 'name price');
 
     if (!contract) {
@@ -266,11 +266,11 @@ const getAllContracts = async (req, res) => {
       filter.status = 'approved';
     } else if (role === 'staff') {
       // Staff only see contracts assigned to them
-      const staff = await Staff.findOne({ userId: req.userId });
-      if (!staff) {
+      const user = await User.findById(req.userId);
+      if (!user || user.role !== 'staff') {
         return res.json({ contracts: [], totalPages: 0, currentPage: page, total: 0 });
       }
-      filter['assignedStaff.staffId'] = staff._id;
+      filter['assignedStaff.staffId'] = user._id;
     } else if (role === 'manager' || role === 'admin') {
       // Managers and Admins see all contracts; no additional filter
     } else {
@@ -280,12 +280,11 @@ const getAllContracts = async (req, res) => {
 
     const query = Contract.find(filter)
       .populate('customerId', 'name email phone')
-      .populate('managerId', 'userId')
+      .populate('managerId', 'name email phone')
       .populate('serviceId', 'name price')
       .populate({
         path: 'assignedStaff.staffId',
-        select: 'employeeId role',
-        populate: { path: 'userId', select: 'name email phone' }
+        select: 'name email phone employeeId staffRole specialization'
       })
       .sort({ createdAt: -1 })
       .limit(Number(limit))
@@ -320,13 +319,13 @@ const approveAndAssign = async (req, res) => {
 
     const [contract, staff] = await Promise.all([
       Contract.findById(contractId),
-      Staff.findById(staffId)
+      User.findById(staffId)
     ]);
 
     if (!contract) {
       return res.status(404).json({ message: 'Contract not found' });
     }
-    if (!staff) {
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: 'Staff not found' });
     }
 
@@ -354,12 +353,11 @@ const approveAndAssign = async (req, res) => {
 
     await contract.populate([
       { path: 'customerId', select: 'name email phone' },
-      { path: 'managerId', select: 'userId' },
+      { path: 'managerId', select: 'name email phone' },
       { path: 'serviceId', select: 'name price' },
       {
         path: 'assignedStaff.staffId',
-        select: 'employeeId role',
-        populate: { path: 'userId', select: 'name email phone' }
+        select: 'name email phone employeeId staffRole specialization'
       }
     ]);
 
@@ -386,8 +384,8 @@ const assignStaffToContract = async (req, res) => {
     }
 
     // Check if staff exists
-    const staff = await Staff.findById(staffId);
-    if (!staff) {
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff not found" });
     }
 
@@ -419,8 +417,7 @@ const assignStaffToContract = async (req, res) => {
     // Populate assigned staff details
     await contract.populate({
       path: 'assignedStaff.staffId',
-      select: 'employeeId role',
-      populate: { path: 'userId', select: 'name email phone' }
+      select: 'name email phone employeeId staffRole specialization'
     });
 
     res.json({
@@ -444,8 +441,8 @@ const getAvailableStaff = async (req, res) => {
     }
 
     // Get all active staff
-    const allStaff = await Staff.find({ isActive: true })
-      .populate('userId', 'name email phone');
+    const allStaff = await User.find({ role: 'staff', isActive: true })
+      .select('name email phone employeeId staffRole specialization');
     
     // Get already assigned staff IDs
     const assignedStaffIds = contract.assignedStaff.map(a => a.staffId.toString());
@@ -468,9 +465,9 @@ const acceptAssignment = async (req, res) => {
     const { id } = req.params;
     const staffUserId = req.userId;
 
-    // Find staff record
-    const staff = await Staff.findOne({ userId: staffUserId });
-    if (!staff) {
+    // Find staff user
+    const staff = await User.findById(staffUserId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff not found" });
     }
 
@@ -526,8 +523,8 @@ const rejectAssignment = async (req, res) => {
     const { reason } = req.body;
     const staffUserId = req.userId;
 
-    const staff = await Staff.findOne({ userId: staffUserId });
-    if (!staff) {
+    const staff = await User.findById(staffUserId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff not found" });
     }
 
@@ -568,8 +565,8 @@ const getAssignedContracts = async (req, res) => {
   try {
     const staffUserId = req.userId;
 
-    const staff = await Staff.findOne({ userId: staffUserId });
-    if (!staff) {
+    const staff = await User.findById(staffUserId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff not found" });
     }
 
@@ -577,11 +574,11 @@ const getAssignedContracts = async (req, res) => {
       'assignedStaff.staffId': staff._id
     })
       .populate('customerId', 'name email phone')
-      .populate('managerId', 'userId')
+      .populate('managerId', 'name email phone')
       .populate('serviceId', 'name price')
       .populate({
         path: 'assignedStaff.staffId',
-        populate: { path: 'userId', select: 'name email phone' }
+        select: 'name email phone employeeId staffRole specialization'
       })
       .sort({ createdAt: -1 });
 
