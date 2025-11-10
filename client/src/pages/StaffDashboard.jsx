@@ -1,11 +1,17 @@
 // client/src/pages/StaffDashboard.jsx - Dashboard cho nhân viên
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { getStaffTasks } from "../api/requestApi";
-import { fmtDateTime24 } from "../utils/datetime";
-import { fmtAddress } from "../utils/address";
-import "../styles/movingService.css";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { getStaffTasks as getStaffTasksFromTaskApi, updateTaskStatus } from '../api/taskApi';
+import { getStaffTasks as getStaffTasksFromRequestApi } from '../api/requestApi';
+import { updateProfile, changePassword } from '../api/userApi';
+import { fmtDateTime24 } from '../utils/datetime';
+import { fmtAddress } from '../utils/address';
+import BackButton from '../components/BackButton';
+import '../styles/movingService.css';
+import './StaffDashboard.css';
 
+// Status configuration for request-based view
 const STATUS_CONFIG = {
   UNDER_SURVEY: {
     label: "Đang khảo sát",
@@ -43,40 +49,19 @@ const getStatusConfig = (status) => {
 };
 
 export default function StaffDashboard() {
+  const { user } = useAuth();
   const nav = useNavigate();
+  
+  // Tab management
+  const [activeTab, setActiveTab] = useState('my-tasks');
+  
+  // Task/Request data
+  const [tasks, setTasks] = useState([]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filterStatus, setFilterStatus] = useState(""); // Lọc theo trạng thái
-  const [searchPhone, setSearchPhone] = useState(""); // Tìm kiếm theo SĐT
-
-  // Load tất cả requests cho staff
-  const loadRequests = async () => {
-    setLoading(true);
-    try {
-      console.log("🔄 Đang load staff tasks...");
-      const data = await getStaffTasks();
-      console.log("✅ Nhận được data:", data);
-      console.log("📊 Số lượng requests:", Array.isArray(data) ? data.length : 0);
-      if (Array.isArray(data) && data.length > 0) {
-        console.log("📋 Status của requests:", data.map(r => ({ id: r._id?.slice(-8), status: r.status })));
-      }
-      setRequests(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("❌ Error loading staff tasks:", err);
-      console.error("Error details:", err.message, err.stack);
-      setRequests([]);
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { getStaffTasks, updateTaskStatus } from '../api/taskApi';
-import { updateProfile, changePassword } from '../api/userApi';
-import BackButton from '../components/BackButton';
-
-export default function StaffDashboard() {
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  // Task selection and modals
   const [selectedTask, setSelectedTask] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -84,6 +69,12 @@ export default function StaffDashboard() {
     status: 'in-progress',
     notes: ''
   });
+  
+  // Request filtering (for request-based view)
+  const [filterStatus, setFilterStatus] = useState("");
+  const [searchPhone, setSearchPhone] = useState("");
+  
+  // Task filtering (for task-based view)
   const [filters, setFilters] = useState({
     status: '',
     taskType: '',
@@ -106,12 +97,13 @@ export default function StaffDashboard() {
     confirmPassword: ''
   });
 
-  // Load staff tasks
+  // Load staff tasks (task-based API)
   const loadTasks = async () => {
     try {
       setLoading(true);
-      const response = await getStaffTasks();
-      setTasks(response.data.tasks || []);
+      setError(null);
+      const response = await getStaffTasksFromTaskApi();
+      setTasks(response.data?.tasks || []);
     } catch (err) {
       console.error('Error loading tasks:', err);
       setError('Failed to load tasks');
@@ -120,201 +112,105 @@ export default function StaffDashboard() {
     }
   };
 
+  // Load staff requests (request-based API)
+  const loadRequests = async () => {
+    setLoading(true);
+    try {
+      console.log("🔄 Đang load staff tasks...");
+      const data = await getStaffTasksFromRequestApi();
+      console.log("✅ Nhận được data:", data);
+      console.log("📊 Số lượng requests:", Array.isArray(data) ? data.length : 0);
+      if (Array.isArray(data) && data.length > 0) {
+        console.log("📋 Status của requests:", data.map(r => ({ id: r._id?.slice(-8), status: r.status })));
+      }
+      setRequests(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("❌ Error loading staff tasks:", err);
+      console.error("Error details:", err.message, err.stack);
+      setRequests([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load data on component mount
   useEffect(() => {
-    loadRequests();
-  }, []);
+    if (activeTab === 'my-tasks') {
+      loadTasks();
+    } else if (activeTab === 'requests') {
+      loadRequests();
+    }
+  }, [activeTab]);
 
   // Filter requests
   const filteredRequests = filterStatus
     ? requests.filter((r) => r.status === filterStatus)
     : requests;
 
-  // Sắp xếp: mới nhất trước
+  // Sort requests: newest first
   const sortedRequests = [...filteredRequests].sort((a, b) => {
     const dateA = new Date(a.createdAt || a.requestDate || 0);
     const dateB = new Date(b.createdAt || b.requestDate || 0);
     return dateB - dateA;
   });
 
-  // Thống kê
-  const stats = {
+  // Filter tasks
+  const filteredTasks = tasks.filter(task => {
+    const matchesStatus = !filters.status || task.status === filters.status;
+    const matchesType = !filters.taskType || task.taskType === filters.taskType;
+    const matchesPriority = !filters.priority || (task.priority && task.priority === filters.priority);
+    const searchText = filters.search.trim().toLowerCase();
+    const matchesSearch = !searchText || [
+      task.requestNumber,
+      task.customer?.name,
+      task.customer?.email,
+      task.customer?.phone,
+      task.taskType
+    ].some(v => (v || '').toString().toLowerCase().includes(searchText));
+
+    // Date filtering by move date if present, else by createdAt
+    const taskDateStr = task?.moveDetails?.moveDate || task?.createdAt;
+    const taskDate = taskDateStr ? new Date(taskDateStr) : null;
+    const fromOk = !filters.dateFrom || (taskDate && taskDate >= new Date(filters.dateFrom));
+    const toOk = !filters.dateTo || (taskDate && taskDate <= new Date(filters.dateTo + 'T23:59:59'));
+
+    return matchesStatus && matchesType && matchesPriority && matchesSearch && fromOk && toOk;
+  });
+
+  // Statistics for requests
+  const requestStats = {
     survey: requests.filter((r) => r.status === "UNDER_SURVEY").length,
     waiting: requests.filter((r) => r.status === "WAITING_PAYMENT").length,
     inProgress: requests.filter((r) => r.status === "IN_PROGRESS").length,
     done: requests.filter((r) => r.status === "DONE").length,
   };
 
-  return (
-    <div className="moving-service-container">
-      <div className="content-wrapper">
-        <div className="page-header">
-          <h1>Staff Dashboard - Quản Lý Công Việc</h1>
-          <p>Xem và quản lý các công việc được phân công</p>
-        </div>
+  // Helper functions
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending': return '#ff9800';
+      case 'assigned': return '#2196f3';
+      case 'in-progress': return '#9c27b0';
+      case 'blocked': return '#795548';
+      case 'overdue': return '#e91e63';
+      case 'completed': return '#4caf50';
+      case 'cancelled': return '#f44336';
+      default: return '#666';
+    }
+  };
 
-        {/* Stats Cards */}
-        <div className="main-card">
-          <h2 style={{ marginTop: 0, marginBottom: "1rem", color: "#2c3e50" }}>Thống kê công việc</h2>
-          <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
-            <div className="stat-card" style={{ background: "linear-gradient(135deg, #2196f3 0%, #2196f3dd 100%)" }}>
-              <h3 style={{ color: "white", margin: 0 }}>{stats.survey}</h3>
-              <p style={{ color: "white", opacity: 0.9, margin: 0 }}>Cần khảo sát</p>
-            </div>
-            <div className="stat-card" style={{ background: "linear-gradient(135deg, #9c27b0 0%, #9c27b0dd 100%)" }}>
-              <h3 style={{ color: "white", margin: 0 }}>{stats.waiting}</h3>
-              <p style={{ color: "white", opacity: 0.9, margin: 0 }}>Chờ thanh toán</p>
-            </div>
-            <div className="stat-card" style={{ background: "linear-gradient(135deg, #00bcd4 0%, #00bcd4dd 100%)" }}>
-              <h3 style={{ color: "white", margin: 0 }}>{stats.inProgress}</h3>
-              <p style={{ color: "white", opacity: 0.9, margin: 0 }}>Đang vận chuyển</p>
-            </div>
-            <div className="stat-card" style={{ background: "linear-gradient(135deg, #4caf50 0%, #4caf50dd 100%)" }}>
-              <h3 style={{ color: "white", margin: 0 }}>{stats.done}</h3>
-              <p style={{ color: "white", opacity: 0.9, margin: 0 }}>Đã hoàn thành</p>
-            </div>
-          </div>
-        </div>
+  const getTaskTypeIcon = (taskType) => {
+    switch (taskType) {
+      case 'packing': return '📦';
+      case 'loading': return '⬆️';
+      case 'transporting': return '🚚';
+      case 'unloading': return '⬇️';
+      case 'unpacking': return '📋';
+      default: return '📝';
+    }
+  };
 
-        {/* Tasks List */}
-        <div className="main-card">
-          <div style={{ marginBottom: "1.5rem" }}>
-            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", marginBottom: "1rem" }}>
-              <input
-                placeholder="Tìm kiếm theo số điện thoại..."
-                value={searchPhone}
-                onChange={(e) => setSearchPhone(e.target.value)}
-                className="form-group input-primary"
-                style={{ flex: 1, minWidth: "250px", maxWidth: "400px" }}
-              />
-              <button onClick={loadRequests} className="btn btn-primary">
-                Làm mới
-              </button>
-            </div>
-
-            {/* Filter buttons */}
-            {requests.length > 0 && (
-              <div className="filter-buttons">
-                <button
-                  onClick={() => setFilterStatus("")}
-                  className={`filter-btn ${filterStatus === "" ? "active" : ""}`}
-                >
-                  Tất cả ({requests.length})
-                </button>
-                {Object.keys(STATUS_CONFIG).map((key) => {
-                  const count = requests.filter((r) => r.status === key).length;
-                  if (count === 0) return null;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setFilterStatus(filterStatus === key ? "" : key)}
-                      className={`filter-btn ${filterStatus === key ? "active" : ""}`}
-                      style={{
-                        borderColor: STATUS_CONFIG[key].color,
-                      }}
-                    >
-                      {STATUS_CONFIG[key].label} ({count})
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {loading ? (
-            <div className="loading-state">
-              <div className="loading-spinner" />
-              <p>Đang tải...</p>
-            </div>
-          ) : sortedRequests.length === 0 ? (
-            <div className="empty-state">
-              <h3>Chưa có công việc nào</h3>
-              <p>
-                {requests.length === 0
-                  ? "Bạn chưa được phân công công việc nào. Vui lòng liên hệ manager."
-                  : `Không có công việc nào với trạng thái "${filterStatus ? getStatusConfig(filterStatus).label : ""}"`}
-              </p>
-            </div>
-          ) : (
-            <div className="moves-list">
-              {sortedRequests
-                .filter((r) => !searchPhone || r.customerPhone?.includes(searchPhone))
-                .map((r) => {
-                  const statusConfig = getStatusConfig(r.status);
-                  const shortId = r._id?.slice(-8) || "N/A";
-                  const statusKey = r.status?.toLowerCase().replace("_", "-") || "unknown";
-                  return (
-                    <div key={r._id} className="move-card">
-                      <div className="move-header">
-                        <h3>Request #{shortId}</h3>
-                        <span
-                          className={`status-badge ${statusKey}`}
-                          style={{
-                            backgroundColor: statusConfig.bg,
-                            color: statusConfig.color,
-                          }}
-                          title={statusConfig.description}
-                        >
-                          {statusConfig.label}
-                        </span>
-                      </div>
-                      <div className="move-details">
-                        <p>
-                          <strong>Khách hàng:</strong> {r.customerName}
-                        </p>
-                        <p>
-                          <strong>SĐT:</strong> {r.customerPhone}
-                        </p>
-                        <p>
-                          <strong>Lấy hàng:</strong> {fmtAddress(r.pickupAddress || r.address)}
-                        </p>
-                        <p>
-                          <strong>Giao hàng:</strong> {fmtAddress(r.deliveryAddress || r.address)}
-                        </p>
-                        <p>
-                          <strong>Thời gian chuyển:</strong> {fmtDateTime24(r.movingTime)}
-                        </p>
-                        {r.surveyFee && (
-                          <p>
-                            <strong>Phí khảo sát:</strong> {r.surveyFee.toLocaleString()}₫
-                          </p>
-                        )}
-                      </div>
-                      <div className="move-actions">
-                        {r.status === "UNDER_SURVEY" && (
-                          <button
-                            onClick={() => nav(`/staff/survey/${r._id}`)}
-                            className="btn btn-primary"
-                          >
-                            Khảo sát & Nhập đồ dùng
-                          </button>
-                        )}
-                        {r.status === "IN_PROGRESS" && (
-                          <button
-                            onClick={() => nav(`/staff/task/${r._id}`)}
-                            className="btn btn-primary"
-                          >
-                            Xem chi tiết & Cập nhật
-                          </button>
-                        )}
-                        <button
-                          onClick={() => nav(`/requests/${r._id}/detail`)}
-                          className="btn btn-secondary"
-                        >
-                          Xem chi tiết
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-  // Handle task status update
+  // Event handlers
   const handleStatusUpdate = async () => {
     if (!selectedTask) return;
 
@@ -342,7 +238,6 @@ export default function StaffDashboard() {
     }
   };
 
-  // Open status update modal
   const openStatusModal = (task, newStatus) => {
     setSelectedTask(task);
     setStatusData({
@@ -352,20 +247,18 @@ export default function StaffDashboard() {
     setShowStatusModal(true);
   };
 
-  // Open details modal
   const openDetailsModal = (task) => {
     setSelectedTask(task);
     setShowDetailsModal(true);
   };
 
-  // Handle profile update
   const handleProfileUpdate = async () => {
     try {
       setLoading(true);
       const response = await updateProfile(profileData);
       
       // Update user context if available
-      if (response.data.user) {
+      if (response.data?.user) {
         // You might want to update the user context here
         // This depends on how your AuthContext is implemented
       }
@@ -380,7 +273,6 @@ export default function StaffDashboard() {
     }
   };
 
-  // Handle password change
   const handlePasswordChange = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setError('New passwords do not match');
@@ -414,7 +306,6 @@ export default function StaffDashboard() {
     }
   };
 
-  // Open profile modal
   const openProfileModal = () => {
     setProfileData({
       name: user?.name || '',
@@ -423,7 +314,6 @@ export default function StaffDashboard() {
     setShowProfileModal(true);
   };
 
-  // Open password modal
   const openPasswordModal = () => {
     setPasswordData({
       currentPassword: '',
@@ -431,58 +321,6 @@ export default function StaffDashboard() {
       confirmPassword: ''
     });
     setShowPasswordModal(true);
-  };
-
-  // Filter tasks
-  const filteredTasks = tasks.filter(task => {
-    const matchesStatus = !filters.status || task.status === filters.status;
-    const matchesType = !filters.taskType || task.taskType === filters.taskType;
-    const matchesPriority = !filters.priority || (task.priority && task.priority === filters.priority);
-    const searchText = filters.search.trim().toLowerCase();
-    const matchesSearch = !searchText || [
-      task.requestNumber,
-      task.customer?.name,
-      task.customer?.email,
-      task.customer?.phone,
-      task.taskType
-    ].some(v => (v || '').toString().toLowerCase().includes(searchText));
-
-    // Date filtering by move date if present, else by createdAt
-    const taskDateStr = task?.moveDetails?.moveDate || task?.createdAt;
-    const taskDate = taskDateStr ? new Date(taskDateStr) : null;
-    const fromOk = !filters.dateFrom || (taskDate && taskDate >= new Date(filters.dateFrom));
-    const toOk = !filters.dateTo || (taskDate && taskDate <= new Date(filters.dateTo + 'T23:59:59'));
-
-    return matchesStatus && matchesType && matchesPriority && matchesSearch && fromOk && toOk;
-  });
-
-  // Load tasks on component mount
-  useEffect(() => {
-    loadTasks();
-  }, []);
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'pending': return '#ff9800';
-      case 'assigned': return '#2196f3';
-      case 'in-progress': return '#9c27b0';
-      case 'blocked': return '#795548';
-      case 'overdue': return '#e91e63';
-      case 'completed': return '#4caf50';
-      case 'cancelled': return '#f44336';
-      default: return '#666';
-    }
-  };
-
-  const getTaskTypeIcon = (taskType) => {
-    switch (taskType) {
-      case 'packing': return '📦';
-      case 'loading': return '⬆️';
-      case 'transporting': return '🚚';
-      case 'unloading': return '⬇️';
-      case 'unpacking': return '📋';
-      default: return '📝';
-    }
   };
 
   return (
@@ -519,6 +357,22 @@ export default function StaffDashboard() {
           My Tasks
         </button>
         <button
+          className={activeTab === 'requests' ? 'nav-btn active' : 'nav-btn'}
+          onClick={() => setActiveTab('requests')}
+          style={{
+            background: activeTab === 'requests' ? 'linear-gradient(90deg, #2196f3 60%, #90caf9 100%)' : 'white',
+            color: activeTab === 'requests' ? '#fff' : '#333',
+            border: activeTab === 'requests' ? 'none' : '1px solid #e0e0e0',
+            marginRight: '0.5rem',
+            fontWeight: 600,
+            boxShadow: activeTab === 'requests' ? '0 2px 8px rgba(33,150,243,0.10)' : 'none',
+            transition: 'all 0.2s'
+          }}
+        >
+          <span role="img" aria-label="requests" style={{ marginRight: 6 }}>📝</span>
+          Requests
+        </button>
+        <button
           className={activeTab === 'history' ? 'nav-btn active' : 'nav-btn'}
           onClick={() => setActiveTab('history')}
           style={{
@@ -552,44 +406,7 @@ export default function StaffDashboard() {
       </nav>
 
       <main className="home-main">
-        {activeTab === 'dashboard' && (
-          <div className="dashboard">
-            <div className="welcome-section">
-              <h2>Welcome back, {user?.name}!</h2>
-              <p>Track your progress and manage tasks efficiently</p>
-            </div>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <h3>{tasks.filter(t => t.status === 'completed').length}</h3>
-                <p>Completed Tasks</p>
-              </div>
-              <div className="stat-card">
-                <h3>{tasks.filter(t => ['pending', 'assigned', 'in-progress', 'blocked'].includes(t.status)).length}</h3>
-                <p>Active Tasks</p>
-              </div>
-              <div className="stat-card">
-                <h3>{tasks.length}</h3>
-                <p>Total Tasks</p>
-              </div>
-            </div>
-
-            <div className="quick-actions">
-              <h3>Quick Actions</h3>
-              <div className="action-buttons">
-                <button className="action-btn primary" onClick={() => setActiveTab('my-tasks')}>
-                  📋 View My Tasks
-                </button>
-                <button className="action-btn secondary" onClick={loadTasks} disabled={loading}>
-                  🔄 Refresh Tasks
-                </button>
-                <button className="action-btn tertiary" onClick={() => setActiveTab('history')}>
-                  🕘 View History
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
+        {/* My Tasks Tab */}
         {activeTab === 'my-tasks' && (
           <div className="dashboard-main">
             <div className="dashboard-header-section">
@@ -664,7 +481,6 @@ export default function StaffDashboard() {
                   onChange={(e) => setFilters({...filters, dateTo: e.target.value})}
                   className="filter-input"
                 />
-                <button onClick={loadTasks} className="refresh-btn">Refresh</button>
               </div>
             </div>
 
@@ -685,13 +501,13 @@ export default function StaffDashboard() {
                     <div className="task-header">
                       <div className="task-title">
                         <span className="task-icon">{getTaskTypeIcon(task.taskType)}</span>
-                        <h3>{task.taskType.charAt(0).toUpperCase() + task.taskType.slice(1)}</h3>
+                        <h3>{task.taskType?.charAt(0).toUpperCase() + task.taskType?.slice(1)}</h3>
                       </div>
                       <span 
                         className="status-badge" 
                         style={{ backgroundColor: getStatusColor(task.status) }}
                       >
-                        {task.status.replace('-', ' ')}
+                        {task.status?.replace('-', ' ')}
                       </span>
                     </div>
                     
@@ -715,7 +531,7 @@ export default function StaffDashboard() {
                         <strong>To:</strong> {task.moveDetails?.toAddress}
                       </div>
                       <div className="detail-row">
-                        <strong>Move Date:</strong> {new Date(task.moveDetails?.moveDate).toLocaleDateString()}
+                        <strong>Move Date:</strong> {task.moveDetails?.moveDate ? new Date(task.moveDetails.moveDate).toLocaleDateString() : 'N/A'}
                       </div>
                       <div className="detail-row">
                         <strong>Duration:</strong> {task.estimatedDuration} hours
@@ -781,6 +597,177 @@ export default function StaffDashboard() {
           </div>
         )}
 
+        {/* Requests Tab */}
+        {activeTab === 'requests' && (
+          <div className="moving-service-container">
+            <div className="content-wrapper">
+              <div className="page-header">
+                <h1>Staff Dashboard - Quản Lý Công Việc</h1>
+                <p>Xem và quản lý các công việc được phân công</p>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="main-card">
+                <h2 style={{ marginTop: 0, marginBottom: "1rem", color: "#2c3e50" }}>Thống kê công việc</h2>
+                <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
+                  <div className="stat-card" style={{ background: "linear-gradient(135deg, #2196f3 0%, #2196f3dd 100%)" }}>
+                    <h3 style={{ color: "white", margin: 0 }}>{requestStats.survey}</h3>
+                    <p style={{ color: "white", opacity: 0.9, margin: 0 }}>Cần khảo sát</p>
+                  </div>
+                  <div className="stat-card" style={{ background: "linear-gradient(135deg, #9c27b0 0%, #9c27b0dd 100%)" }}>
+                    <h3 style={{ color: "white", margin: 0 }}>{requestStats.waiting}</h3>
+                    <p style={{ color: "white", opacity: 0.9, margin: 0 }}>Chờ thanh toán</p>
+                  </div>
+                  <div className="stat-card" style={{ background: "linear-gradient(135deg, #00bcd4 0%, #00bcd4dd 100%)" }}>
+                    <h3 style={{ color: "white", margin: 0 }}>{requestStats.inProgress}</h3>
+                    <p style={{ color: "white", opacity: 0.9, margin: 0 }}>Đang vận chuyển</p>
+                  </div>
+                  <div className="stat-card" style={{ background: "linear-gradient(135deg, #4caf50 0%, #4caf50dd 100%)" }}>
+                    <h3 style={{ color: "white", margin: 0 }}>{requestStats.done}</h3>
+                    <p style={{ color: "white", opacity: 0.9, margin: 0 }}>Đã hoàn thành</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tasks List */}
+              <div className="main-card">
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", marginBottom: "1rem" }}>
+                    <input
+                      placeholder="Tìm kiếm theo số điện thoại..."
+                      value={searchPhone}
+                      onChange={(e) => setSearchPhone(e.target.value)}
+                      className="form-group input-primary"
+                      style={{ flex: 1, minWidth: "250px", maxWidth: "400px" }}
+                    />
+                    <button onClick={loadRequests} className="btn btn-primary">
+                      Làm mới
+                    </button>
+                  </div>
+
+                  {/* Filter buttons */}
+                  {requests.length > 0 && (
+                    <div className="filter-buttons">
+                      <button
+                        onClick={() => setFilterStatus("")}
+                        className={`filter-btn ${filterStatus === "" ? "active" : ""}`}
+                      >
+                        Tất cả ({requests.length})
+                      </button>
+                      {Object.keys(STATUS_CONFIG).map((key) => {
+                        const count = requests.filter((r) => r.status === key).length;
+                        if (count === 0) return null;
+                        return (
+                          <button
+                            key={key}
+                            onClick={() => setFilterStatus(filterStatus === key ? "" : key)}
+                            className={`filter-btn ${filterStatus === key ? "active" : ""}`}
+                            style={{
+                              borderColor: STATUS_CONFIG[key].color,
+                            }}
+                          >
+                            {STATUS_CONFIG[key].label} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {loading ? (
+                  <div className="loading-state">
+                    <div className="loading-spinner" />
+                    <p>Đang tải...</p>
+                  </div>
+                ) : sortedRequests.length === 0 ? (
+                  <div className="empty-state">
+                    <h3>Chưa có công việc nào</h3>
+                    <p>
+                      {requests.length === 0
+                        ? "Bạn chưa được phân công công việc nào. Vui lòng liên hệ manager."
+                        : `Không có công việc nào với trạng thái "${filterStatus ? getStatusConfig(filterStatus).label : ""}"`}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="moves-list">
+                    {sortedRequests
+                      .filter((r) => !searchPhone || r.customerPhone?.includes(searchPhone))
+                      .map((r) => {
+                        const statusConfig = getStatusConfig(r.status);
+                        const shortId = r._id?.slice(-8) || "N/A";
+                        const statusKey = r.status?.toLowerCase().replace("_", "-") || "unknown";
+                        return (
+                          <div key={r._id} className="move-card">
+                            <div className="move-header">
+                              <h3>Request #{shortId}</h3>
+                              <span
+                                className={`status-badge ${statusKey}`}
+                                style={{
+                                  backgroundColor: statusConfig.bg,
+                                  color: statusConfig.color,
+                                }}
+                                title={statusConfig.description}
+                              >
+                                {statusConfig.label}
+                              </span>
+                            </div>
+                            <div className="move-details">
+                              <p>
+                                <strong>Khách hàng:</strong> {r.customerName}
+                              </p>
+                              <p>
+                                <strong>SĐT:</strong> {r.customerPhone}
+                              </p>
+                              <p>
+                                <strong>Lấy hàng:</strong> {fmtAddress(r.pickupAddress || r.address)}
+                              </p>
+                              <p>
+                                <strong>Giao hàng:</strong> {fmtAddress(r.deliveryAddress || r.address)}
+                              </p>
+                              <p>
+                                <strong>Thời gian chuyển:</strong> {fmtDateTime24(r.movingTime)}
+                              </p>
+                              {r.surveyFee && (
+                                <p>
+                                  <strong>Phí khảo sát:</strong> {r.surveyFee.toLocaleString()}₫
+                                </p>
+                              )}
+                            </div>
+                            <div className="move-actions">
+                              {r.status === "UNDER_SURVEY" && (
+                                <button
+                                  onClick={() => nav(`/staff/survey/${r._id}`)}
+                                  className="btn btn-primary"
+                                >
+                                  Khảo sát & Nhập đồ dùng
+                                </button>
+                              )}
+                              {r.status === "IN_PROGRESS" && (
+                                <button
+                                  onClick={() => nav(`/staff/task/${r._id}`)}
+                                  className="btn btn-primary"
+                                >
+                                  Xem chi tiết & Cập nhật
+                                </button>
+                              )}
+                              <button
+                                onClick={() => nav(`/requests/${r._id}/detail`)}
+                                className="btn btn-secondary"
+                              >
+                                Xem chi tiết
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* History Tab */}
         {activeTab === 'history' && (
           <section className="dashboard-stats">
             <h3>My Performance</h3>
@@ -795,13 +782,14 @@ export default function StaffDashboard() {
               {tasks.slice(0, 10).map(t => (
                 <div key={`${t.taskId}-history`} className="history-item">
                   <span>#{t.requestNumber} • {t.taskType}</span>
-                  <span className="status-badge" style={{ backgroundColor: getStatusColor(t.status) }}>{t.status.replace('-', ' ')}</span>
+                  <span className="status-badge" style={{ backgroundColor: getStatusColor(t.status) }}>{t.status?.replace('-', ' ')}</span>
                 </div>
               ))}
             </div>
           </section>
         )}
 
+        {/* Profile Tab */}
         {activeTab === 'profile' && (
           <div className="profile">
             <h2>My Profile</h2>
@@ -866,7 +854,6 @@ export default function StaffDashboard() {
                   rows="3"
                 />
               </div>
-              {/* Placeholder for attachments - requires backend endpoint */}
               <div className="form-group">
                 <label>Attachments (Optional):</label>
                 <input type="file" multiple disabled title="File upload not supported yet" />
