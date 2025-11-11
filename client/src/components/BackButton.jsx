@@ -1,32 +1,36 @@
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
-export default function BackButton({ fallbackPath = '/', children = '← Back' }) {
+const BackButton = ({ fallbackPath = '/dashboard' }) => {
   const navigate = useNavigate();
-  const location = useLocation();
 
-  const handleBack = () => {
-    // Check if there's history to go back to
+  const handleGoBack = () => {
     if (window.history.length > 1) {
       navigate(-1);
     } else {
-      // Fallback to a specific path
       navigate(fallbackPath);
     }
   };
 
-  // Don't show back button on landing page
-  if (location.pathname === '/') {
-    return null;
-  }
-
   return (
     <button 
-      onClick={handleBack}
+      onClick={handleGoBack}
       className="back-button"
-      type="button"
+      style={{
+        padding: '8px 16px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        marginBottom: '20px',
+        fontSize: '14px'
+      }}
     >
-      {children}
+      ← Back
     </button>
   );
-}
+};
+
+export default BackButton;
+

@@ -1,59 +1,142 @@
+// server/controllers/reviewController.js
 const Review = require("../models/Review");
 
-// 📌 Lấy tất cả review
+// Get all reviews
 const getReviews = async (req, res) => {
   try {
-    const reviews = await Review.find().sort({ createdAt: -1 });
-    res.json(reviews);
+    const { requestId, page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+
+    // Build filter
+    const filter = {};
+    if (requestId) {
+      filter.requestId = requestId;
+    }
+
+    const reviews = await Review.find(filter)
+      .populate('requestId', 'requestId')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Review.countDocuments(filter);
+
+    res.json({
+      reviews,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / limit),
+        totalReviews: total,
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      }
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Error fetching reviews:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// 📌 Lấy review theo ID
+// Get review by ID
 const getReviewById = async (req, res) => {
   try {
-    const review = await Review.findById(req.params.id);
-    if (!review) return res.status(404).json({ message: "Review not found" });
-    res.json(review);
+    const { id } = req.params;
+    const review = await Review.findById(id)
+      .populate('requestId', 'requestId');
+
+    if (!review) {
+      return res.status(404).json({ message: "Review not found" });
+    }
+
+    res.json({ review });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Error fetching review:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// 📌 Tạo review mới
+// Create a new review
 const createReview = async (req, res) => {
-  const { user, rating, comment } = req.body;
   try {
-    const review = new Review({ user, rating, comment });
-    await review.save();
-    res.status(201).json(review);
+    const { user, rating, comment, requestId } = req.body;
+
+    // Validation
+    if (!user || !rating || !comment) {
+      return res.status(400).json({ message: "User, rating, and comment are required" });
+    }
+
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+    }
+
+    const review = await Review.create({
+      user,
+      rating,
+      comment,
+      requestId: requestId || undefined
+    });
+
+    res.status(201).json({
+      message: "Review created successfully",
+      review
+    });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error("Error creating review:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// 📌 Update review
+// Update a review
 const updateReview = async (req, res) => {
   try {
-    const review = await Review.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
+    const { id } = req.params;
+    const { rating, comment } = req.body;
+
+    const review = await Review.findById(id);
+    if (!review) {
+      return res.status(404).json({ message: "Review not found" });
+    }
+
+    // Update fields if provided
+    if (rating !== undefined) {
+      if (rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+      review.rating = rating;
+    }
+
+    if (comment !== undefined) {
+      review.comment = comment;
+    }
+
+    await review.save();
+
+    res.json({
+      message: "Review updated successfully",
+      review
     });
-    if (!review) return res.status(404).json({ message: "Review not found" });
-    res.json(review);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error("Error updating review:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
-// 📌 Delete review
+// Delete a review
 const deleteReview = async (req, res) => {
   try {
-    const review = await Review.findByIdAndDelete(req.params.id);
-    if (!review) return res.status(404).json({ message: "Review not found" });
-    res.json({ message: "Review deleted successfully" });
+    const { id } = req.params;
+    const review = await Review.findByIdAndDelete(id);
+
+    if (!review) {
+      return res.status(404).json({ message: "Review not found" });
+    }
+
+    res.json({
+      message: "Review deleted successfully"
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Error deleting review:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -64,3 +147,4 @@ module.exports = {
   updateReview,
   deleteReview
 };
+

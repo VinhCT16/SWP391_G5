@@ -1,9 +1,8 @@
+// server/routes/contractRoutes.js
 const express = require("express");
 const {
   createContractFromRequest,
-  getContractById,
-  updateContractStatus,
-  getAllContracts,
+  getContractsForApproval,
   approveContract,
   rejectContract,
   getContractsForApproval,
@@ -18,8 +17,7 @@ const {
   getAllServices
 } = require("../controllers/contractController");
 const auth = require("../utils/authMiddleware");
-const { requireManager, requireCustomer, requireStaff } = require("../utils/authMiddleware");
-const Contract = require("../models/Contract");
+const { requireManager, requireCustomer } = require("../utils/authMiddleware");
 
 const router = express.Router();
 

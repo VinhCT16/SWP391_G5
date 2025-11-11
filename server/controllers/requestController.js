@@ -1,59 +1,90 @@
+// server/controllers/requestController.js
 const Request = require("../models/Request");
-const Service = require("../models/Service");
-const Staff = require("../models/Staff");
+const User = require("../models/User");
 const { v4: uuidv4 } = require('uuid');
 
-// Generate unique request ID
-const generateRequestId = () => `REQ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+// Get all requests (manager view)
+const getAllRequests = async (req, res) => {
+  try {
+    const { status, search, page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
 
-// Create a new moving request
+    // Build filter
+    const filter = {};
+    if (status) filter.status = status;
+    if (search) {
+      filter.$or = [
+        { requestId: { $regex: search, $options: 'i' } },
+        { 'moveDetails.fromAddress': { $regex: search, $options: 'i' } },
+        { 'moveDetails.toAddress': { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const requests = await Request.find(filter)
+      .populate('customerId', 'name email phone')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Request.countDocuments(filter);
+
+    res.json({
+      requests,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / limit),
+        totalRequests: total,
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1
+      }
+    });
+  } catch (err) {
+    console.error("Error fetching requests:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get customer's requests
+const getMyRequests = async (req, res) => {
+  try {
+    const customerId = req.userId;
+
+    const requests = await Request.find({ customerId })
+      .populate('contractId')
+      .sort({ createdAt: -1 });
+
+    res.json({ requests });
+  } catch (err) {
+    console.error("Error fetching customer requests:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Create request (customer)
 const createRequest = async (req, res) => {
   try {
     const { moveDetails, items, estimatedPrice } = req.body;
     const customerId = req.userId;
 
-    // Validate required fields
-    if (!moveDetails || !moveDetails.fromAddress || !moveDetails.toAddress || !moveDetails.moveDate) {
-      return res.status(400).json({ 
-        message: "Move details (fromAddress, toAddress, moveDate) are required" 
-      });
-    }
+    // Generate unique request ID
+    const requestId = `REQ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Create the request
-    const requestData = {
-      requestId: generateRequestId(),
+    const request = await Request.create({
+      requestId,
       customerId,
-      moveDetails: {
-        fromAddress: moveDetails.fromAddress,
-        toAddress: moveDetails.toAddress,
-        moveDate: new Date(moveDetails.moveDate),
-        serviceType: moveDetails.serviceType || "Local Move",
-        phone: moveDetails.phone
-      },
+      moveDetails,
       items: items || [],
       estimatedPrice: estimatedPrice || {
         basePrice: 0,
         additionalServices: [],
         totalPrice: 0
       },
-      status: "submitted"
-    };
+      status: 'submitted'
+    });
 
-    const request = await Request.create(requestData);
-    
-    // Populate customer details
-    await request.populate('customerId', 'name email phone');
-    
     res.status(201).json({
-      message: "Request submitted successfully",
-      request: {
-        id: request._id,
-        requestId: request.requestId,
-        status: request.status,
-        moveDetails: request.moveDetails,
-        estimatedPrice: request.estimatedPrice,
-        createdAt: request.createdAt
-      }
+      message: "Request created successfully",
+      request: request
     });
   } catch (err) {
     console.error("Error creating request:", err);
@@ -101,12 +132,15 @@ const getRequestById = async (req, res) => {
 };
 
 // Update request status (for managers)
+// Handles both requestId and id parameters
 const updateRequestStatus = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { requestId, id } = req.params;
     const { status, rejectionReason, notes } = req.body;
+    const managerId = req.userId;
 
-    const request = await Request.findById(id);
+    // Support both requestId and id parameter names
+    const request = await Request.findById(requestId || id);
     if (!request) {
       return res.status(404).json({ message: "Request not found" });
     }
@@ -116,25 +150,34 @@ const updateRequestStatus = async (req, res) => {
     
     if (status === 'rejected' && rejectionReason) {
       request.approval = {
-        reviewedBy: req.userId,
+        reviewedBy: managerId,
         reviewedAt: new Date(),
         approved: false,
         rejectionReason,
-        notes
+        notes: notes || ''
       };
     } else if (status === 'approved') {
       request.approval = {
-        reviewedBy: req.userId,
+        reviewedBy: managerId,
         reviewedAt: new Date(),
         approved: true,
-        notes
+        notes: notes || ''
+      };
+    } else {
+      // For other statuses, update approval if provided
+      request.approval = {
+        reviewedBy: managerId,
+        reviewedAt: new Date(),
+        approved: status === 'approved',
+        rejectionReason: rejectionReason || '',
+        notes: notes || ''
       };
     }
 
     await request.save();
     
     res.json({
-      message: "Request status updated successfully",
+      message: `Request ${status} successfully`,
       request: {
         id: request._id,
         requestId: request.requestId,
@@ -148,36 +191,6 @@ const updateRequestStatus = async (req, res) => {
   }
 };
 
-// Get all requests (for managers)
-const getAllRequests = async (req, res) => {
-  try {
-    const { status, page = 1, limit = 10 } = req.query;
-    
-    const filter = {};
-    if (status) {
-      filter.status = status;
-    }
-
-    const requests = await Request.find(filter)
-      .populate('customerId', 'name email phone')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
-
-    const total = await Request.countDocuments(filter);
-
-    res.json({
-      requests,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
-      total
-    });
-  } catch (err) {
-    console.error("Error fetching requests:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
 // Get available staff for a request (Manager)
 const getAvailableStaffForRequest = async (req, res) => {
   try {
@@ -187,7 +200,7 @@ const getAvailableStaffForRequest = async (req, res) => {
       return res.status(404).json({ message: "Request not found" });
     }
 
-    const allStaff = await Staff.find({ isActive: true }).populate('userId', 'name email phone');
+    const allStaff = await User.find({ role: 'staff', isActive: true }).select('name email phone employeeId staffRole specialization');
     const assignedIds = (request.assignedStaff || []).map(a => a.staffId.toString());
     const availableStaff = allStaff.filter(s => !assignedIds.includes(s._id.toString()));
     return res.json({ availableStaff });
@@ -209,8 +222,8 @@ const assignStaffToRequest = async (req, res) => {
       return res.status(404).json({ message: 'Request not found' });
     }
 
-    const staff = await Staff.findById(staffId);
-    if (!staff) {
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: 'Staff not found' });
     }
 
@@ -222,8 +235,7 @@ const assignStaffToRequest = async (req, res) => {
 
     await request.populate({
       path: 'assignedStaff.staffId',
-      select: 'employeeId role',
-      populate: { path: 'userId', select: 'name email phone' }
+      select: 'name email phone employeeId staffRole specialization'
     });
 
     return res.json({ message: 'Staff assigned to request', request });
@@ -234,11 +246,13 @@ const assignStaffToRequest = async (req, res) => {
 };
 
 module.exports = {
+  getAllRequests,
+  getMyRequests,
+  updateRequestStatus,
   createRequest,
   getCustomerRequests,
   getRequestById,
-  updateRequestStatus,
-  getAllRequests,
   getAvailableStaffForRequest,
   assignStaffToRequest
 };
+

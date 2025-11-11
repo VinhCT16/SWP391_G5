@@ -1,8 +1,4 @@
 const User = require("../models/User");
-const Admin = require("../models/Admin");
-const Staff = require("../models/Staff");
-const Manager = require("../models/Manager");
-const Customer = require("../models/Customer");
 const Complaint = require("../models/Complaint");
 const bcrypt = require("bcrypt");
 
@@ -57,14 +53,23 @@ const getUserById = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Get additional profile information based on role
-    let profile = null;
+    // Profile information is now directly in the user object
+    // Extract role-specific fields for response
+    const profile = {};
     if (user.role === 'staff') {
-      profile = await Staff.findOne({ userId }).select('-userId');
+      profile.employeeId = user.employeeId;
+      profile.staffRole = user.staffRole;
+      profile.specialization = user.specialization;
+      profile.availability = user.availability;
+      profile.rating = user.rating;
     } else if (user.role === 'manager') {
-      profile = await Manager.findOne({ userId }).select('-userId');
+      profile.employeeId = user.employeeId;
+      profile.department = user.department;
+      profile.managerPermissions = user.managerPermissions;
     } else if (user.role === 'admin') {
-      profile = await Admin.findOne({ userId }).select('-userId');
+      profile.adminId = user.adminId;
+      profile.department = user.department;
+      profile.adminPermissions = user.adminPermissions;
     }
 
     res.json({ user, profile });
@@ -94,60 +99,57 @@ const createUser = async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
-    const user = await User.create({
+    // Build user data with role-specific fields
+    const userData = {
       name,
       email: email.toLowerCase(),
       password: hashedPassword,
       phone: phone || null,
       role
-    });
+    };
 
-    // Create role-specific profile
+    // Add role-specific fields directly to user
     if (role === 'staff' && additionalData) {
-      await Staff.create({
-        userId: user._id,
-        employeeId: additionalData.employeeId,
-        role: additionalData.staffRole,
-        specialization: additionalData.specialization || [],
-        availability: additionalData.availability || {
-          isAvailable: true,
-          workingHours: { start: "08:00", end: "17:00" },
-          workDays: ["monday", "tuesday", "wednesday", "thursday", "friday"]
-        }
-      });
+      userData.employeeId = additionalData.employeeId;
+      userData.staffRole = additionalData.staffRole;
+      userData.specialization = additionalData.specialization || [];
+      userData.availability = additionalData.availability || {
+        isAvailable: true,
+        workingHours: { start: "08:00", end: "17:00" },
+        workDays: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+      };
+      userData.hireDate = new Date();
     } else if (role === 'manager' && additionalData) {
-      await Manager.create({
-        userId: user._id,
-        employeeId: additionalData.employeeId,
-        department: additionalData.department,
-        permissions: additionalData.permissions || []
-      });
+      userData.employeeId = additionalData.employeeId;
+      userData.department = additionalData.department;
+      userData.managerPermissions = additionalData.permissions || [];
+      userData.hireDate = new Date();
     } else if (role === 'admin' && additionalData) {
-      await Admin.create({
-        userId: user._id,
-        adminId: additionalData.adminId,
-        department: additionalData.department,
-        permissions: additionalData.permissions || {
-          userManagement: {
-            canViewUsers: true,
-            canCreateUsers: true,
-            canUpdateUsers: true,
-            canDeleteUsers: true,
-            canLockUnlockUsers: true
-          },
-          staffManagement: {
-            canManageStaff: true,
-            canAssignRoles: true,
-            canViewStaffPerformance: true
-          },
-          systemManagement: {
-            canViewSystemLogs: true,
-            canManageSystemSettings: true
-          }
+      userData.adminId = additionalData.adminId;
+      userData.department = additionalData.department;
+      userData.adminPermissions = additionalData.permissions || {
+        userManagement: {
+          canViewUsers: true,
+          canCreateUsers: true,
+          canUpdateUsers: true,
+          canDeleteUsers: true,
+          canLockUnlockUsers: true
+        },
+        staffManagement: {
+          canManageStaff: true,
+          canAssignRoles: true,
+          canViewStaffPerformance: true
+        },
+        systemManagement: {
+          canViewSystemLogs: true,
+          canManageSystemSettings: true
         }
-      });
+      };
+      userData.hireDate = new Date();
     }
+
+    // Create user with all role-specific data
+    const user = await User.create(userData);
 
     const safeUser = {
       id: user._id,
@@ -185,30 +187,26 @@ const updateUser = async (req, res) => {
     if (role) user.role = role;
     if (isActive !== undefined) user.isActive = isActive;
 
-    await user.save();
-
-    // Update role-specific profile if provided
+    // Update role-specific fields directly on user if provided
     if (additionalData) {
       if (user.role === 'staff') {
-        await Staff.findOneAndUpdate(
-          { userId },
-          { $set: additionalData },
-          { upsert: true, new: true }
-        );
+        if (additionalData.employeeId !== undefined) user.employeeId = additionalData.employeeId;
+        if (additionalData.staffRole !== undefined) user.staffRole = additionalData.staffRole;
+        if (additionalData.specialization !== undefined) user.specialization = additionalData.specialization;
+        if (additionalData.availability !== undefined) user.availability = additionalData.availability;
+        if (additionalData.rating !== undefined) user.rating = additionalData.rating;
       } else if (user.role === 'manager') {
-        await Manager.findOneAndUpdate(
-          { userId },
-          { $set: additionalData },
-          { upsert: true, new: true }
-        );
+        if (additionalData.employeeId !== undefined) user.employeeId = additionalData.employeeId;
+        if (additionalData.department !== undefined) user.department = additionalData.department;
+        if (additionalData.permissions !== undefined) user.managerPermissions = additionalData.permissions;
       } else if (user.role === 'admin') {
-        await Admin.findOneAndUpdate(
-          { userId },
-          { $set: additionalData },
-          { upsert: true, new: true }
-        );
+        if (additionalData.adminId !== undefined) user.adminId = additionalData.adminId;
+        if (additionalData.department !== undefined) user.department = additionalData.department;
+        if (additionalData.permissions !== undefined) user.adminPermissions = additionalData.permissions;
       }
     }
+
+    await user.save();
 
     const safeUser = {
       id: user._id,
@@ -268,16 +266,7 @@ const deleteUser = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Delete role-specific profile first
-    if (user.role === 'staff') {
-      await Staff.findOneAndDelete({ userId });
-    } else if (user.role === 'manager') {
-      await Manager.findOneAndDelete({ userId });
-    } else if (user.role === 'admin') {
-      await Admin.findOneAndDelete({ userId });
-    }
-
-    // Delete user
+    // Delete user (all role-specific data is in the user document)
     await User.findByIdAndDelete(userId);
 
     res.json({ message: "User deleted successfully" });
@@ -368,20 +357,12 @@ const getAllCustomers = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
-    // Get customer profiles for additional info
-    const customerIds = customers.map(c => c._id);
-    const customerProfiles = await Customer.find({ 
-      email: { $in: customers.map(c => c.email) } 
-    });
-
-    // Merge user data with customer profile data
+    // Customer data is now directly in the user object
     const customersWithProfiles = customers.map(customer => {
-      const profile = customerProfiles.find(p => p.email === customer.email);
       return {
         ...customer.toObject(),
-        customerProfile: profile || null,
-        totalRequests: profile ? profile.requestHistory.length : 0,
-        totalReviews: profile ? profile.reviews.length : 0
+        totalRequests: customer.requestHistory ? customer.requestHistory.length : 0,
+        totalReviews: customer.reviews ? customer.reviews.length : 0
       };
     });
 
@@ -413,13 +394,16 @@ const getCustomerById = async (req, res) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    const customerProfile = await Customer.findOne({ email: user.email });
-    
+    // Customer data is now directly in the user object
     res.json({ 
       customer: user,
-      profile: customerProfile,
-      totalRequests: customerProfile ? customerProfile.requestHistory.length : 0,
-      totalReviews: customerProfile ? customerProfile.reviews.length : 0
+      profile: {
+        chatHistory: user.chatHistory || [],
+        reviews: user.reviews || [],
+        requestHistory: user.requestHistory || []
+      },
+      totalRequests: user.requestHistory ? user.requestHistory.length : 0,
+      totalReviews: user.reviews ? user.reviews.length : 0
     });
   } catch (error) {
     console.error("Error fetching customer:", error);
@@ -649,10 +633,10 @@ const getCustomerStats = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(5);
 
-    // Get customer activity stats
-    const customerProfiles = await Customer.find();
-    const totalReviews = customerProfiles.reduce((sum, profile) => sum + profile.reviews.length, 0);
-    const totalRequests = customerProfiles.reduce((sum, profile) => sum + profile.requestHistory.length, 0);
+    // Get customer activity stats (data is now in User model)
+    const customerUsers = await User.find({ role: 'customer' });
+    const totalReviews = customerUsers.reduce((sum, user) => sum + (user.reviews ? user.reviews.length : 0), 0);
+    const totalRequests = customerUsers.reduce((sum, user) => sum + (user.requestHistory ? user.requestHistory.length : 0), 0);
 
     res.json({
       totalCustomers,

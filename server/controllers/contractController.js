@@ -1,15 +1,17 @@
-const Contract = require("../models/Contract");
+// server/controllers/contractController.js
 const Request = require("../models/Request");
 const Service = require("../models/Service");
 const Staff = require("../models/Staff");
 const Manager = require("../models/Manager");
 const Customer = require("../models/Customer");
 const User = require("../models/User");
+const Service = require("../models/Service");
 const { v4: uuidv4 } = require('uuid');
-const { generateContractPDFBuffer } = require('../utils/pdfGenerator');
 
 // Generate unique contract ID
-const generateContractId = () => `CON-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+const generateContractId = () => {
+  return `CONT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+};
 
 // Helper function to find or create Manager document
 const findOrCreateManager = async (managerUserId) => {
@@ -314,15 +316,7 @@ const createContractFromRequest = async (req, res) => {
 
     res.status(201).json({
       message: "Contract created successfully",
-      contract: {
-        id: contract._id,
-        contractId: contract.contractId,
-        status: contract.status,
-        moveDetails: contract.moveDetails,
-        pricing: contract.pricing,
-        paymentMethod: contract.paymentMethod,
-        createdAt: contract.createdAt
-      }
+      contract: contract
     });
   } catch (err) {
     console.error("Error creating contract:", err);
@@ -365,8 +359,8 @@ const createContractFromRequest = async (req, res) => {
   }
 };
 
-// Get contract by ID
-const getContractById = async (req, res) => {
+// Get contracts for approval (manager view)
+const getContractsForApproval = async (req, res) => {
   try {
     const { id } = req.params;
     const contract = await Contract.findById(id)
@@ -387,60 +381,17 @@ const getContractById = async (req, res) => {
         populate: { path: 'userId', select: 'name email phone' }
       });
 
-    if (!contract) {
-      return res.status(404).json({ message: "Contract not found" });
-    }
-
-    res.json({ contract });
+    res.json({ contracts });
   } catch (err) {
-    console.error("Error fetching contract:", err);
+    console.error("Error fetching contracts:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-// Update contract status
-const updateContractStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status, notes } = req.body;
-
-    const contract = await Contract.findById(id);
-    if (!contract) {
-      return res.status(404).json({ message: "Contract not found" });
-    }
-
-    contract.status = status;
-    if (notes) {
-      contract.approval.notes = notes;
-    }
-
-    if (status === 'signed') {
-      contract.signatures.customerSigned = true;
-      contract.signatures.managerSigned = true;
-      contract.signatures.signedAt = new Date();
-    }
-
-    await contract.save();
-
-    res.json({
-      message: "Contract status updated successfully",
-      contract: {
-        id: contract._id,
-        contractId: contract.contractId,
-        status: contract.status,
-        signatures: contract.signatures
-      }
-    });
-  } catch (err) {
-    console.error("Error updating contract:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Approve contract (Manager only)
+// Approve contract
 const approveContract = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { contractId } = req.params;
     const { notes } = req.body;
     const managerUserId = req.userId;
 
@@ -452,11 +403,12 @@ const approveContract = async (req, res) => {
       return res.status(403).json({ message: managerErr.message });
     }
 
-    const contract = await Contract.findById(id);
+    const contract = await Contract.findById(contractId);
     if (!contract) {
       return res.status(404).json({ message: "Contract not found" });
     }
 
+    // Update contract status
     contract.status = 'approved';
     contract.approval = {
       approvedBy: manager._id, // Use Manager document ID, not User ID
@@ -483,13 +435,7 @@ const approveContract = async (req, res) => {
 
     res.json({
       message: "Contract approved successfully",
-      contract: {
-        id: contract._id,
-        contractId: contract.contractId,
-        status: contract.status,
-        approval: contract.approval,
-        createdAt: contract.createdAt
-      }
+      contract: contract
     });
   } catch (err) {
     console.error("Error approving contract:", err);
@@ -497,10 +443,10 @@ const approveContract = async (req, res) => {
   }
 };
 
-// Reject contract (Manager only)
+// Reject contract
 const rejectContract = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { contractId } = req.params;
     const { rejectionReason, notes } = req.body;
     const managerUserId = req.userId;
 
@@ -512,16 +458,13 @@ const rejectContract = async (req, res) => {
       return res.status(403).json({ message: managerErr.message });
     }
 
-    const contract = await Contract.findById(id);
+    const contract = await Contract.findById(contractId);
     if (!contract) {
       return res.status(404).json({ message: "Contract not found" });
     }
 
-    if (!rejectionReason) {
-      return res.status(400).json({ message: "Rejection reason is required" });
-    }
-
-    contract.status = 'cancelled';
+    // Update contract status
+    contract.status = 'rejected';
     contract.approval = {
       approvedBy: manager._id, // Use Manager document ID, not User ID
       approvedAt: new Date(),
@@ -531,14 +474,15 @@ const rejectContract = async (req, res) => {
 
     await contract.save();
 
+    // Update request status back to approved (so manager can create new contract)
+    await Request.findByIdAndUpdate(contract.requestId, {
+      status: 'approved',
+      contractId: null
+    });
+
     res.json({
       message: "Contract rejected successfully",
-      contract: {
-        id: contract._id,
-        contractId: contract.contractId,
-        status: contract.status,
-        approval: contract.approval
-      }
+      contract: contract
     });
   } catch (err) {
     console.error("Error rejecting contract:", err);
@@ -546,8 +490,8 @@ const rejectContract = async (req, res) => {
   }
 };
 
-// Get contracts for manager approval
-const getContractsForApproval = async (req, res) => {
+// Get customer contracts
+const getCustomerContracts = async (req, res) => {
   try {
     const { status, page = 1, limit = 10, showSigned = false } = req.query;
     
@@ -580,19 +524,19 @@ const getContractsForApproval = async (req, res) => {
       })
       .populate('serviceId', 'name price')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .limit(Number(limit))
+      .skip((Number(page) - 1) * Number(limit));
 
     const total = await Contract.countDocuments(filter);
 
     res.json({
       contracts,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
+      totalPages: Math.ceil(total / Number(limit)),
+      currentPage: Number(page),
       total
     });
   } catch (err) {
-    console.error("Error fetching contracts for approval:", err);
+    console.error("Error fetching customer contracts:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -619,7 +563,9 @@ const exportContractPDF = async (req, res) => {
       return res.status(404).json({ message: "Contract not found" });
     }
 
-    const pdfBuffer = await generateContractPDFBuffer(contract);
+    // TODO: Implement PDF generation
+    // For now, return a placeholder
+    const pdfBuffer = Buffer.from('PDF placeholder - implement PDF generation');
     
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="contract-${contract.contractId}.pdf"`);
@@ -653,11 +599,11 @@ const getAllContracts = async (req, res) => {
       filter.status = 'approved';
     } else if (role === 'staff') {
       // Staff only see contracts assigned to them
-      const staff = await Staff.findOne({ userId: req.userId });
-      if (!staff) {
+      const user = await User.findById(req.userId);
+      if (!user || user.role !== 'staff') {
         return res.json({ contracts: [], totalPages: 0, currentPage: page, total: 0 });
       }
-      filter['assignedStaff.staffId'] = staff._id;
+      filter['assignedStaff.staffId'] = user._id;
     } else if (role === 'manager' || role === 'admin') {
       // Managers and Admins see all contracts; no additional filter
     } else {
@@ -679,8 +625,7 @@ const getAllContracts = async (req, res) => {
       .populate('serviceId', 'name price')
       .populate({
         path: 'assignedStaff.staffId',
-        select: 'employeeId role',
-        populate: { path: 'userId', select: 'name email phone' }
+        select: 'name email phone employeeId staffRole specialization'
       })
       .sort({ createdAt: -1 })
       .limit(Number(limit))
@@ -723,13 +668,13 @@ const approveAndAssign = async (req, res) => {
 
     const [contract, staff] = await Promise.all([
       Contract.findById(contractId),
-      Staff.findById(staffId)
+      User.findById(staffId)
     ]);
 
     if (!contract) {
       return res.status(404).json({ message: 'Contract not found' });
     }
-    if (!staff) {
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: 'Staff not found' });
     }
 
@@ -769,8 +714,7 @@ const approveAndAssign = async (req, res) => {
       { path: 'serviceId', select: 'name price' },
       {
         path: 'assignedStaff.staffId',
-        select: 'employeeId role',
-        populate: { path: 'userId', select: 'name email phone' }
+        select: 'name email phone employeeId staffRole specialization'
       }
     ]);
 
@@ -805,8 +749,8 @@ const assignStaffToContract = async (req, res) => {
     }
 
     // Check if staff exists
-    const staff = await Staff.findById(staffId);
-    if (!staff) {
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff not found" });
     }
 
@@ -833,8 +777,7 @@ const assignStaffToContract = async (req, res) => {
     // Populate assigned staff details
     await contract.populate({
       path: 'assignedStaff.staffId',
-      select: 'employeeId role',
-      populate: { path: 'userId', select: 'name email phone' }
+      select: 'name email phone employeeId staffRole specialization'
     });
 
     res.json({
@@ -858,8 +801,8 @@ const getAvailableStaff = async (req, res) => {
     }
 
     // Get all active staff
-    const allStaff = await Staff.find({ isActive: true })
-      .populate('userId', 'name email phone');
+    const allStaff = await User.find({ role: 'staff', isActive: true })
+      .select('name email phone employeeId staffRole specialization');
     
     // Get already assigned staff IDs
     const assignedStaffIds = contract.assignedStaff.map(a => a.staffId.toString());
@@ -882,9 +825,9 @@ const acceptAssignment = async (req, res) => {
     const { id } = req.params;
     const staffUserId = req.userId;
 
-    // Find staff record
-    const staff = await Staff.findOne({ userId: staffUserId });
-    if (!staff) {
+    // Find staff user
+    const staff = await User.findById(staffUserId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff not found" });
     }
 
@@ -930,8 +873,8 @@ const rejectAssignment = async (req, res) => {
     const { reason } = req.body;
     const staffUserId = req.userId;
 
-    const staff = await Staff.findOne({ userId: staffUserId });
-    if (!staff) {
+    const staff = await User.findById(staffUserId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff not found" });
     }
 
@@ -968,8 +911,8 @@ const getAssignedContracts = async (req, res) => {
   try {
     const staffUserId = req.userId;
 
-    const staff = await Staff.findOne({ userId: staffUserId });
-    if (!staff) {
+    const staff = await User.findById(staffUserId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff not found" });
     }
 
@@ -989,13 +932,58 @@ const getAssignedContracts = async (req, res) => {
       .populate('serviceId', 'name price')
       .populate({
         path: 'assignedStaff.staffId',
-        populate: { path: 'userId', select: 'name email phone' }
+        select: 'name email phone employeeId staffRole specialization'
       })
       .sort({ createdAt: -1 });
 
     res.json({ contracts });
   } catch (err) {
-    console.error("Error fetching assigned contracts:", err);
+    console.error("Error fetching customer contracts:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get contract progress (for customer)
+const getContractProgress = async (req, res) => {
+  try {
+    const { contractId } = req.params;
+    const customerId = req.userId;
+
+    const contract = await Contract.findById(contractId)
+      .populate('requestId')
+      .populate('managerId', 'name email');
+
+    if (!contract) {
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    // Check if customer owns this contract
+    if (contract.customerId.toString() !== customerId) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    // Get request with tasks
+    const request = await Request.findById(contract.requestId)
+      .populate('tasks.assignedStaff', 'name email')
+      .populate('tasks.transporter', 'name email');
+
+    // Calculate progress
+    const totalTasks = request.tasks.length;
+    const completedTasks = request.tasks.filter(task => task.status === 'completed').length;
+    const progressPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+
+    res.json({
+      contract: contract,
+      request: request,
+      progress: {
+        totalTasks,
+        completedTasks,
+        progressPercentage: Math.round(progressPercentage),
+        status: request.status
+      }
+    });
+  } catch (err) {
+    console.error("Error fetching contract progress:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -1126,12 +1114,12 @@ const customerSignContract = async (req, res) => {
 
 module.exports = {
   createContractFromRequest,
-  getContractById,
-  updateContractStatus,
-  getAllContracts,
+  getContractsForApproval,
   approveContract,
   rejectContract,
-  getContractsForApproval,
+  getCustomerContracts,
+  getContractProgress,
+  getAllContracts,
   exportContractPDF,
   assignStaffToContract,
   getAvailableStaff,

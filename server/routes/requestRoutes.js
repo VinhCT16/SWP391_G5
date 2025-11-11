@@ -1,27 +1,23 @@
+// server/routes/requestRoutes.js
 const express = require("express");
 const {
-  createRequest,
-  getCustomerRequests,
-  getRequestById,
-  updateRequestStatus,
   getAllRequests,
-  getAvailableStaffForRequest,
-  assignStaffToRequest
+  getMyRequests,
+  updateRequestStatus,
+  createRequest
 } = require("../controllers/requestController");
 const auth = require("../utils/authMiddleware");
 const { requireManager, requireCustomer } = require("../utils/authMiddleware");
 
 const router = express.Router();
 
-// Customer routes
-router.post("/", auth, requireCustomer, createRequest);
-router.get("/my-requests", auth, requireCustomer, getCustomerRequests);
-router.get("/:id", auth, getRequestById);
-
 // Manager routes
-router.get("/", auth, requireManager, getAllRequests);
-router.put("/:id/status", auth, requireManager, updateRequestStatus);
-router.get("/:id/available-staff", auth, requireManager, getAvailableStaffForRequest);
-router.post("/:id/assign-staff", auth, requireManager, assignStaffToRequest);
+router.get("/all", auth, requireManager, getAllRequests);
+router.put("/:requestId/status", auth, requireManager, updateRequestStatus);
+
+// Customer routes
+router.get("/my", auth, requireCustomer, getMyRequests);
+router.post("/", auth, requireCustomer, createRequest);
 
 module.exports = router;
+

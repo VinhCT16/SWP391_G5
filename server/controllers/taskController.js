@@ -1,5 +1,5 @@
 const Request = require("../models/Request");
-const Staff = require("../models/Staff");
+const User = require("../models/User");
 const { v4: uuidv4 } = require('uuid');
 
 // Create tasks from approved contract
@@ -47,12 +47,12 @@ const createTasksFromContract = async (req, res) => {
     // Update staff current tasks
     for (const task of createdTasks) {
       if (task.assignedStaff) {
-        await Staff.findByIdAndUpdate(task.assignedStaff, {
+        await User.findByIdAndUpdate(task.assignedStaff, {
           $addToSet: { currentTasks: request._id }
         });
       }
       if (task.transporter) {
-        await Staff.findByIdAndUpdate(task.transporter, {
+        await User.findByIdAndUpdate(task.transporter, {
           $addToSet: { currentTasks: request._id }
         });
       }
@@ -74,9 +74,9 @@ const getStaffTasks = async (req, res) => {
   try {
     const staffId = req.userId;
     
-    // Find staff member
-    const staff = await Staff.findOne({ userId: staffId });
-    if (!staff) {
+    // Find staff user
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff member not found" });
     }
 
@@ -171,8 +171,8 @@ const updateTaskStatus = async (req, res) => {
     }
 
     // Check if staff is assigned to this task
-    const staff = await Staff.findOne({ userId: staffId });
-    if (!staff) {
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff member not found" });
     }
 
@@ -214,9 +214,8 @@ const updateTaskStatus = async (req, res) => {
 // Get all staff members
 const getAllStaff = async (req, res) => {
   try {
-    const staff = await Staff.find({ isActive: true })
-      .populate('userId', 'name email')
-      .select('employeeId role specialization availability rating');
+    const staff = await User.find({ role: 'staff', isActive: true })
+      .select('name email phone employeeId staffRole specialization availability rating');
 
     res.json({ staff });
   } catch (err) {
@@ -244,8 +243,8 @@ const assignStaffToTask = async (req, res) => {
     }
 
     // Find the staff member
-    const staff = await Staff.findById(staffId);
-    if (!staff) {
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff member not found" });
     }
 
@@ -259,7 +258,7 @@ const assignStaffToTask = async (req, res) => {
     }
 
     // Add to staff's current tasks
-    await Staff.findByIdAndUpdate(staffId, {
+    await User.findByIdAndUpdate(staffId, {
       $addToSet: { currentTasks: request._id }
     });
 
@@ -267,7 +266,7 @@ const assignStaffToTask = async (req, res) => {
     task.taskHistory.push({
       historyId: uuidv4(),
       status: 'assigned',
-      notes: `Assigned to ${staff.role}`,
+      notes: `Assigned to ${staff.staffRole}`,
       updatedBy: req.userId,
       updatedAt: new Date()
     });
@@ -308,8 +307,8 @@ const updateTaskDetails = async (req, res) => {
     }
 
     // Check if staff is assigned to this task
-    const staff = await Staff.findOne({ userId: staffId });
-    if (!staff) {
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff member not found" });
     }
 
