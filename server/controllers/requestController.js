@@ -2,6 +2,7 @@
 const Request = require("../models/Request");
 const User = require("../models/User");
 const { v4: uuidv4 } = require('uuid');
+const { autoCreateContractFromRequest } = require("./contractController");
 
 // Get all requests (manager view)
 const getAllRequests = async (req, res) => {
@@ -175,6 +176,19 @@ const updateRequestStatus = async (req, res) => {
     }
 
     await request.save();
+    
+    // Automatically create contract when request is approved
+    if (status === 'approved') {
+      try {
+        console.log('Request approved, automatically creating contract...');
+        const contract = await autoCreateContractFromRequest(request._id, managerId);
+        console.log('Contract created automatically:', contract._id);
+      } catch (contractErr) {
+        // Log error but don't fail the request approval
+        console.error('Error automatically creating contract:', contractErr);
+        // Contract creation can be done manually later if automatic creation fails
+      }
+    }
     
     res.json({
       message: `Request ${status} successfully`,
