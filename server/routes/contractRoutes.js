@@ -5,7 +5,6 @@ const {
   getContractsForApproval,
   approveContract,
   rejectContract,
-  getContractsForApproval,
   exportContractPDF,
   assignStaffToContract,
   getAvailableStaff,
@@ -14,10 +13,14 @@ const {
   getAssignedContracts,
   managerSignContract,
   customerSignContract,
-  getAllServices
+  getAllServices,
+  getAllContracts,
+  getContractById,
+  updateContractStatus
 } = require("../controllers/contractController");
 const auth = require("../utils/authMiddleware");
-const { requireManager, requireCustomer } = require("../utils/authMiddleware");
+const { requireManager, requireCustomer, requireStaff } = require("../utils/authMiddleware");
+const Contract = require("../models/Contract");
 
 const router = express.Router();
 
@@ -30,18 +33,17 @@ router.post("/from-request/:requestId", auth, requireManager, createContractFrom
 router.get("/customer/:customerId", auth, requireCustomer, async (req, res) => {
   try {
     const { customerId } = req.params;
-    const contracts = await Contract.find({ customerId })
-      .populate({
-        path: 'customerId',
-        select: 'userId email phone',
-        populate: { path: 'userId', select: 'name email phone' }
-      })
+    // Verify the customerId matches the authenticated user
+    if (customerId !== req.userId.toString()) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    
+    // Contract.customerId references User, so populate User directly
+    const contracts = await Contract.find({ customerId: req.userId })
+      .populate('customerId', 'name email phone role')
       .populate('serviceId', 'name price')
-      .populate({
-        path: 'managerId',
-        select: 'userId employeeId department',
-        populate: { path: 'userId', select: 'name email phone' }
-      })
+      .populate('managerId', 'name email phone role')
+      .populate('assignedStaff.staffId', 'name email phone role')
       .sort({ createdAt: -1 });
     
     res.json({ contracts });
