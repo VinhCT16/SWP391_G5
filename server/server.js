@@ -4,6 +4,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const dotenv = require("dotenv");
 const { connectDB } = require("./config/db");
+const http = require("http");
 
 
 dotenv.config();
@@ -12,27 +13,67 @@ const app = express();
 
 // Middlewares
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // For parsing FormData text fields
 
-const allowedOrigins = process.env.CLIENT_URL ? [process.env.CLIENT_URL] : ["http://localhost:3000", "http://localhost:3001"];
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-  })
-);
+// CORS configuration - allow credentials for cookie-based auth
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:3001",
+  credentials: true, // Allow cookies to be sent
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Cookie"],
+  exposedHeaders: ["Set-Cookie"]
+}));
+
+// Cookie parser must be after CORS
 app.use(cookieParser());
+
+// Middleware to handle cookie size issues - clear if too many cookies
+app.use((req, res, next) => {
+  if (req.headers.cookie) {
+    const cookieCount = req.headers.cookie.split(';').length;
+    // If there are too many cookies, clear old ones
+    if (cookieCount > 10) {
+      // Clear all cookies except the access_token
+      const cookies = req.headers.cookie.split(';');
+      cookies.forEach(cookie => {
+        const name = cookie.split('=')[0].trim();
+        if (name !== 'access_token') {
+          res.clearCookie(name);
+        }
+      });
+    }
+  }
+  next();
+});
 
 // Routes
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/requests", require("./routes/requestRoutes"));
 app.use("/api/contracts", require("./routes/contractRoutes"));
 app.use("/api/tasks", require("./routes/taskRoutes"));
-app.use("/reviews", reviewRoutes);
+app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/accounts", require("./routes/accountRoutes"));
+app.use("/api/reviews", reviewRoutes);
 
+
+app.get("/", (req, res) => {
+  res.send("API is running...");
+});
 // Start server after DB connect
 const port = process.env.PORT || 3000;
 connectDB().then(() => {
-  app.listen(port, () => console.log(`🚀 Server listening on port ${port}`));
+  // Create HTTP server with increased header size limit
+  const server = http.createServer(app);
+  
+  // Increase max header size (default is 8KB, increasing to 32KB)
+  if (server.maxHeaderSize !== undefined) {
+    server.maxHeaderSize = 32768; // 32KB
+  }
+  
+  server.listen(port, () => {
+    console.log(`🚀 Server listening on port ${port}`);
+    console.log(`📝 Max header size: ${server.maxHeaderSize || 'default'} bytes`);
+  });
 });
 
 

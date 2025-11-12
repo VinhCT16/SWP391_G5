@@ -1,5 +1,5 @@
 const Request = require("../models/Request");
-const Staff = require("../models/Staff");
+const User = require("../models/User");
 const { v4: uuidv4 } = require('uuid');
 
 // Create tasks from approved contract
@@ -31,6 +31,12 @@ const createTasksFromContract = async (req, res) => {
       assignedStaff: taskData.assignedStaff || null,
       transporter: taskData.transporter || null,
       estimatedDuration: taskData.estimatedDuration || 2,
+      priority: taskData.priority || 'medium',
+      description: taskData.description || '',
+      deadline: taskData.deadline || null,
+      managerNotes: taskData.managerNotes || '',
+      customerNotes: taskData.customerNotes || '',
+      attachments: taskData.attachments || [],
       status: 'pending'
     }));
 
@@ -41,12 +47,12 @@ const createTasksFromContract = async (req, res) => {
     // Update staff current tasks
     for (const task of createdTasks) {
       if (task.assignedStaff) {
-        await Staff.findByIdAndUpdate(task.assignedStaff, {
+        await User.findByIdAndUpdate(task.assignedStaff, {
           $addToSet: { currentTasks: request._id }
         });
       }
       if (task.transporter) {
-        await Staff.findByIdAndUpdate(task.transporter, {
+        await User.findByIdAndUpdate(task.transporter, {
           $addToSet: { currentTasks: request._id }
         });
       }
@@ -68,9 +74,9 @@ const getStaffTasks = async (req, res) => {
   try {
     const staffId = req.userId;
     
-    // Find staff member
-    const staff = await Staff.findOne({ userId: staffId });
-    if (!staff) {
+    // Find staff user
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff member not found" });
     }
 
@@ -98,6 +104,13 @@ const getStaffTasks = async (req, res) => {
             taskType: task.taskType,
             status: task.status,
             estimatedDuration: task.estimatedDuration,
+            priority: task.priority,
+            description: task.description,
+            deadline: task.deadline,
+            managerNotes: task.managerNotes,
+            customerNotes: task.customerNotes,
+            attachments: task.attachments,
+            contractId: request.contractId,
             moveDetails: request.moveDetails,
             createdAt: request.createdAt
           });
@@ -116,6 +129,13 @@ const getStaffTasks = async (req, res) => {
             taskType: task.taskType,
             status: task.status,
             estimatedDuration: task.estimatedDuration,
+            priority: task.priority,
+            description: task.description,
+            deadline: task.deadline,
+            managerNotes: task.managerNotes,
+            customerNotes: task.customerNotes,
+            attachments: task.attachments,
+            contractId: request.contractId,
             moveDetails: request.moveDetails,
             createdAt: request.createdAt,
             isTransporter: true
@@ -151,8 +171,8 @@ const updateTaskStatus = async (req, res) => {
     }
 
     // Check if staff is assigned to this task
-    const staff = await Staff.findOne({ userId: staffId });
-    if (!staff) {
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff member not found" });
     }
 
@@ -194,9 +214,8 @@ const updateTaskStatus = async (req, res) => {
 // Get all staff members
 const getAllStaff = async (req, res) => {
   try {
-    const staff = await Staff.find({ isActive: true })
-      .populate('userId', 'name email')
-      .select('employeeId role specialization availability rating');
+    const staff = await User.find({ role: 'staff', isActive: true })
+      .select('name email phone employeeId staffRole specialization availability rating');
 
     res.json({ staff });
   } catch (err) {
@@ -224,8 +243,8 @@ const assignStaffToTask = async (req, res) => {
     }
 
     // Find the staff member
-    const staff = await Staff.findById(staffId);
-    if (!staff) {
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff member not found" });
     }
 
@@ -239,7 +258,7 @@ const assignStaffToTask = async (req, res) => {
     }
 
     // Add to staff's current tasks
-    await Staff.findByIdAndUpdate(staffId, {
+    await User.findByIdAndUpdate(staffId, {
       $addToSet: { currentTasks: request._id }
     });
 
@@ -247,7 +266,7 @@ const assignStaffToTask = async (req, res) => {
     task.taskHistory.push({
       historyId: uuidv4(),
       status: 'assigned',
-      notes: `Assigned to ${staff.role}`,
+      notes: `Assigned to ${staff.staffRole}`,
       updatedBy: req.userId,
       updatedAt: new Date()
     });
@@ -268,10 +287,69 @@ const assignStaffToTask = async (req, res) => {
   }
 };
 
+// Update task details (priority, description, deadline, notes)
+const updateTaskDetails = async (req, res) => {
+  try {
+    const { requestId, taskId } = req.params;
+    const { priority, description, deadline, managerNotes, customerNotes } = req.body;
+    const staffId = req.userId;
+
+    // Find the request
+    const request = await Request.findById(requestId);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    // Find the specific task
+    const task = request.tasks.find(t => t.taskId === taskId);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    // Check if staff is assigned to this task
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
+      return res.status(404).json({ message: "Staff member not found" });
+    }
+
+    const isAssigned = task.assignedStaff && task.assignedStaff.toString() === staff._id.toString();
+    const isTransporter = task.transporter && task.transporter.toString() === staff._id.toString();
+
+    if (!isAssigned && !isTransporter) {
+      return res.status(403).json({ message: "You are not assigned to this task" });
+    }
+
+    // Update task details
+    if (priority !== undefined) task.priority = priority;
+    if (description !== undefined) task.description = description;
+    if (deadline !== undefined) task.deadline = deadline;
+    if (managerNotes !== undefined) task.managerNotes = managerNotes;
+    if (customerNotes !== undefined) task.customerNotes = customerNotes;
+
+    await request.save();
+
+    res.json({
+      message: "Task details updated successfully",
+      task: {
+        taskId: task.taskId,
+        priority: task.priority,
+        description: task.description,
+        deadline: task.deadline,
+        managerNotes: task.managerNotes,
+        customerNotes: task.customerNotes
+      }
+    });
+  } catch (err) {
+    console.error("Error updating task details:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   createTasksFromContract,
   getStaffTasks,
   updateTaskStatus,
+  updateTaskDetails,
   getAllStaff,
   assignStaffToTask
 };

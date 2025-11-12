@@ -7,7 +7,7 @@ const auth = require("../utils/authMiddleware");
 const router = express.Router();
 
 const COOKIE_NAME = "access_token";
-const TOKEN_EXPIRES_IN = "15m";
+const TOKEN_EXPIRES_IN = "24h"; // Increased from 15m to 24h for better user experience
 
 router.post("/register", async (req, res) => {
   try {
@@ -16,10 +16,12 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Name, email, and password are required" });
     }
 
-    // Validate role
-    const validRoles = ["customer", "manager", "staff"];
-    if (!validRoles.includes(role)) {
-      return res.status(400).json({ message: "Invalid role specified" });
+    // Public registration only allows customer role
+    // Manager, staff, and admin accounts must be created by admin with proper credentials
+    if (role !== "customer") {
+      return res.status(403).json({ 
+        message: "Only customer accounts can be created through public registration. Other roles must be created by an administrator." 
+      });
     }
 
     const existing = await User.findOne({ email: email.toLowerCase() });
@@ -77,11 +79,32 @@ router.post("/login", async (req, res) => {
     });
 
     const isProd = process.env.NODE_ENV === "production";
-    res.cookie(COOKIE_NAME, token, {
+    
+    // Clear any existing cookies first to avoid accumulation
+    res.clearCookie(COOKIE_NAME, { path: '/' });
+    res.clearCookie(COOKIE_NAME, { path: '/', domain: undefined });
+    
+    // Set new cookie with proper settings for development and production
+    const cookieOptions = {
       httpOnly: true,
-      secure: isProd,
-      sameSite: "strict",
-      maxAge: 15 * 60 * 1000,
+      secure: isProd, // Only use secure cookies in production (HTTPS)
+      sameSite: isProd ? "strict" : "lax", // Lax for development to allow cross-site requests
+      path: '/', // Available for all paths
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds (matches token expiration)
+    };
+    
+    // In development, don't set domain to allow localhost to work
+    if (!isProd) {
+      cookieOptions.domain = undefined; // Don't set domain in development
+    }
+    
+    res.cookie(COOKIE_NAME, token, cookieOptions);
+    
+    console.log('Cookie set successfully', {
+      cookieName: COOKIE_NAME,
+      hasToken: !!token,
+      isProd: isProd,
+      cookieOptions: cookieOptions
     });
 
     const safeUser = { 
@@ -99,10 +122,12 @@ router.post("/login", async (req, res) => {
 
 router.post("/logout", (req, res) => {
   const isProd = process.env.NODE_ENV === "production";
+  // Clear cookie with same options used to set it
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
     secure: isProd,
-    sameSite: "strict",
+    sameSite: isProd ? "strict" : "lax",
+    path: '/'
   });
   return res.json({ message: "Logged out" });
 });
@@ -121,60 +146,85 @@ router.get("/me", auth, async (req, res) => {
   });
 });
 
-// Create Manager Profile (requires manager role)
-router.post("/create-manager", auth, require("../utils/authMiddleware").requireManager, async (req, res) => {
+// Update user profile
+router.put("/profile", auth, async (req, res) => {
   try {
-    const Manager = require("../models/Manager");
-    const { employeeId, department, permissions } = req.body;
-    
-    // Check if manager profile already exists
-    const existingManager = await Manager.findOne({ userId: req.userId });
-    if (existingManager) {
-      return res.status(409).json({ message: "Manager profile already exists" });
+    const { name, phone } = req.body;
+    const userId = req.userId;
+
+    if (!name) {
+      return res.status(400).json({ message: "Name is required" });
     }
-    
-    const manager = await Manager.create({
-      userId: req.userId,
-      employeeId,
-      department,
-      permissions: permissions || []
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Update user fields
+    user.name = name;
+    if (phone !== undefined) user.phone = phone;
+
+    await user.save();
+
+    const safeUser = { 
+      id: user._id, 
+      name: user.name, 
+      email: user.email,
+      role: user.role,
+      phone: user.phone
+    };
+
+    return res.json({ 
+      message: "Profile updated successfully",
+      user: safeUser 
     });
-    
-    return res.status(201).json({ manager });
   } catch (err) {
+    console.error("Error updating profile:", err);
     return res.status(500).json({ message: "Server error" });
   }
 });
 
-// Create Staff Profile (requires staff role)
-router.post("/create-staff", auth, require("../utils/authMiddleware").requireStaff, async (req, res) => {
+// Change password
+router.put("/password", auth, async (req, res) => {
   try {
-    const Staff = require("../models/Staff");
-    const { employeeId, role, specialization, availability } = req.body;
-    
-    // Check if staff profile already exists
-    const existingStaff = await Staff.findOne({ userId: req.userId });
-    if (existingStaff) {
-      return res.status(409).json({ message: "Staff profile already exists" });
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.userId;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required" });
     }
-    
-    const staff = await Staff.create({
-      userId: req.userId,
-      employeeId,
-      role,
-      specialization: specialization || [],
-      availability: availability || {
-        isAvailable: true,
-        workingHours: { start: "08:00", end: "17:00" },
-        workDays: ["monday", "tuesday", "wednesday", "thursday", "friday"]
-      }
-    });
-    
-    return res.status(201).json({ staff });
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters long" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Verify current password
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    // Hash new password
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedNewPassword;
+
+    await user.save();
+
+    return res.json({ message: "Password changed successfully" });
   } catch (err) {
+    console.error("Error changing password:", err);
     return res.status(500).json({ message: "Server error" });
   }
 });
+
+// Note: Profile creation endpoints removed - role-specific data is now stored directly in User model
+// Profile data should be set during user creation (by admin) or updated via profile update endpoint
 
 module.exports = router;
 

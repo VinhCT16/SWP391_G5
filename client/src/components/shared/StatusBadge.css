@@ -1,0 +1,70 @@
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: capitalize;
+  display: inline-block;
+}
+
+.status-submitted,
+.status-pending {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.status-approved,
+.status-active {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-rejected,
+.status-locked,
+.status-cancelled {
+  background: #ffebee;
+  color: #d32f2f;
+}
+
+.status-in-progress,
+.status-assigned {
+  background: #e0f7fa;
+  color: #00bcd4;
+}
+
+.status-completed,
+.status-done {
+  background: #e8f5e9;
+  color: #4caf50;
+}
+
+.status-blocked {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.status-overdue {
+  background: #fce4ec;
+  color: #e91e63;
+}
+
+.status-unknown {
+  background: #f5f5f5;
+  color: #666;
+}
+
+.status-draft {
+  background: #f3e5f5;
+  color: #9c27b0;
+}
+
+.status-waiting-payment {
+  background: #f3e5f5;
+  color: #9c27b0;
+}
+
+.status-under-survey {
+  background: #e3f2fd;
+  color: #2196f3;
+}
+

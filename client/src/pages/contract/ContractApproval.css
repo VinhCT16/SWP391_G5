@@ -1,0 +1,404 @@
+.contract-approval-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #f8f9fa;
+  min-height: 100vh;
+}
+
+.contract-approval-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.contract-approval-header h1 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+.contract-approval-header p {
+  color: #7f8c8d;
+  margin: 0;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  font-size: 18px;
+  color: #7f8c8d;
+}
+
+.error-message {
+  background: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  border: 1px solid #fcc;
+}
+
+.no-contracts {
+  text-align: center;
+  padding: 40px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.no-contracts p {
+  color: #7f8c8d;
+  font-size: 16px;
+  margin: 0;
+}
+
+.contracts-list {
+  display: grid;
+  gap: 20px;
+}
+
+.contract-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  overflow: hidden;
+  transition: box-shadow 0.3s;
+}
+
+.contract-card:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.contract-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e1e8ed;
+}
+
+.contract-info h3 {
+  color: #2c3e50;
+  margin: 0 0 8px 0;
+  font-size: 18px;
+}
+
+.contract-info p {
+  color: #7f8c8d;
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.contract-status {
+  display: flex;
+  align-items: center;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-draft {
+  background: #f39c12;
+  color: white;
+}
+
+.status-pending {
+  background: #3498db;
+  color: white;
+}
+
+.status-approved {
+  background: #27ae60;
+  color: white;
+}
+
+.status-signed {
+  background: #9b59b6;
+  color: white;
+}
+
+.status-active {
+  background: #1abc9c;
+  color: white;
+}
+
+.status-completed {
+  background: #34495e;
+  color: white;
+}
+
+.status-cancelled {
+  background: #e74c3c;
+  color: white;
+}
+
+.status-default {
+  background: #95a5a6;
+  color: white;
+}
+
+.contract-details {
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.detail-section {
+  background: #fafbfc;
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid #e1e8ed;
+}
+
+.detail-section h4 {
+  color: #2c3e50;
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-section p {
+  margin: 6px 0;
+  font-size: 14px;
+  color: #2c3e50;
+}
+
+.detail-section strong {
+  color: #34495e;
+}
+
+.contract-actions {
+  display: flex;
+  gap: 10px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-top: 1px solid #e1e8ed;
+  justify-content: flex-end;
+}
+
+.contract-actions button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.approve-btn {
+  background: #27ae60;
+  color: white;
+}
+
+.approve-btn:hover {
+  background: #229954;
+  transform: translateY(-1px);
+}
+
+.reject-btn {
+  background: #e74c3c;
+  color: white;
+}
+
+.reject-btn:hover {
+  background: #c0392b;
+  transform: translateY(-1px);
+}
+
+.view-btn {
+  background: #3498db;
+  color: white;
+}
+
+.view-btn:hover {
+  background: #2980b9;
+  transform: translateY(-1px);
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e1e8ed;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #7f8c8d;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.3s;
+}
+
+.close-btn:hover {
+  background: #f8f9fa;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-body p {
+  color: #2c3e50;
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.form-group textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-group textarea:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 20px;
+  border-top: 1px solid #e1e8ed;
+}
+
+.modal-actions button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.modal-actions .cancel-btn {
+  background: #95a5a6;
+  color: white;
+}
+
+.modal-actions .cancel-btn:hover {
+  background: #7f8c8d;
+}
+
+.modal-actions .approve-btn {
+  background: #27ae60;
+  color: white;
+}
+
+.modal-actions .approve-btn:hover {
+  background: #229954;
+}
+
+.modal-actions .reject-btn {
+  background: #e74c3c;
+  color: white;
+}
+
+.modal-actions .reject-btn:hover {
+  background: #c0392b;
+}
+
+@media (max-width: 768px) {
+  .contract-approval-container {
+    padding: 10px;
+  }
+  
+  .contract-header {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .contract-details {
+    grid-template-columns: 1fr;
+  }
+  
+  .contract-actions {
+    flex-direction: column;
+  }
+  
+  .contract-actions button {
+    width: 100%;
+  }
+  
+  .modal {
+    width: 95%;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .modal-actions button {
+    width: 100%;
+  }
+}

@@ -1,0 +1,425 @@
+.contract-document-container {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #f5f5f5;
+}
+
+.contract-document {
+  background: white;
+  padding: 60px 50px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  min-height: 800px;
+  font-family: 'Times New Roman', serif;
+}
+
+/* Header Section */
+.contract-header-section {
+  text-align: center;
+  border-bottom: 3px solid #333;
+  padding-bottom: 20px;
+  margin-bottom: 30px;
+}
+
+.contract-title {
+  font-size: 28px;
+  font-weight: bold;
+  margin: 0 0 10px 0;
+  color: #1a1a1a;
+  letter-spacing: 1px;
+}
+
+.contract-id {
+  font-size: 14px;
+  color: #666;
+  margin: 5px 0;
+}
+
+.contract-date {
+  font-size: 14px;
+  color: #666;
+  margin: 5px 0;
+}
+
+/* Section Styling */
+.contract-section {
+  margin-bottom: 35px;
+  page-break-inside: avoid;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #1a1a1a;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 8px;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Parties Section */
+.parties-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin-top: 15px;
+}
+
+.party-info {
+  padding: 15px;
+  background: #f9f9f9;
+  border-left: 4px solid #007bff;
+}
+
+.party-info h3 {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 10px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.party-name {
+  font-size: 16px;
+  font-weight: bold;
+  margin: 8px 0;
+  color: #1a1a1a;
+}
+
+.party-detail {
+  font-size: 14px;
+  color: #555;
+  margin: 4px 0;
+}
+
+/* Service Details */
+.service-details {
+  margin-top: 10px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #333;
+}
+
+.detail-value {
+  color: #555;
+}
+
+/* Move Addresses */
+.move-addresses {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-top: 15px;
+}
+
+.address-block {
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 4px;
+}
+
+.address-block h3 {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 10px 0;
+  text-transform: uppercase;
+}
+
+.address-block p {
+  margin: 0;
+  color: #333;
+  line-height: 1.6;
+}
+
+/* Pricing Table */
+.pricing-table {
+  margin-top: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pricing-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.pricing-row:last-child {
+  border-bottom: none;
+}
+
+.pricing-row.indent {
+  padding-left: 40px;
+  background: #f9f9f9;
+}
+
+.pricing-row.total {
+  background: #e8f4fd;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.pricing-row.balance {
+  background: #fff3cd;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.pricing-label {
+  color: #333;
+}
+
+.pricing-value {
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.pricing-subheader {
+  padding: 8px 20px;
+  background: #f0f0f0;
+  font-weight: 600;
+  color: #555;
+  font-size: 13px;
+}
+
+/* Payment Method */
+.payment-method {
+  font-size: 15px;
+  padding: 10px 0;
+  color: #333;
+}
+
+/* Terms and Conditions */
+.terms-list {
+  margin-top: 15px;
+}
+
+.term-item {
+  margin-bottom: 20px;
+  padding-left: 15px;
+  border-left: 3px solid #007bff;
+}
+
+.term-item h3 {
+  font-size: 15px;
+  color: #1a1a1a;
+  margin: 0 0 8px 0;
+}
+
+.term-item p {
+  margin: 0;
+  line-height: 1.8;
+  color: #444;
+  text-align: justify;
+}
+
+/* Commitments */
+.commitments-list {
+  margin-top: 15px;
+}
+
+.commitment-item {
+  margin-bottom: 25px;
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 4px;
+}
+
+.commitment-item h3 {
+  font-size: 15px;
+  color: #1a1a1a;
+  margin: 0 0 12px 0;
+}
+
+.commitment-item ul {
+  margin: 0;
+  padding-left: 25px;
+  color: #444;
+}
+
+.commitment-item li {
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+
+/* Approval Information */
+.approval-info {
+  margin-top: 10px;
+  padding: 15px;
+  background: #e8f4fd;
+  border-radius: 4px;
+}
+
+.approval-info p {
+  margin: 5px 0;
+  color: #333;
+}
+
+/* Signatures Section */
+.signatures-section {
+  margin-top: 50px;
+  page-break-inside: avoid;
+}
+
+.signatures-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 50px;
+  margin-top: 30px;
+  margin-bottom: 20px;
+}
+
+.signature-block {
+  text-align: center;
+}
+
+.signature-field {
+  min-height: 120px;
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.signature-line {
+  border-bottom: 2px solid #333;
+  width: 100%;
+  margin: 40px 0 10px 0;
+  height: 60px;
+  position: relative;
+}
+
+.signature-line.placeholder {
+  border-bottom: 2px dashed #999;
+}
+
+.signature-signed {
+  text-align: center;
+}
+
+.signature-name {
+  font-weight: bold;
+  font-size: 14px;
+  color: #1a1a1a;
+  margin: 5px 0;
+}
+
+.signature-date {
+  font-size: 12px;
+  color: #666;
+  margin: 5px 0;
+}
+
+.signature-unsigned {
+  text-align: center;
+}
+
+.signature-label {
+  font-size: 12px;
+  color: #999;
+  margin: 10px 0;
+  font-style: italic;
+}
+
+.signature-title {
+  font-weight: bold;
+  font-size: 14px;
+  color: #333;
+  margin-top: 10px;
+  text-transform: uppercase;
+}
+
+.sign-button {
+  margin-top: 15px;
+  padding: 10px 20px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.3s;
+}
+
+.sign-button:hover {
+  background: #0056b3;
+}
+
+.sign-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.contract-fully-signed {
+  margin-top: 30px;
+  padding: 20px;
+  background: #d4edda;
+  border: 2px solid #28a745;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.fully-signed-notice {
+  margin: 0;
+  font-size: 16px;
+  font-weight: bold;
+  color: #155724;
+}
+
+/* Footer */
+.contract-footer {
+  margin-top: 50px;
+  padding-top: 20px;
+  border-top: 2px solid #ddd;
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+}
+
+.contract-footer p {
+  margin: 5px 0;
+}
+
+/* Print Styles */
+@media print {
+  .contract-document-container {
+    padding: 0;
+    background: white;
+  }
+
+  .contract-document {
+    box-shadow: none;
+    padding: 40px 50px;
+  }
+
+  .sign-button {
+    display: none;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .contract-document {
+    padding: 30px 20px;
+  }
+
+  .parties-grid,
+  .move-addresses,
+  .signatures-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+

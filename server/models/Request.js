@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const requestSchema = new mongoose.Schema({
   requestId: { 
@@ -46,6 +46,21 @@ const requestSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, 
     ref: "Contract" 
   },
+
+  // Staff Assignment at Request Level (before contract)
+  assignedStaff: [{
+    staffId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
+    assignedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+    assignedAt: { type: Date, default: Date.now },
+    notes: String
+  }],
   
   // Tasks
   tasks: [
@@ -56,15 +71,29 @@ const requestSchema = new mongoose.Schema({
         enum: ["packing", "loading", "transporting", "unloading", "unpacking"],
         required: true 
       },
-      assignedStaff: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
-      transporter: { type: mongoose.Schema.Types.ObjectId, ref: "Staff" },
+      assignedStaff: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      transporter: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       status: { 
         type: String, 
-        enum: ["pending", "assigned", "in-progress", "completed", "cancelled"], 
+        enum: ["pending", "assigned", "in-progress", "blocked", "overdue", "completed", "cancelled"], 
         default: "pending" 
       },
       estimatedDuration: Number, // in hours
       actualDuration: Number,
+      priority: { 
+        type: String, 
+        enum: ["low", "medium", "high"], 
+        default: "medium" 
+      },
+      description: String,
+      deadline: Date,
+      managerNotes: String,
+      customerNotes: String,
+      attachments: [{
+        name: String,
+        url: String,
+        uploadedAt: { type: Date, default: Date.now }
+      }],
       taskHistory: [
         {
           historyId: { type: mongoose.Schema.Types.ObjectId, default: new mongoose.Types.ObjectId() },
@@ -86,7 +115,7 @@ const requestSchema = new mongoose.Schema({
   
   // Approval
   approval: {
-    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Manager" },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     reviewedAt: Date,
     approved: Boolean,
     rejectionReason: String,
@@ -104,4 +133,4 @@ const requestSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-export default mongoose.model("Request", requestSchema);
+module.exports = mongoose.model("Request", requestSchema);

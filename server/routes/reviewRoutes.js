@@ -9,7 +9,7 @@ const {
 
 const router = express.Router();
 
-// 📌 Routes cho CRUD
+//Routes cho CRUD
 router.get("/", getReviews);          // GET /reviews
 router.get("/:id", getReviewById);    // GET /reviews/:id
 router.post("/", createReview);       // POST /reviews

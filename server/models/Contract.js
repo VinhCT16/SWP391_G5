@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const contractSchema = new mongoose.Schema({
   contractId: { 
@@ -13,12 +13,12 @@ const contractSchema = new mongoose.Schema({
   },
   customerId: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: "Customer", 
+    ref: "User", 
     required: true 
   },
   managerId: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: "Manager", 
+    ref: "User", 
     required: true 
   },
   serviceId: { 
@@ -26,6 +26,30 @@ const contractSchema = new mongoose.Schema({
     ref: "Service", 
     required: true 
   },
+  
+  // Staff Assignment
+  assignedStaff: [{
+    staffId: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "User", 
+      required: true 
+    },
+    assignedBy: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: "User" 
+    },
+    assignedAt: { 
+      type: Date, 
+      default: Date.now 
+    },
+    acceptedAt: Date,
+    status: { 
+      type: String, 
+      enum: ["pending", "accepted", "rejected", "completed"], 
+      default: "pending" 
+    },
+    notes: String
+  }],
   
   // Contract Details
   moveDetails: {
@@ -64,13 +88,13 @@ const contractSchema = new mongoose.Schema({
   // Contract Status
   status: { 
     type: String, 
-    enum: ["draft", "pending_approval", "approved", "signed", "active", "completed", "cancelled"],
+    enum: ["draft", "pending_approval", "approved", "signed", "staff_pending", "active", "in_progress", "completed", "cancelled"],
     default: "draft" 
   },
   
   // Approval Process
   approval: {
-    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Manager" },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     approvedAt: Date,
     rejectionReason: String,
     notes: String
@@ -91,4 +115,4 @@ const contractSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-export default mongoose.model("Contract", contractSchema);
+module.exports = mongoose.model("Contract", contractSchema);
