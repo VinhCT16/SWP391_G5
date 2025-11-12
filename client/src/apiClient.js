@@ -9,10 +9,22 @@ const apiClient = axios.create({
   },
 });
 
-// Request interceptor to add auth token if available
+// Request interceptor to ensure credentials are sent
 apiClient.interceptors.request.use(
   (config) => {
-    // You can add token logic here if needed
+    // Ensure credentials are always included for cookie-based auth
+    config.withCredentials = true;
+    
+    // Debug logging in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('API Request:', {
+        url: config.url,
+        method: config.method,
+        withCredentials: config.withCredentials,
+        hasCookies: document.cookie ? document.cookie.substring(0, 100) : 'none'
+      });
+    }
+    
     return config;
   },
   (error) => {
@@ -28,7 +40,14 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Handle unauthorized access
-      console.log('Unauthorized access');
+      console.error('Unauthorized access - authentication failed', {
+        url: error.config?.url,
+        message: error.response?.data?.message,
+        hasCookies: document.cookie ? 'yes' : 'no'
+      });
+      
+      // Clear user state if token is invalid
+      // The AuthContext will handle this via checkAuthStatus
     }
     return Promise.reject(error);
   }

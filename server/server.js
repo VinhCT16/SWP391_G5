@@ -14,12 +14,16 @@ const app = express();
 // Middlewares
 app.use(express.json());
 
+// CORS configuration - allow credentials for cookie-based auth
 app.use(cors({
-  origin: "http://localhost:3001",
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+  origin: process.env.FRONTEND_URL || "http://localhost:3001",
+  credentials: true, // Allow cookies to be sent
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Cookie"],
+  exposedHeaders: ["Set-Cookie"]
 }));
+
+// Cookie parser must be after CORS
 app.use(cookieParser());
 
 // Middleware to handle cookie size issues - clear if too many cookies

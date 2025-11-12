@@ -1,0 +1,184 @@
+@import '../../styles/dashboard.css';
+
+.staff-dashboard {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.tasks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.task-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.task-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.task-icon {
+  font-size: 1.5rem;
+}
+
+.task-details {
+  margin-bottom: 15px;
+}
+
+.detail-row {
+  margin: 8px 0;
+  color: #333;
+}
+
+.role-badge {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.task-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.start-btn,
+.complete-btn,
+.block-btn,
+.view-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.start-btn {
+  background: #28a745;
+  color: white;
+}
+
+.start-btn:hover {
+  background: #218838;
+}
+
+.complete-btn {
+  background: #17a2b8;
+  color: white;
+}
+
+.complete-btn:hover {
+  background: #138496;
+}
+
+.block-btn {
+  background: #ffc107;
+  color: #212529;
+}
+
+.block-btn:hover {
+  background: #e0a800;
+}
+
+.view-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.view-btn:hover {
+  background: #545b62;
+}
+
+.moves-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.move-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.move-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.move-details p {
+  margin: 8px 0;
+  color: #333;
+}
+
+.move-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.profile-info {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.profile-section {
+  margin-bottom: 30px;
+}
+
+.profile-section h3 {
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.info-row .label {
+  font-weight: bold;
+  color: #555;
+}
+
+.info-row .value {
+  color: #333;
+}

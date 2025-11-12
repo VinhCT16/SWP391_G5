@@ -1,0 +1,217 @@
+@import '../../styles/dashboard.css';
+
+.manager-dashboard {
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.dashboard-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px 0;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.logo span {
+  opacity: 0.9;
+  font-size: 0.9rem;
+}
+
+.user-info {
+  font-size: 1.1rem;
+}
+
+.dashboard-nav {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 0 20px;
+}
+
+.nav-btn {
+  padding: 12px 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: #666;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.nav-btn:hover {
+  color: #007bff;
+}
+
+.nav-btn.active {
+  color: #007bff;
+  border-bottom-color: #007bff;
+  font-weight: bold;
+}
+
+.dashboard-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.dashboard-header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.dashboard-header-section h2 {
+  color: #333;
+  margin: 0;
+}
+
+.dashboard-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.requests-grid,
+.contracts-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.request-card,
+.contract-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.request-header,
+.contract-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.request-header h3,
+.contract-header h3 {
+  margin: 0;
+  color: #333;
+}
+
+.request-details,
+.contract-details {
+  margin-bottom: 15px;
+}
+
+.detail-row {
+  margin: 8px 0;
+  color: #333;
+}
+
+.approval-info {
+  margin-top: 15px;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+}
+
+.approval-info h4 {
+  margin-top: 0;
+  color: #333;
+}
+
+.request-actions,
+.contract-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.approve-btn,
+.reject-btn,
+.contract-btn,
+.view-btn,
+.assign-btn,
+.create-contract-btn,
+.tasks-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.approve-btn {
+  background: #28a745;
+  color: white;
+}
+
+.approve-btn:hover {
+  background: #218838;
+}
+
+.reject-btn {
+  background: #dc3545;
+  color: white;
+}
+
+.reject-btn:hover {
+  background: #c82333;
+}
+
+.contract-btn,
+.create-contract-btn {
+  background: #007bff;
+  color: white;
+}
+
+.contract-btn:hover,
+.create-contract-btn:hover {
+  background: #0056b3;
+}
+
+.view-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.view-btn:hover {
+  background: #545b62;
+}
+
+.assign-btn {
+  background: #17a2b8;
+  color: white;
+}
+
+.assign-btn:hover {
+  background: #138496;
+}
+
+.tasks-btn {
+  background: #ffc107;
+  color: #212529;
+}
+
+.tasks-btn:hover {
+  background: #e0a800;
+}

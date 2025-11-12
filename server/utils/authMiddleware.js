@@ -4,12 +4,28 @@ const User = require("../models/User");
 // Basic authentication middleware
 module.exports = function auth(req, res, next) {
   try {
+    // Check for token in cookies
     const token = req.cookies && req.cookies["access_token"];
+    
+    // Debug logging in development
+    if (!token && process.env.NODE_ENV !== 'production') {
+      console.log('Auth Debug:', {
+        url: req.url,
+        method: req.method,
+        hasCookies: !!req.cookies,
+        cookieNames: req.cookies ? Object.keys(req.cookies) : [],
+        cookieHeader: req.headers.cookie ? req.headers.cookie.substring(0, 100) : 'none',
+        allCookies: req.cookies
+      });
+    }
+    
     if (!token) {
       console.error('Authentication error: No token found in cookies', { 
         url: req.url,
         method: req.method,
-        hasCookies: !!req.cookies
+        hasCookies: !!req.cookies,
+        cookieNames: req.cookies ? Object.keys(req.cookies) : [],
+        cookieHeader: req.headers.cookie ? req.headers.cookie.substring(0, 100) : 'none'
       });
       return res.status(401).json({ 
         message: "Unauthorized: No authentication token found. Please login again." 

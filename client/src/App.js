@@ -1,34 +1,32 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
-import RoleProtectedRoute from './components/RoleProtectedRoute';
-import DashboardRedirect from './components/DashboardRedirect';
-import Navigation from './components/Navigation';
-import Breadcrumb from './components/Breadcrumb';
-import Landing from './pages/Landing';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import CustomerDashboard from './pages/CustomerDashboard';
-import CustomerReview from "./pages/CustomerReview";
-import ManagerReview from "./pages/ManagerReview";
-import ManagerDashboard from "./pages/ManagerDashboard";
-import StaffDashboard from "./pages/StaffDashboard";
-import AdminDashboard from "./pages/AdminDashboard";
-import About from "./pages/About";
-import ContractForm from "./pages/ContractForm";
-import ContractApproval from "./pages/ContractApproval";
-import ContractDetailView from "./pages/ContractDetailView";
-import CheckoutPage from './pages/CheckoutPage';
-import CreateRequestPage from "./pages/CreateRequestPage";
-import ManageRequestsPage from "./pages/ManageRequestsPage";
-import EditRequestPage from "./pages/EditRequestPage";
-import RequestDetailPage from "./pages/RequestDetailPage";
-import QuoteItemsPage from "./pages/QuoteItemsPage";
-import QuoteServicePage from "./pages/QuoteServicePage";
-import QuoteSummaryPage from "./pages/QuoteSummaryPage";
-import QuotePage from "./pages/QuotePage";
-import CustomerContractView from "./pages/CustomerContractView";
+import ProtectedRoute from './components/layout/ProtectedRoute';
+import RoleProtectedRoute from './components/layout/RoleProtectedRoute';
+import DashboardRedirect from './components/layout/DashboardRedirect';
+import Landing from './pages/auth/Landing';
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import CustomerDashboard from './pages/dashboard/CustomerDashboard';
+import CustomerReview from "./pages/review/CustomerReview";
+import ManagerReview from "./pages/review/ManagerReview";
+import ManagerDashboard from "./pages/dashboard/ManagerDashboard";
+import StaffDashboard from "./pages/dashboard/StaffDashboard";
+import AdminDashboard from "./pages/dashboard/AdminDashboard";
+import About from "./pages/about/About";
+import ContractForm from "./pages/contract/ContractForm";
+import ContractApproval from "./pages/contract/ContractApproval";
+import ContractDetailView from "./pages/contract/ContractDetailView";
+import CheckoutPage from './pages/checkout/CheckoutPage';
+import CreateRequestPage from "./pages/request/CreateRequestPage";
+import ManageRequestsPage from "./pages/request/ManageRequestsPage";
+import EditRequestPage from "./pages/request/EditRequestPage";
+import RequestDetailPage from "./pages/request/RequestDetailPage";
+import QuoteItemsPage from "./pages/quote/QuoteItemsPage";
+import QuoteServicePage from "./pages/quote/QuoteServicePage";
+import QuoteSummaryPage from "./pages/quote/QuoteSummaryPage";
+import QuotePage from "./pages/quote/QuotePage";
+import CustomerContractView from "./pages/contract/CustomerContractView";
 
 export default function App() {
   return (
@@ -59,8 +57,6 @@ export default function App() {
       backgroundColor: '#f5f5f5'
     }}>
       <AuthProvider>
-        <Navigation />
-        <Breadcrumb />
         <Routes>
           {/* Public routes */}
           <Route path="/" element={<Landing />} />

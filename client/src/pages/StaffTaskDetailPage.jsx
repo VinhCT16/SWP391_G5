@@ -1,11 +1,11 @@
-// client/src/pages/StaffTaskDetailPage.jsx - Chi tiết task và cập nhật trạng thái
+// client/src/pages/staff/StaffTaskDetailPage.jsx - Chi tiết task và cập nhật trạng thái
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getRequest, updateRequest } from "../api/requestApi";
-import { fmtAddress } from "../utils/address";
-import { fmtDateTime24 } from "../utils/datetime";
-import RouteMapLibre from "../components/RouteMapLibre";
-import "../styles/movingService.css";
+import { getRequest, updateRequest } from "../../api/requestApi";
+import { fmtAddress } from "../../utils/address";
+import { fmtDateTime24 } from "../../utils/datetime";
+import RouteMapLibre from "../../components/map/RouteMapLibre";
+import "../../styles/movingService.css";
 
 const STATUS_CONFIG = {
   WAITING_PAYMENT: { label: "Chờ thanh toán", color: "#9c27b0", bg: "#f3e5f5" },

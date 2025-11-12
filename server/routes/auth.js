@@ -7,7 +7,7 @@ const auth = require("../utils/authMiddleware");
 const router = express.Router();
 
 const COOKIE_NAME = "access_token";
-const TOKEN_EXPIRES_IN = "15m";
+const TOKEN_EXPIRES_IN = "24h"; // Increased from 15m to 24h for better user experience
 
 router.post("/register", async (req, res) => {
   try {
@@ -81,17 +81,30 @@ router.post("/login", async (req, res) => {
     const isProd = process.env.NODE_ENV === "production";
     
     // Clear any existing cookies first to avoid accumulation
-    res.clearCookie(COOKIE_NAME);
-    res.clearCookie(COOKIE_NAME, { domain: undefined });
     res.clearCookie(COOKIE_NAME, { path: '/' });
+    res.clearCookie(COOKIE_NAME, { path: '/', domain: undefined });
     
-    // Set new cookie with minimal size
-    res.cookie(COOKIE_NAME, token, {
+    // Set new cookie with proper settings for development and production
+    const cookieOptions = {
       httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? "strict" : "lax",
-      maxAge: 15 * 60 * 1000,
-      path: '/'
+      secure: isProd, // Only use secure cookies in production (HTTPS)
+      sameSite: isProd ? "strict" : "lax", // Lax for development to allow cross-site requests
+      path: '/', // Available for all paths
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds (matches token expiration)
+    };
+    
+    // In development, don't set domain to allow localhost to work
+    if (!isProd) {
+      cookieOptions.domain = undefined; // Don't set domain in development
+    }
+    
+    res.cookie(COOKIE_NAME, token, cookieOptions);
+    
+    console.log('Cookie set successfully', {
+      cookieName: COOKIE_NAME,
+      hasToken: !!token,
+      isProd: isProd,
+      cookieOptions: cookieOptions
     });
 
     const safeUser = { 
@@ -109,10 +122,12 @@ router.post("/login", async (req, res) => {
 
 router.post("/logout", (req, res) => {
   const isProd = process.env.NODE_ENV === "production";
+  // Clear cookie with same options used to set it
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? "strict" : "lax",
+    path: '/'
   });
   return res.json({ message: "Logged out" });
 });
