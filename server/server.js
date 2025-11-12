@@ -13,6 +13,7 @@ const app = express();
 
 // Middlewares
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // For parsing FormData text fields
 
 // CORS configuration - allow credentials for cookie-based auth
 app.use(cors({

@@ -64,8 +64,93 @@ const getMyRequests = async (req, res) => {
 // Create request (customer)
 const createRequest = async (req, res) => {
   try {
-    const { moveDetails, items, estimatedPrice } = req.body;
     const customerId = req.userId;
+    
+    // Handle both JSON and FormData
+    let formData = req.body;
+    let imageFiles = [];
+    
+    // If FormData, extract fields and files
+    if (req.files && req.files.length > 0) {
+      imageFiles = req.files.map(file => ({
+        name: file.originalname,
+        url: file.path || file.buffer?.toString('base64') || '',
+        uploadedAt: new Date()
+      }));
+    }
+    
+    // Check if we have the new simple form format (name, phone, address, deliveryTime, serviceType, notes)
+    if (formData.name || formData.phone || formData.address || formData.deliveryTime) {
+      // Validate required fields
+      if (!formData.phone) {
+        return res.status(400).json({ error: "Phone number is required" });
+      }
+      if (!formData.address) {
+        return res.status(400).json({ error: "Address is required" });
+      }
+      if (!formData.deliveryTime) {
+        return res.status(400).json({ error: "Delivery time is required" });
+      }
+      
+      // Map simple form to expected structure
+      const moveDate = new Date(formData.deliveryTime);
+      if (isNaN(moveDate.getTime())) {
+        return res.status(400).json({ error: "Invalid delivery time format" });
+      }
+      
+      // Map serviceType: "Thường" -> "Local Move", "Hỏa tốc" -> "Long Distance"
+      let serviceType = "Local Move";
+      if (formData.serviceType === "Hỏa tốc") {
+        serviceType = "Long Distance";
+      } else if (formData.serviceType === "Commercial") {
+        serviceType = "Commercial";
+      }
+      
+      // For now, use the same address for both fromAddress and toAddress
+      // TODO: Update form to collect separate pickup and delivery addresses
+      const address = formData.address.trim();
+      
+      const moveDetails = {
+        fromAddress: address,
+        toAddress: address, // Using same address for now - should be updated in form
+        moveDate: moveDate,
+        serviceType: serviceType,
+        phone: formData.phone.trim()
+      };
+      
+      const requestId = `REQ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Build request object
+      const requestData = {
+        requestId,
+        customerId,
+        moveDetails,
+        items: [],
+        estimatedPrice: {
+          basePrice: 0,
+          additionalServices: [],
+          totalPrice: 0
+        },
+        status: 'submitted'
+      };
+      
+      // Add notes to approval object if provided
+      if (formData.notes && formData.notes.trim()) {
+        requestData.approval = {
+          notes: formData.notes.trim()
+        };
+      }
+      
+      const request = await Request.create(requestData);
+      
+      return res.status(201).json({
+        message: "Request created successfully",
+        request: request
+      });
+    }
+    
+    // Original JSON format handling
+    const { moveDetails, items, estimatedPrice } = formData;
 
     // Generate unique request ID
     const requestId = `REQ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -89,7 +174,7 @@ const createRequest = async (req, res) => {
     });
   } catch (err) {
     console.error("Error creating request:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
