@@ -11,6 +11,9 @@ const VN_STATUS = {
   CANCELLED: "Đã hủy",
 };
 
+const th = { textAlign: "left", padding: 8, borderBottom: "1px solid #ddd" };
+const td = { padding: 8, borderBottom: "1px solid #eee" };
+
 export default function RequestList({ items = [], onEdit, onCancel }) {
   const rows = useMemo(() => items.map((r) => ({
     id: r._id,
@@ -48,6 +51,3 @@ export default function RequestList({ items = [], onEdit, onCancel }) {
     </table>
   );
 }
-
-const th = { textAlign: "left", padding: 8, borderBottom: "1px solid #ddd" };
-const td = { padding: 8, borderBottom: "1px solid #eee" };

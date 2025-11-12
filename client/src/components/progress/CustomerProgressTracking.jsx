@@ -15,8 +15,9 @@ const CustomerProgressTracking = () => {
   const loadContracts = async () => {
     try {
       setLoading(true);
-      const response = await getCustomerContracts();
-      setContracts(response.data.contracts || []);
+      // getCustomerContracts needs customerId, but we can use the authenticated user
+      const response = await getCustomerContracts(user?._id || user?.id);
+      setContracts(response.contracts || response.data?.contracts || []);
     } catch (err) {
       console.error('Error loading contracts:', err);
       setError('Failed to load contracts');

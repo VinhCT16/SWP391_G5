@@ -23,7 +23,8 @@ export default function CustomerDashboard() {
     try {
       setLoading(true);
       const response = await getMyRequests();
-      setRequests(response.data.requests || []);
+      // getMyRequests returns data directly, not wrapped in data.requests
+      setRequests(response.requests || response.data?.requests || []);
     } catch (err) {
       console.error('Error loading requests:', err);
       setError('Failed to load requests');
@@ -36,7 +37,8 @@ export default function CustomerDashboard() {
     try {
       setLoading(true);
       const response = await getAllContracts();
-      setContracts(response.data.contracts || []);
+      // getAllContracts returns data directly, check both formats
+      setContracts(response.contracts || response.data?.contracts || []);
     } catch (err) {
       console.error('Error loading contracts:', err);
       setError('Failed to load contracts');
@@ -156,6 +158,7 @@ export default function CustomerDashboard() {
           setError={setError}
           onTabChange={setActiveTab}
           onSuccess={handleRequestSuccess}
+          onRefresh={loadRequests}
           onOpenProfileModal={() => setShowProfileModal(true)}
           onOpenPasswordModal={() => setShowPasswordModal(true)}
         />

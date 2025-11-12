@@ -3,24 +3,33 @@ const BASE = process.env.REACT_APP_API_URL || "http://localhost:3000/api";
 
 // Fetch with credentials for cookie-based auth
 const fetchWithAuth = async (url, options = {}) => {
+  // If body is FormData, don't set Content-Type (browser will set it with boundary)
+  const isFormData = options.body instanceof FormData;
+  const headers = isFormData 
+    ? { ...options.headers } // Don't set Content-Type for FormData
+    : {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      };
+  
   return fetch(url, {
     ...options,
     credentials: 'include', // Include cookies in all requests
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
   });
 };
 
-// ----- CREATE (JSON body, images là mảng base64 nếu có) -----
+// ----- CREATE (supports both JSON and FormData) -----
 export async function createRequest(payload) {
+  // If payload is FormData, send as-is; otherwise stringify JSON
+  const body = payload instanceof FormData ? payload : JSON.stringify(payload);
+  
   const res = await fetchWithAuth(`${BASE}/requests`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) throw new Error(data.error || data.message || res.statusText);
   return data;
 }
 
