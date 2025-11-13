@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fileToBase64 } from "../../utils/toBase64";
+import { updateRequestItems } from "../../api/requestApi";
 
 const MAX_IMAGES_PER_ITEM = 4;
 const MAX_FILE_MB = 1.5;
@@ -60,7 +61,7 @@ export default function QuoteItemsPage() {
     ));
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     // Validate: ít nhất 1 đồ dùng có tên
     const hasValidItem = items.some(it => it.name.trim());
     if (!hasValidItem) {
@@ -68,9 +69,25 @@ export default function QuoteItemsPage() {
       return;
     }
 
+    const validItems = items.filter(it => it.name.trim());
+
+    // If this is a staff review, save items to request and navigate back
+    if (state?.isStaffReview && state?.requestId && state?.taskId) {
+      try {
+        await updateRequestItems(state.requestId, validItems, state.taskId);
+        alert("✅ Đã lưu danh sách đồ dùng thành công!");
+        nav("/dashboard/staff"); // Navigate back to staff dashboard
+        return;
+      } catch (err) {
+        alert("❌ Lỗi khi lưu danh sách đồ dùng: " + (err.message || "Unknown error"));
+        return;
+      }
+    }
+
+    // Normal flow: continue to service selection
     const payload = {
       ...state,
-      items: items.filter(it => it.name.trim()), // Chỉ lấy items có tên
+      items: validItems,
     };
     
     nav("/quote/service", { state: payload });
@@ -78,11 +95,15 @@ export default function QuoteItemsPage() {
 
   const hasApartment = items.some(it => it.isApartment);
 
+  const isStaffReview = state?.isStaffReview;
+
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: "auto" }}>
-      <h1>Thêm đồ dùng cần vận chuyển</h1>
+      <h1>{isStaffReview ? "📋 Khảo sát và liệt kê đồ dùng" : "Thêm đồ dùng cần vận chuyển"}</h1>
       <p style={{ color: "#666", marginBottom: 20 }}>
-        Nhập thông tin các đồ dùng bạn muốn chuyển. Bạn có thể thêm nhiều đồ dùng.
+        {isStaffReview 
+          ? "Vui lòng khảo sát và nhập thông tin các đồ dùng khách hàng cần vận chuyển. Bạn có thể thêm nhiều đồ dùng."
+          : "Nhập thông tin các đồ dùng bạn muốn chuyển. Bạn có thể thêm nhiều đồ dùng."}
       </p>
 
       {items.map((item, idx) => (
@@ -224,7 +245,7 @@ export default function QuoteItemsPage() {
           Quay lại
         </button>
         <button onClick={handleNext} style={{ ...btnStyle, background: "#111", flex: 1 }}>
-          Tiếp theo: Chọn xe và dịch vụ →
+          {isStaffReview ? "✅ Lưu danh sách đồ dùng" : "Tiếp theo: Chọn xe và dịch vụ →"}
         </button>
       </div>
 

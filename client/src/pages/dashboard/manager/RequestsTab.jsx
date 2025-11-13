@@ -59,6 +59,8 @@ export default function RequestsTab({
         >
           <option value="">All Status</option>
           <option value="submitted">Submitted</option>
+          <option value="PENDING">Pending</option>
+          <option value="UNDER_SURVEY">Under Survey</option>
           <option value="under_review">Under Review</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
@@ -114,7 +116,7 @@ export default function RequestsTab({
                 )}
               </CardBody>
               <CardActions>
-                {request.status === 'submitted' && (
+                {(request.status === 'submitted' || request.status === 'PENDING') && (
                   <>
                     <Button variant="success" onClick={() => onApprove(request)}>Approve</Button>
                     <Button variant="danger" onClick={() => onReject(request)}>Reject</Button>

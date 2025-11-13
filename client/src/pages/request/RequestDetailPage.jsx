@@ -1,7 +1,7 @@
 // client/src/pages/request/RequestDetailPage.jsx - Chi tiết Request đầy đủ
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getRequest } from "../../api/requestApi";
+import { getRequest, cancelRequest } from "../../api/requestApi";
 import { fmtDateTime24 } from "../../utils/datetime";
 import { fmtAddress } from "../../utils/address";
 import RouteMapLibre from "../../components/map/RouteMapLibre";
@@ -56,8 +56,10 @@ export default function RequestDetailPage() {
   useEffect(() => {
     (async () => {
       try {
-      const r = await getRequest(id);
-      setReq(r);
+        const response = await getRequest(id);
+        // getRequest returns { request: {...} } or direct request object
+        const requestData = response.request || response;
+        setReq(requestData);
       } catch (e) {
         setError("Không tải được request");
         console.error("Request detail error:", e);
@@ -129,10 +131,10 @@ export default function RequestDetailPage() {
         <h2 style={{ marginTop: 0, marginBottom: 16 }}>Thông tin khách hàng</h2>
         <div style={{ display: "grid", gap: 12 }}>
           <div>
-            <strong>Họ và tên:</strong> {req.customerName}
+            <strong>Họ và tên:</strong> {req.customerName || "N/A"}
           </div>
           <div>
-            <strong>Số điện thoại:</strong> {req.customerPhone}
+            <strong>Số điện thoại:</strong> {req.customerPhone || req.moveDetails?.phone || "N/A"}
           </div>
         </div>
       </div>
@@ -144,7 +146,11 @@ export default function RequestDetailPage() {
           <div>
             <strong style={{ color: "#4caf50" }}>📍 Lấy hàng:</strong>
             <div style={{ marginTop: 4, padding: 8, background: "#fff", borderRadius: 4 }}>
-              {fmtAddress(req.pickupAddress || req.address)}
+              {req.pickupAddress 
+                ? fmtAddress(req.pickupAddress) 
+                : req.moveDetails?.fromAddress 
+                ? req.moveDetails.fromAddress 
+                : fmtAddress(req.address) || "N/A"}
             </div>
             {pickupLoc && (
               <div style={{ fontSize: "0.85em", color: "#666", marginTop: 4 }}>
@@ -155,7 +161,11 @@ export default function RequestDetailPage() {
           <div>
             <strong style={{ color: "#f44336" }}>🎯 Giao hàng:</strong>
             <div style={{ marginTop: 4, padding: 8, background: "#fff", borderRadius: 4 }}>
-              {fmtAddress(req.deliveryAddress || req.address)}
+              {req.deliveryAddress 
+                ? fmtAddress(req.deliveryAddress) 
+                : req.moveDetails?.toAddress 
+                ? req.moveDetails.toAddress 
+                : fmtAddress(req.address) || "N/A"}
             </div>
             {deliveryLoc && (
               <div style={{ fontSize: "0.85em", color: "#666", marginTop: 4 }}>
@@ -183,10 +193,14 @@ export default function RequestDetailPage() {
         <h2 style={{ marginTop: 0, marginBottom: 16 }}>Thông tin dịch vụ</h2>
         <div style={{ display: "grid", gap: 12 }}>
           <div>
-            <strong>Thời gian chuyển:</strong> {fmtDateTime24(req.movingTime)}
+            <strong>Thời gian chuyển:</strong> {fmtDateTime24(req.movingTime || req.moveDetails?.moveDate)}
           </div>
           <div>
-            <strong>Loại dịch vụ:</strong> {req.serviceType === "EXPRESS" ? "Hỏa tốc" : "Thường"}
+            <strong>Loại dịch vụ:</strong> {
+              req.serviceType === "EXPRESS" || req.moveDetails?.serviceType === "Long Distance" 
+                ? "Hỏa tốc" 
+                : req.moveDetails?.serviceType || "Thường"
+            }
           </div>
           {req.surveyFee && (
             <div>
@@ -314,19 +328,19 @@ export default function RequestDetailPage() {
             </div>
           )}
           <div>
-            <strong>Thời gian chuyển:</strong> {fmtDateTime24(req.movingTime)}
+            <strong>Thời gian chuyển:</strong> {fmtDateTime24(req.movingTime || req.moveDetails?.moveDate)}
           </div>
         </div>
       </div>
 
       {/* Hành động */}
-      <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+      <div style={{ display: "flex", gap: 12, marginTop: 24, flexWrap: "wrap" }}>
         {["PENDING_CONFIRMATION", "PENDING_REVIEW"].includes(req.status) && (
           <button
             onClick={() => nav(`/requests/${id}/edit`)}
             style={{ ...btnStyle, background: "#2196f3" }}
           >
-            Sửa request
+            ✏️ Sửa request
           </button>
         )}
         {["PENDING_CONFIRMATION", "UNDER_SURVEY", "WAITING_PAYMENT", "PENDING_REVIEW"].includes(req.status) && (
@@ -334,8 +348,8 @@ export default function RequestDetailPage() {
             onClick={async () => {
               if (!window.confirm("Bạn có chắc chắn muốn hủy request này không?")) return;
               try {
-                const { cancelRequest } = await import("../api/requestApi");
                 await cancelRequest(id);
+                alert("Đã hủy request thành công");
                 nav("/my-requests");
               } catch (err) {
                 alert("Lỗi khi hủy: " + (err.message || "Vui lòng thử lại"));
@@ -343,7 +357,7 @@ export default function RequestDetailPage() {
             }}
             style={{ ...btnStyle, background: "#f44336" }}
           >
-            Hủy request
+            🗑️ Hủy request
           </button>
         )}
       </div>

@@ -8,6 +8,7 @@ export default function AddressPicker({ value, onChange }) {
   const [loadingP, setLoadingP] = useState(false);
   const [loadingD, setLoadingD] = useState(false);
   const [loadingW, setLoadingW] = useState(false);
+  const [error, setError] = useState(null);
 
   const provinceCode = value?.province?.code || "";
   const districtCode = value?.district?.code || "";
@@ -20,18 +21,43 @@ export default function AddressPicker({ value, onChange }) {
 
   // --- API helpers ---
   async function fetchProvinces() {
-    const res = await fetch("https://provinces.open-api.vn/api/?depth=1");
-    return res.json();
+    try {
+      const res = await fetch("https://provinces.open-api.vn/api/?depth=1");
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      return res.json();
+    } catch (error) {
+      console.error("Error fetching provinces:", error);
+      // Return empty array on error to prevent crashes
+      return [];
+    }
   }
   async function fetchDistrictsAPI(pCode) {
-    const res = await fetch(`https://provinces.open-api.vn/api/p/${pCode}?depth=2`);
-    const data = await res.json();
-    return data?.districts || [];
+    try {
+      const res = await fetch(`https://provinces.open-api.vn/api/p/${pCode}?depth=2`);
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      const data = await res.json();
+      return data?.districts || [];
+    } catch (error) {
+      console.error("Error fetching districts:", error);
+      return [];
+    }
   }
   async function fetchWardsAPI(dCode) {
-    const res = await fetch(`https://provinces.open-api.vn/api/d/${dCode}?depth=2`);
-    const data = await res.json();
-    return data?.wards || [];
+    try {
+      const res = await fetch(`https://provinces.open-api.vn/api/d/${dCode}?depth=2`);
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      const data = await res.json();
+      return data?.wards || [];
+    } catch (error) {
+      console.error("Error fetching wards:", error);
+      return [];
+    }
   }
 
   // Load provinces on mount
@@ -43,6 +69,15 @@ export default function AddressPicker({ value, onChange }) {
         const list = await fetchProvinces();
         if (!alive) return;
         setProvinces(list);
+        setError(null);
+        if (list.length === 0) {
+          setError("Không thể tải danh sách tỉnh/thành. Vui lòng kiểm tra kết nối mạng.");
+          console.warn("No provinces loaded. Check network connection or API availability.");
+        }
+      } catch (error) {
+        console.error("Failed to load provinces:", error);
+        setProvinces([]);
+        setError("Không thể tải danh sách địa chỉ. Vui lòng thử lại sau.");
       } finally {
         setLoadingP(false);
       }
@@ -158,10 +193,21 @@ export default function AddressPicker({ value, onChange }) {
 
   return (
     <div className="grid gap-2">
+      {error && (
+        <div style={{ 
+          padding: '8px', 
+          background: '#fee', 
+          color: '#c33', 
+          borderRadius: '4px',
+          fontSize: '14px'
+        }}>
+          {error}
+        </div>
+      )}
       <select
         value={provinceCode}
         onChange={(e) => onProvinceChange(e.target.value)}
-        disabled={loadingP}
+        disabled={loadingP || provinces.length === 0}
       >
         <option value="">-- Chọn Tỉnh/Thành --</option>
         {provinces.map(p => (

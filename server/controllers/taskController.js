@@ -1,6 +1,8 @@
+const Task = require("../models/Task");
 const Request = require("../models/Request");
 const User = require("../models/User");
-const { v4: uuidv4 } = require('uuid');
+const mongoose = require('mongoose');
+const { validateStaffAssignment, canStaffHandleTask } = require("../utils/staffAssignment");
 
 // Create tasks from approved contract
 const createTasksFromContract = async (req, res) => {
@@ -19,28 +21,31 @@ const createTasksFromContract = async (req, res) => {
       return res.status(400).json({ message: "Request must have a contract before creating tasks" });
     }
 
-    // Check if tasks already exist
-    if (request.tasks && request.tasks.length > 0) {
+    // Check if tasks already exist for this request
+    const existingTasks = await Task.find({ requestId: request._id });
+    if (existingTasks.length > 0) {
       return res.status(409).json({ message: "Tasks already exist for this request" });
     }
 
     // Create tasks
-    const createdTasks = tasks.map(taskData => ({
-      taskId: uuidv4(),
-      taskType: taskData.taskType,
-      assignedStaff: taskData.assignedStaff || null,
-      transporter: taskData.transporter || null,
-      estimatedDuration: taskData.estimatedDuration || 2,
-      priority: taskData.priority || 'medium',
-      description: taskData.description || '',
-      deadline: taskData.deadline || null,
-      managerNotes: taskData.managerNotes || '',
-      customerNotes: taskData.customerNotes || '',
-      attachments: taskData.attachments || [],
-      status: 'pending'
-    }));
+    const createdTasks = await Task.insertMany(
+      tasks.map(taskData => ({
+        requestId: request._id,
+        taskType: taskData.taskType,
+        assignedStaff: taskData.assignedStaff || null,
+        transporter: taskData.transporter || null,
+        estimatedDuration: taskData.estimatedDuration || 2,
+        priority: taskData.priority || 'medium',
+        description: taskData.description || '',
+        deadline: taskData.deadline || null,
+        managerNotes: taskData.managerNotes || '',
+        customerNotes: taskData.customerNotes || '',
+        attachments: taskData.attachments || [],
+        status: 'pending'
+      }))
+    );
 
-    request.tasks = createdTasks;
+    // Update request status
     request.status = 'in_progress';
     await request.save();
 
@@ -65,7 +70,7 @@ const createTasksFromContract = async (req, res) => {
     });
   } catch (err) {
     console.error("Error creating tasks:", err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
@@ -80,73 +85,105 @@ const getStaffTasks = async (req, res) => {
       return res.status(404).json({ message: "Staff member not found" });
     }
 
-    // Get requests with tasks assigned to this staff
-    const requests = await Request.find({
-      'tasks.assignedStaff': staff._id
-    }).populate('customerId', 'name email phone');
+    // Get tasks assigned to this staff (as assignedStaff or transporter)
+    const tasks = await Task.find({
+      $or: [
+        { assignedStaff: staff._id },
+        { transporter: staff._id }
+      ]
+    })
+    .populate({
+      path: 'requestId',
+      select: 'requestId customerId customerName customerPhone moveDetails contractId status createdAt',
+      populate: {
+        path: 'customerId',
+        select: 'name email phone'
+      }
+    })
+    .sort({ createdAt: -1 });
 
-    // Get requests where this staff is transporter
-    const transportRequests = await Request.find({
-      'tasks.transporter': staff._id
-    }).populate('customerId', 'name email phone');
-
-    // Combine and format tasks
-    const allTasks = [];
-    
-    requests.forEach(request => {
-      request.tasks.forEach(task => {
-        if (task.assignedStaff && task.assignedStaff.toString() === staff._id.toString()) {
-          allTasks.push({
-            taskId: task.taskId,
-            requestId: request._id,
-            requestNumber: request.requestId,
-            customer: request.customerId,
-            taskType: task.taskType,
-            status: task.status,
-            estimatedDuration: task.estimatedDuration,
-            priority: task.priority,
-            description: task.description,
-            deadline: task.deadline,
-            managerNotes: task.managerNotes,
-            customerNotes: task.customerNotes,
-            attachments: task.attachments,
-            contractId: request.contractId,
-            moveDetails: request.moveDetails,
-            createdAt: request.createdAt
-          });
-        }
-      });
+    // Format tasks with request information
+    const formattedTasks = tasks.map(task => {
+      const request = task.requestId;
+      // Get customer from populated customerId or use top-level customerName/customerPhone
+      const customer = request?.customerId || (request?.customerName ? {
+        name: request.customerName,
+        email: null,
+        phone: request.customerPhone
+      } : null);
+      
+      return {
+        _id: task._id,
+        taskId: task._id, // For backward compatibility
+        requestId: request?._id,
+        requestNumber: request?.requestId,
+        customer: customer,
+        request: request, // Include full request object for fallback
+        taskType: task.taskType,
+        status: task.status,
+        estimatedDuration: task.estimatedDuration,
+        priority: task.priority,
+        description: task.description,
+        deadline: task.deadline,
+        managerNotes: task.managerNotes,
+        customerNotes: task.customerNotes,
+        attachments: task.attachments,
+        contractId: request?.contractId,
+        moveDetails: request?.moveDetails,
+        createdAt: task.createdAt,
+        assignedStaff: task.assignedStaff,
+        transporter: task.transporter,
+        isTransporter: task.transporter?.toString() === staff._id.toString()
+      };
     });
 
-    transportRequests.forEach(request => {
-      request.tasks.forEach(task => {
-        if (task.transporter && task.transporter.toString() === staff._id.toString()) {
-          allTasks.push({
-            taskId: task.taskId,
-            requestId: request._id,
-            requestNumber: request.requestId,
-            customer: request.customerId,
-            taskType: task.taskType,
-            status: task.status,
-            estimatedDuration: task.estimatedDuration,
-            priority: task.priority,
-            description: task.description,
-            deadline: task.deadline,
-            managerNotes: task.managerNotes,
-            customerNotes: task.customerNotes,
-            attachments: task.attachments,
-            contractId: request.contractId,
-            moveDetails: request.moveDetails,
-            createdAt: request.createdAt,
-            isTransporter: true
-          });
-        }
-      });
-    });
-
-    res.json({ tasks: allTasks });
+    res.json({ tasks: formattedTasks });
   } catch (err) {
     console.error("Error fetching staff tasks:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get task by ID
+const getTaskById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const task = await Task.findById(id)
+      .populate('requestId', 'requestId customerId moveDetails contractId')
+      .populate('assignedStaff', 'name email phone')
+      .populate('transporter', 'name email phone')
+      .populate('requestId.customerId', 'name email phone');
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    res.json({ task });
+  } catch (err) {
+    console.error("Error fetching task:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get all tasks for a request
+const getTasksByRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    
+    const request = await Request.findById(requestId);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    const tasks = await Task.find({ requestId: request._id })
+      .populate('assignedStaff', 'name email phone')
+      .populate('transporter', 'name email phone')
+      .sort({ createdAt: 1 });
+
+    res.json({ tasks });
+  } catch (err) {
+    console.error("Error fetching tasks:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -154,18 +191,12 @@ const getStaffTasks = async (req, res) => {
 // Update task status
 const updateTaskStatus = async (req, res) => {
   try {
-    const { requestId, taskId } = req.params;
+    const { id } = req.params;
     const { status, notes } = req.body;
     const staffId = req.userId;
 
-    // Find the request
-    const request = await Request.findById(requestId);
-    if (!request) {
-      return res.status(404).json({ message: "Request not found" });
-    }
-
-    // Find the specific task
-    const task = request.tasks.find(t => t.taskId === taskId);
+    // Find the task
+    const task = await Task.findById(id);
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
@@ -188,21 +219,64 @@ const updateTaskStatus = async (req, res) => {
     
     // Add to task history
     task.taskHistory.push({
-      historyId: uuidv4(),
+      historyId: new mongoose.Types.ObjectId(),
       status: status,
       notes: notes || '',
       updatedBy: staffId,
       updatedAt: new Date()
     });
 
-    await request.save();
+    await task.save();
+
+    // Special handling for review tasks: when completed, update request status
+    if (task.taskType === 'review' && status === 'completed') {
+      try {
+        const request = await Request.findById(task.requestId);
+        if (request && request.status === 'UNDER_SURVEY') {
+          console.log(`[TaskController] Review task ${task._id} completed. Updating request ${request._id} status from UNDER_SURVEY to PENDING`);
+          request.status = 'PENDING';
+          await request.save();
+          console.log(`[TaskController] Request ${request._id} status updated to PENDING - ready for manager approval`);
+        }
+      } catch (requestErr) {
+        // Log error but don't fail the task status update
+        console.error('[TaskController] Error updating request status after review task completion:', requestErr);
+      }
+    }
+
+    // Check if all tasks for this request are completed, then update request status to "Done"
+    if (status === 'completed') {
+      try {
+        const request = await Request.findById(task.requestId);
+        if (request) {
+          // Get all tasks for this request (excluding review tasks)
+          const allTasks = await Task.find({
+            requestId: request._id,
+            taskType: { $in: ['packing', 'transporting'] } // Only check packing and transporting tasks
+          });
+
+          // Check if all tasks are completed
+          const allCompleted = allTasks.length > 0 && allTasks.every(t => t.status === 'completed');
+
+          if (allCompleted && request.status !== 'DONE' && request.status !== 'completed') {
+            console.log(`[TaskController] All tasks completed for request ${request._id}. Updating status to DONE`);
+            request.status = 'DONE';
+            await request.save();
+            console.log(`[TaskController] Request ${request._id} status updated to DONE`);
+          }
+        }
+      } catch (requestErr) {
+        // Log error but don't fail the task status update
+        console.error('[TaskController] Error checking/updating request status after task completion:', requestErr);
+      }
+    }
 
     res.json({
       message: "Task status updated successfully",
       task: {
-        taskId: task.taskId,
+        _id: task._id,
         status: task.status,
-        updatedAt: new Date()
+        updatedAt: task.updatedAt
       }
     });
   } catch (err) {
@@ -227,17 +301,11 @@ const getAllStaff = async (req, res) => {
 // Assign staff to task
 const assignStaffToTask = async (req, res) => {
   try {
-    const { requestId, taskId } = req.params;
+    const { id } = req.params;
     const { staffId, role } = req.body; // role: 'assignedStaff' or 'transporter'
 
-    // Find the request
-    const request = await Request.findById(requestId);
-    if (!request) {
-      return res.status(404).json({ message: "Request not found" });
-    }
-
-    // Find the specific task
-    const task = request.tasks.find(t => t.taskId === taskId);
+    // Find the task
+    const task = await Task.findById(id);
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
@@ -246,6 +314,19 @@ const assignStaffToTask = async (req, res) => {
     const staff = await User.findById(staffId);
     if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff member not found" });
+    }
+
+    // Role validation temporarily disabled - any staff can handle any task
+    // if (!canStaffHandleTask(staff.staffRole, task.taskType)) {
+    //   return res.status(400).json({ 
+    //     message: `Staff with role '${staff.staffRole}' cannot be assigned to '${task.taskType}' tasks. Compatible roles required.` 
+    //   });
+    // }
+
+    // Get the request to update staff's current tasks
+    const request = await Request.findById(task.requestId);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
     }
 
     // Assign staff to task
@@ -257,6 +338,11 @@ const assignStaffToTask = async (req, res) => {
       return res.status(400).json({ message: "Invalid role specified" });
     }
 
+    // Update task status if it was pending
+    if (task.status === 'pending') {
+      task.status = 'assigned';
+    }
+
     // Add to staff's current tasks
     await User.findByIdAndUpdate(staffId, {
       $addToSet: { currentTasks: request._id }
@@ -264,19 +350,19 @@ const assignStaffToTask = async (req, res) => {
 
     // Add to task history
     task.taskHistory.push({
-      historyId: uuidv4(),
+      historyId: new mongoose.Types.ObjectId(),
       status: 'assigned',
       notes: `Assigned to ${staff.staffRole}`,
       updatedBy: req.userId,
       updatedAt: new Date()
     });
 
-    await request.save();
+    await task.save();
 
     res.json({
       message: "Staff assigned to task successfully",
       task: {
-        taskId: task.taskId,
+        _id: task._id,
         assignedStaff: task.assignedStaff,
         transporter: task.transporter
       }
@@ -290,18 +376,12 @@ const assignStaffToTask = async (req, res) => {
 // Update task details (priority, description, deadline, notes)
 const updateTaskDetails = async (req, res) => {
   try {
-    const { requestId, taskId } = req.params;
+    const { id } = req.params;
     const { priority, description, deadline, managerNotes, customerNotes } = req.body;
     const staffId = req.userId;
 
-    // Find the request
-    const request = await Request.findById(requestId);
-    if (!request) {
-      return res.status(404).json({ message: "Request not found" });
-    }
-
-    // Find the specific task
-    const task = request.tasks.find(t => t.taskId === taskId);
+    // Find the task
+    const task = await Task.findById(id);
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
@@ -326,12 +406,12 @@ const updateTaskDetails = async (req, res) => {
     if (managerNotes !== undefined) task.managerNotes = managerNotes;
     if (customerNotes !== undefined) task.customerNotes = customerNotes;
 
-    await request.save();
+    await task.save();
 
     res.json({
       message: "Task details updated successfully",
       task: {
-        taskId: task.taskId,
+        _id: task._id,
         priority: task.priority,
         description: task.description,
         deadline: task.deadline,
@@ -345,11 +425,97 @@ const updateTaskDetails = async (req, res) => {
   }
 };
 
+// Create a single task
+const createTask = async (req, res) => {
+  try {
+    const { requestId, taskType, assignedStaff, transporter, estimatedDuration, priority, description, deadline } = req.body;
+
+    // Find the request
+    const request = await Request.findById(requestId);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    // Create task
+    const task = await Task.create({
+      requestId: request._id,
+      taskType,
+      assignedStaff: assignedStaff || null,
+      transporter: transporter || null,
+      estimatedDuration: estimatedDuration || 2,
+      priority: priority || 'medium',
+      description: description || '',
+      deadline: deadline || null,
+      status: assignedStaff || transporter ? 'assigned' : 'pending'
+    });
+
+    // Update staff current tasks if assigned
+    if (task.assignedStaff) {
+      await User.findByIdAndUpdate(task.assignedStaff, {
+        $addToSet: { currentTasks: request._id }
+      });
+    }
+    if (task.transporter) {
+      await User.findByIdAndUpdate(task.transporter, {
+        $addToSet: { currentTasks: request._id }
+      });
+    }
+
+    res.status(201).json({
+      message: "Task created successfully",
+      task
+    });
+  } catch (err) {
+    console.error("Error creating task:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// Delete task
+const deleteTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    // Get the request to update staff's current tasks
+    const request = await Request.findById(task.requestId);
+    
+    // Remove from staff's current tasks
+    if (task.assignedStaff && request) {
+      await User.findByIdAndUpdate(task.assignedStaff, {
+        $pull: { currentTasks: request._id }
+      });
+    }
+    if (task.transporter && request) {
+      await User.findByIdAndUpdate(task.transporter, {
+        $pull: { currentTasks: request._id }
+      });
+    }
+
+    await Task.findByIdAndDelete(id);
+
+    res.json({
+      message: "Task deleted successfully"
+    });
+  } catch (err) {
+    console.error("Error deleting task:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
+  createTask,
   createTasksFromContract,
+  getTaskById,
+  getTasksByRequest,
   getStaffTasks,
   updateTaskStatus,
   updateTaskDetails,
   getAllStaff,
-  assignStaffToTask
+  assignStaffToTask,
+  deleteTask
 };

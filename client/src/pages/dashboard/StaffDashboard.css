@@ -5,6 +5,32 @@
   background-color: #f8f9fa;
 }
 
+/* Use shared dashboard styles from dashboard.css */
+.staff-dashboard .dashboard-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 20px 0;
+}
+
+.staff-dashboard .dashboard-header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.staff-dashboard .dashboard-header h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.staff-dashboard .dashboard-header span {
+  opacity: 0.9;
+  font-size: 0.9rem;
+}
+
 .tasks-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

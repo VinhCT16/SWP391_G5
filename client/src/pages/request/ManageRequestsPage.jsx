@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { listRequestsByPhone, cancelRequest } from "../../api/requestApi";
+import { getMyRequests, cancelRequest } from "../../api/requestApi";
 import { useNavigate } from "react-router-dom";
-import { normalizeVNPhone } from "../../utils/validation";
+import { useAuth } from "../../context/AuthContext";
 import { fmtDateTime24 } from "../../utils/datetime";
 import { fmtAddress } from "../../utils/address";
 import "../../styles/movingService.css";
@@ -77,21 +77,25 @@ const getStatusConfig = (status) => {
 
 export default function ManageRequestsPage() {
   const nav = useNavigate();
-  const [phone, setPhone] = useState(localStorage.getItem("my_phone") || "");
+  const { user } = useAuth();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState(""); // Lọc theo trạng thái
 
   const load = async () => {
-    const p = normalizeVNPhone(phone || "");
-    if (!p) {
+    if (!user) {
       setRows([]);
       return;
     }
     setLoading(true);
     try {
-      const data = await listRequestsByPhone(p);
-      setRows(Array.isArray(data) ? data : []);
+      const response = await getMyRequests();
+      // getMyRequests returns { requests: [...] }
+      const requests = response.requests || response.data?.requests || [];
+      setRows(Array.isArray(requests) ? requests : []);
+    } catch (err) {
+      console.error("Error loading requests:", err);
+      setRows([]);
     } finally {
       setLoading(false);
     }
@@ -99,10 +103,7 @@ export default function ManageRequestsPage() {
 
   useEffect(() => {
     load();
-  }, []); // auto load theo localStorage
-  useEffect(() => {
-    localStorage.setItem("my_phone", phone);
-  }, [phone]);
+  }, [user]); // Reload when user changes
 
   const onCancel = async (id) => {
     if (!window.confirm("Bạn có chắc chắn muốn hủy request này không?")) return;
@@ -132,20 +133,20 @@ export default function ManageRequestsPage() {
 
         <div className="main-card">
           <div style={{ marginBottom: "1.5rem" }}>
-            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", marginBottom: "1rem" }}>
-              <input
-                placeholder="Nhập số điện thoại đã dùng để tạo request"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="form-group input-primary"
-                style={{ flex: 1, minWidth: "250px", maxWidth: "400px" }}
-              />
-              <button onClick={load} className="btn btn-primary">
-                Tải
-              </button>
-              <button onClick={() => nav("/requests/new")} className="btn btn-secondary">
-                Tạo mới
-              </button>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", marginBottom: "1rem", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                <button onClick={load} className="btn btn-primary" disabled={loading}>
+                  {loading ? "Đang tải..." : "Làm mới"}
+                </button>
+                <button onClick={() => nav("/requests/new")} className="btn btn-secondary">
+                  Tạo mới
+                </button>
+              </div>
+              {user && (
+                <div style={{ fontSize: "0.9em", color: "#666" }}>
+                  Hiển thị yêu cầu của: <strong>{user.name || user.email}</strong>
+                </div>
+              )}
             </div>
 
             {/* Bộ lọc trạng thái */}
@@ -225,19 +226,31 @@ export default function ManageRequestsPage() {
                     </div>
                     <div className="move-details">
                       <p>
-                        <strong>Tên khách hàng:</strong> {r.customerName}
+                        <strong>Tên khách hàng:</strong> {r.customerName || "N/A"}
                       </p>
                       <p>
-                        <strong>Số điện thoại:</strong> {r.customerPhone}
+                        <strong>Số điện thoại:</strong> {r.customerPhone || r.moveDetails?.phone || "N/A"}
                       </p>
                       <p>
-                        <strong>Lấy hàng:</strong> {fmtAddress(r.pickupAddress || r.address)}
+                        <strong>Lấy hàng:</strong> {
+                          r.pickupAddress 
+                            ? fmtAddress(r.pickupAddress) 
+                            : r.moveDetails?.fromAddress 
+                            ? r.moveDetails.fromAddress 
+                            : fmtAddress(r.address) || "N/A"
+                        }
                       </p>
                       <p>
-                        <strong>Giao hàng:</strong> {fmtAddress(r.deliveryAddress || r.address)}
+                        <strong>Giao hàng:</strong> {
+                          r.deliveryAddress 
+                            ? fmtAddress(r.deliveryAddress) 
+                            : r.moveDetails?.toAddress 
+                            ? r.moveDetails.toAddress 
+                            : fmtAddress(r.address) || "N/A"
+                        }
                       </p>
                       <p>
-                        <strong>Thời gian chuyển:</strong> {fmtDateTime24(r.movingTime)}
+                        <strong>Thời gian chuyển:</strong> {fmtDateTime24(r.movingTime || r.moveDetails?.moveDate) || "N/A"}
                       </p>
                       <p>
                         <strong>Tạo lúc:</strong> {new Date(r.createdAt || r.requestDate).toLocaleString("vi-VN")}

@@ -60,7 +60,8 @@ const contractSchema = new mongoose.Schema({
       type: String, 
       enum: ["Local Move", "Long Distance", "Commercial"],
       required: true 
-    }
+    },
+    phone: { type: String } // Customer phone from request
   },
   
   // Pricing
@@ -112,7 +113,26 @@ const contractSchema = new mongoose.Schema({
     liability: { type: String, default: "Standard moving liability coverage" },
     cancellation: { type: String, default: "24-hour notice required for cancellation" },
     additionalTerms: String
-  }
+  },
+
+  // Items to Move (from request)
+  items: [
+    {
+      itemId: { type: mongoose.Schema.Types.ObjectId, default: new mongoose.Types.ObjectId() },
+      description: { type: String, required: true },
+      quantity: { type: Number, required: true },
+      category: { 
+        type: String, 
+        enum: ["furniture", "electronics", "clothing", "kitchen", "books", "other"],
+        default: "other"
+      },
+      estimatedValue: Number,
+      requiresSpecialHandling: { type: Boolean, default: false }
+    }
+  ],
+
+  // Survey fee (from request, if applicable)
+  surveyFee: { type: Number, default: undefined }
 }, { timestamps: true });
 
 module.exports = mongoose.model("Contract", contractSchema);

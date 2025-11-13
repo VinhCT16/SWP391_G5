@@ -317,7 +317,7 @@ export default function CreateRequestPage() {
         }
         
         setMsg("✅ Đã tạo yêu cầu khảo sát. Chúng tôi sẽ liên hệ bạn trong vòng 24h.");
-        setTimeout(() => nav("/my-requests"), 1500);
+        setTimeout(() => nav("/my-request"), 1500);
       } catch (err) {
         console.error("❌ [CreateRequestPage] Error:", err);
         setMsg("❌ " + (err.message || "Có lỗi khi tạo yêu cầu"));

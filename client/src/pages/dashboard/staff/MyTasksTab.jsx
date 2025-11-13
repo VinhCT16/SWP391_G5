@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Card, { CardHeader, CardBody, CardActions } from '../../../components/shared/Card';
 import StatusBadge from '../../../components/shared/StatusBadge';
 import Button from '../../../components/shared/Button';
 
 export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateStatus, onViewDetails }) {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState({
     status: '',
     taskType: '',
@@ -33,8 +35,28 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
       case 'transporting': return '🚚';
       case 'unloading': return '⬇️';
       case 'unpacking': return '📋';
+      case 'review': return '🔍';
       default: return '📝';
     }
+  };
+
+  const handleReviewItems = (task) => {
+    // Navigate to QuoteItemsPage with request data
+    // task.requestId is the request's _id (MongoDB ObjectId)
+    const requestData = {
+      requestId: task.requestId || task.request?._id || task._id,
+      requestNumber: task.requestNumber || task.request?.requestId,
+      customerName: task.customer?.name || task.request?.customerName,
+      customerPhone: task.customer?.phone || task.request?.customerPhone,
+      pickupAddress: task.moveDetails?.fromAddress || task.request?.moveDetails?.fromAddress,
+      deliveryAddress: task.moveDetails?.toAddress || task.request?.moveDetails?.toAddress,
+      movingTime: task.moveDetails?.moveDate || task.request?.moveDetails?.moveDate,
+      serviceType: task.moveDetails?.serviceType || task.request?.moveDetails?.serviceType,
+      taskId: task.taskId || task._id, // Use taskId or _id for the task
+      isStaffReview: true // Flag to indicate this is a staff review
+    };
+    
+    navigate('/quote/items', { state: requestData });
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -102,6 +124,7 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
             <option value="transporting">Transporting</option>
             <option value="unloading">Unloading</option>
             <option value="unpacking">Unpacking</option>
+            <option value="review">Review</option>
           </select>
           <select
             value={filters.priority}
@@ -145,14 +168,36 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
               </CardHeader>
               <CardBody>
                 <div className="task-details">
-                  <div className="detail-row"><strong>Request #:</strong> {task.requestNumber}</div>
-                  <div className="detail-row"><strong>Customer:</strong> {task.customer?.name}</div>
-                  <div className="detail-row"><strong>Email:</strong> {task.customer?.email}</div>
-                  <div className="detail-row"><strong>Phone:</strong> {task.customer?.phone}</div>
-                  <div className="detail-row"><strong>From:</strong> {task.moveDetails?.fromAddress}</div>
-                  <div className="detail-row"><strong>To:</strong> {task.moveDetails?.toAddress}</div>
-                  <div className="detail-row"><strong>Move Date:</strong> {task.moveDetails?.moveDate ? new Date(task.moveDetails.moveDate).toLocaleDateString() : 'N/A'}</div>
-                  <div className="detail-row"><strong>Duration:</strong> {task.estimatedDuration} hours</div>
+                  <div className="detail-row">
+                    <strong>Request #:</strong> {task.requestNumber || task.requestId || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Customer:</strong> {task.customer?.name || task.request?.customerName || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Email:</strong> {task.customer?.email || task.request?.customerEmail || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Phone:</strong> {task.customer?.phone || task.request?.customerPhone || task.moveDetails?.phone || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>From:</strong> {task.moveDetails?.fromAddress || task.request?.moveDetails?.fromAddress || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>To:</strong> {task.moveDetails?.toAddress || task.request?.moveDetails?.toAddress || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Move Date:</strong> {
+                      task.moveDetails?.moveDate 
+                        ? new Date(task.moveDetails.moveDate).toLocaleDateString() 
+                        : task.request?.moveDetails?.moveDate
+                        ? new Date(task.request.moveDetails.moveDate).toLocaleDateString()
+                        : 'N/A'
+                    }
+                  </div>
+                  <div className="detail-row">
+                    <strong>Duration:</strong> {task.estimatedDuration ? `${task.estimatedDuration} hours` : 'N/A'}
+                  </div>
                   {task.isTransporter && (
                     <div className="detail-row">
                       <strong>Role:</strong> <span className="role-badge">Transporter</span>
@@ -161,6 +206,16 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
                 </div>
               </CardBody>
               <CardActions>
+                {/* Special button for review tasks */}
+                {task.taskType === 'review' && (
+                  <Button 
+                    variant="primary" 
+                    onClick={() => handleReviewItems(task)}
+                    style={{ background: '#2196f3', color: 'white' }}
+                  >
+                    📋 List Items
+                  </Button>
+                )}
                 {task.status === 'pending' && (
                   <Button variant="success" onClick={() => onUpdateStatus(task, 'in-progress')}>
                     Start Task

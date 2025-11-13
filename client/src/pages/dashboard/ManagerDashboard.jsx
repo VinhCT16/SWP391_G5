@@ -19,6 +19,7 @@ export default function ManagerDashboard() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [selectedContract, setSelectedContract] = useState(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [approvalActionType, setApprovalActionType] = useState('approve');
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [availableStaff, setAvailableStaff] = useState([]);
   const [activeTab, setActiveTab] = useState('requests');
@@ -31,7 +32,8 @@ export default function ManagerDashboard() {
     try {
       setLoading(true);
       const response = await getAllRequests({ status: filters.status });
-      setRequests(response.data.requests || []);
+      // Handle both response.requests and response.data?.requests
+      setRequests(response.requests || response.data?.requests || []);
     } catch (err) {
       console.error('Error loading requests:', err);
       setError('Failed to load requests');
@@ -44,7 +46,8 @@ export default function ManagerDashboard() {
     try {
       setLoading(true);
       const response = await getContractsForApproval();
-      setContracts(response.data.contracts || []);
+      // Handle both response.contracts and response.data?.contracts
+      setContracts(response.contracts || response.data?.contracts || []);
     } catch (err) {
       console.error('Error loading contracts:', err);
       setError('Failed to load contracts');
@@ -89,7 +92,10 @@ export default function ManagerDashboard() {
       alert('Tasks created successfully!');
     } catch (err) {
       console.error('Error creating tasks:', err);
-      setError(err?.response?.data?.message || 'Failed to create tasks');
+      // Handle both axios errors and fetch errors
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to create tasks';
+      setError(errorMessage);
+      alert(`Error: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -127,7 +133,8 @@ export default function ManagerDashboard() {
     try {
       setSelectedRequest(request);
       const res = await getAvailableStaffForRequest(request._id);
-      setAvailableStaff(res.data?.availableStaff || []);
+      // Handle both response.availableStaff and response.data?.availableStaff
+      setAvailableStaff(res.availableStaff || res.data?.availableStaff || []);
       setShowAssignModal(true);
     } catch (e) {
       setError('Failed to load available staff');
@@ -149,9 +156,11 @@ export default function ManagerDashboard() {
         window.location.href = `/contracts/${request.contractId}`;
         return;
       }
-      const { getAllContracts } = await import('../api/contractApi');
+      const { getAllContracts } = await import('../../api/contractApi');
       const res = await getAllContracts({ requestId: request._id, limit: 1 });
-      const found = res.data.contracts && res.data.contracts[0];
+      // Handle both response.contracts and response.data?.contracts
+      const contracts = res.contracts || res.data?.contracts || [];
+      const found = contracts[0];
       if (found && found._id) {
         window.location.href = `/contracts/${found._id}`;
       } else {
@@ -236,10 +245,12 @@ export default function ManagerDashboard() {
           onRefresh={activeTab === 'requests' ? loadRequests : loadContracts}
           onApprove={(request) => {
             setSelectedRequest(request);
+            setApprovalActionType('approve');
             setShowApprovalModal(true);
           }}
           onReject={(request) => {
             setSelectedRequest(request);
+            setApprovalActionType('reject');
             setShowApprovalModal(true);
           }}
           onAssignStaff={openAssignStaffModal}
@@ -269,9 +280,11 @@ export default function ManagerDashboard() {
         onClose={() => {
           setShowApprovalModal(false);
           setSelectedRequest(null);
+          setApprovalActionType('approve');
         }}
         request={selectedRequest}
         onApprove={handleApproval}
+        actionType={approvalActionType}
         loading={loading}
       />
 
