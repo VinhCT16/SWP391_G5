@@ -77,7 +77,13 @@ const userSchema = new mongoose.Schema(
     // Staff-specific fields
     staffRole: {
       type: String,
-      enum: ["packager", "transporter", "supervisor"]
+      enum: ["packager", "transporter", "supervisor", "loader", "unloader", "reviewer"]
+      // packager: Handles packing and unpacking tasks
+      // transporter: Handles transportation tasks
+      // supervisor: Can handle all task types (flexible)
+      // loader: Specialized in loading tasks
+      // unloader: Specialized in unloading tasks
+      // reviewer: Specialized in review/survey tasks
     },
     specialization: [{
       type: String,

@@ -79,70 +79,145 @@ const generateContractPDF = async (contract) => {
     doc.setFont(undefined, 'normal');
     doc.text(`Type: ${contract.paymentMethod?.type?.replace('_', ' ').toUpperCase() || 'N/A'}`, 20, totalY + 45);
     
+    // Items List (from request)
+    let itemsY = totalY + 60;
+    if (contract.requestId && contract.requestId.items && contract.requestId.items.length > 0) {
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('ITEMS FOR TRANSPORTATION', 20, itemsY);
+      
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'normal');
+      itemsY += 10;
+      
+      contract.requestId.items.forEach((item, index) => {
+        // Check if we need a new page
+        if (itemsY > 250) {
+          doc.addPage();
+          itemsY = 20;
+        }
+        
+        doc.setFont(undefined, 'bold');
+        doc.text(`${index + 1}. ${item.description || 'Item'}`, 20, itemsY);
+        itemsY += 7;
+        
+        doc.setFont(undefined, 'normal');
+        if (item.quantity) {
+          doc.text(`   Quantity: ${item.quantity}`, 25, itemsY);
+          itemsY += 7;
+        }
+        if (item.category) {
+          doc.text(`   Category: ${item.category}`, 25, itemsY);
+          itemsY += 7;
+        }
+        if (item.dimensions) {
+          const dims = [];
+          if (item.dimensions.weight) dims.push(`Weight: ${item.dimensions.weight}kg`);
+          if (item.dimensions.length && item.dimensions.width && item.dimensions.height) {
+            dims.push(`Size: ${item.dimensions.length}×${item.dimensions.width}×${item.dimensions.height}cm`);
+          }
+          if (dims.length > 0) {
+            doc.text(`   ${dims.join(', ')}`, 25, itemsY);
+            itemsY += 7;
+          }
+        }
+        if (item.requiresSpecialHandling) {
+          doc.text(`   ⚠️ Requires Special Handling`, 25, itemsY);
+          itemsY += 7;
+        }
+        itemsY += 3; // Space between items
+      });
+      
+      itemsY += 5;
+    }
+    
     // Terms and Conditions
     doc.setFontSize(14);
     doc.setFont(undefined, 'bold');
-    doc.text('TERMS AND CONDITIONS', 20, totalY + 60);
+    doc.text('TERMS AND CONDITIONS', 20, itemsY);
     
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
+    itemsY += 10;
     
     // Split text into multiple lines if too long
     const liabilityText = contract.terms?.liability || 'Standard moving liability coverage';
     const liabilityLines = doc.splitTextToSize(liabilityText, 170);
-    doc.text('Liability Coverage:', 20, totalY + 70);
-    doc.text(liabilityLines, 20, totalY + 77);
+    doc.text('Liability Coverage:', 20, itemsY);
+    doc.text(liabilityLines, 20, itemsY + 7);
+    itemsY += 7 + (liabilityLines.length * 7);
     
     const cancellationText = contract.terms?.cancellation || '24-hour notice required for cancellation';
     const cancellationLines = doc.splitTextToSize(cancellationText, 170);
-    doc.text('Cancellation Policy:', 20, totalY + 90);
-    doc.text(cancellationLines, 20, totalY + 97);
+    doc.text('Cancellation Policy:', 20, itemsY);
+    doc.text(cancellationLines, 20, itemsY + 7);
+    itemsY += 7 + (cancellationLines.length * 7);
     
     if (contract.terms?.additionalTerms) {
       const additionalLines = doc.splitTextToSize(contract.terms.additionalTerms, 170);
-      doc.text('Additional Terms:', 20, totalY + 110);
-      doc.text(additionalLines, 20, totalY + 117);
+      doc.text('Additional Terms:', 20, itemsY);
+      doc.text(additionalLines, 20, itemsY + 7);
+      itemsY += 7 + (additionalLines.length * 7);
     }
     
     // Approval Information
     if (contract.approval) {
+      // Check if we need a new page
+      if (itemsY > 250) {
+        doc.addPage();
+        itemsY = 20;
+      }
+      
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
-      doc.text('APPROVAL INFORMATION', 20, totalY + 140);
+      doc.text('APPROVAL INFORMATION', 20, itemsY);
       
       doc.setFontSize(10);
       doc.setFont(undefined, 'normal');
+      itemsY += 10;
       
       if (contract.approval.approvedAt) {
-        doc.text(`Approved Date: ${new Date(contract.approval.approvedAt).toLocaleDateString()}`, 20, totalY + 150);
+        doc.text(`Approved Date: ${new Date(contract.approval.approvedAt).toLocaleDateString()}`, 20, itemsY);
+        itemsY += 7;
       }
       
       if (contract.approval.notes) {
         const notesLines = doc.splitTextToSize(contract.approval.notes, 170);
-        doc.text('Approval Notes:', 20, totalY + 157);
-        doc.text(notesLines, 20, totalY + 164);
+        doc.text('Approval Notes:', 20, itemsY);
+        doc.text(notesLines, 20, itemsY + 7);
+        itemsY += 7 + (notesLines.length * 7);
       }
       
       if (contract.approval.rejectionReason) {
         const rejectionLines = doc.splitTextToSize(contract.approval.rejectionReason, 170);
-        doc.text('Rejection Reason:', 20, totalY + 180);
-        doc.text(rejectionLines, 20, totalY + 187);
+        doc.text('Rejection Reason:', 20, itemsY);
+        doc.text(rejectionLines, 20, itemsY + 7);
+        itemsY += 7 + (rejectionLines.length * 7);
       }
     }
     
     // Signatures
     if (contract.signatures) {
+      // Check if we need a new page
+      if (itemsY > 250) {
+        doc.addPage();
+        itemsY = 20;
+      }
+      
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
-      doc.text('SIGNATURES', 20, totalY + 210);
+      doc.text('SIGNATURES', 20, itemsY);
       
       doc.setFontSize(10);
       doc.setFont(undefined, 'normal');
-      doc.text(`Customer Signed: ${contract.signatures.customerSigned ? 'Yes' : 'No'}`, 20, totalY + 220);
-      doc.text(`Manager Signed: ${contract.signatures.managerSigned ? 'Yes' : 'No'}`, 20, totalY + 227);
+      itemsY += 10;
+      doc.text(`Customer Signed: ${contract.signatures.customerSigned ? 'Yes' : 'No'}`, 20, itemsY);
+      itemsY += 7;
+      doc.text(`Manager Signed: ${contract.signatures.managerSigned ? 'Yes' : 'No'}`, 20, itemsY);
+      itemsY += 7;
       
       if (contract.signatures.signedAt) {
-        doc.text(`Signed Date: ${new Date(contract.signatures.signedAt).toLocaleDateString()}`, 20, totalY + 234);
+        doc.text(`Signed Date: ${new Date(contract.signatures.signedAt).toLocaleDateString()}`, 20, itemsY);
       }
     }
     

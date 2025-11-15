@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getStaffTasks as getStaffTasksFromTaskApi, updateTaskStatus } from '../../api/taskApi';
-import { getStaffTasks as getStaffTasksFromRequestApi } from '../../api/requestApi';
+import { getStaffTasks as getStaffTasksFromTaskApi, getAllAvailableTasks, pickTask, updateTaskStatus } from '../../api/taskApi';
 import StaffDashboardTabs from './staff/StaffDashboardTabs';
 import ProfileModal from '../../components/dashboard/ProfileModal';
 import PasswordModal from '../../components/dashboard/PasswordModal';
@@ -14,9 +13,9 @@ import './StaffDashboard.css';
 export default function StaffDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('my-tasks');
+  const [activeTab, setActiveTab] = useState('task-list');
   const [tasks, setTasks] = useState([]);
-  const [requests, setRequests] = useState([]);
+  const [availableTasks, setAvailableTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -30,7 +29,8 @@ export default function StaffDashboard() {
       setLoading(true);
       setError(null);
       const response = await getStaffTasksFromTaskApi();
-      setTasks(response.data?.tasks || []);
+      // Handle both response.tasks and response.data?.tasks
+      setTasks(response.tasks || response.data?.tasks || []);
     } catch (err) {
       console.error('Error loading tasks:', err);
       setError('Failed to load tasks');
@@ -39,43 +39,45 @@ export default function StaffDashboard() {
     }
   };
 
-  const loadRequests = async () => {
-    setLoading(true);
+  const loadAvailableTasks = async () => {
     try {
-      const data = await getStaffTasksFromRequestApi();
-      setRequests(Array.isArray(data) ? data : []);
+      setLoading(true);
+      setError(null);
+      const response = await getAllAvailableTasks();
+      setAvailableTasks(response.tasks || response.data?.tasks || []);
     } catch (err) {
-      console.error("Error loading staff tasks:", err);
-      setRequests([]);
+      console.error('Error loading available tasks:', err);
+      setError('Failed to load available tasks');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (activeTab === 'my-tasks') {
+    if (activeTab === 'task-list') {
+      loadAvailableTasks();
+    } else if (activeTab === 'my-tasks' || activeTab === 'history') {
       loadTasks();
-    } else if (activeTab === 'requests') {
-      loadRequests();
     }
   }, [activeTab]);
 
-  const handleStatusUpdate = async (requestId, taskId, statusData) => {
+  const handleStatusUpdate = async (taskId, statusData) => {
     try {
       setLoading(true);
-      await updateTaskStatus(requestId, taskId, statusData);
+      await updateTaskStatus(taskId, statusData);
       await loadTasks();
-      alert('Task status updated successfully!');
     } catch (err) {
       console.error('Error updating task status:', err);
-      setError(err?.response?.data?.message || 'Failed to update task status');
+      // Handle both axios errors and fetch errors
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to update task status';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   const openStatusModal = (task, newStatus) => {
-    setSelectedTask({ ...task, status: newStatus });
+    setSelectedTask(newStatus !== undefined ? { ...task, status: newStatus } : task);
     setShowStatusModal(true);
   };
 
@@ -84,20 +86,35 @@ export default function StaffDashboard() {
     setShowDetailsModal(true);
   };
 
+  const handlePickTask = async (taskId) => {
+    try {
+      setLoading(true);
+      await pickTask(taskId);
+      await loadAvailableTasks(); // Refresh available tasks
+      await loadTasks(); // Refresh assigned tasks
+    } catch (err) {
+      console.error('Error picking task:', err);
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to pick task';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleProfileSuccess = () => {
     loadTasks();
-    loadRequests();
+    loadAvailableTasks();
   };
 
   return (
     <div className="staff-dashboard">
-      <header className="home-header">
-        <div className="header-content">
-          <div className="logo">
+      <header className="dashboard-header">
+        <div className="dashboard-header-content">
+          <div>
             <h1>Staff Dashboard</h1>
             <span>Manage your assigned tasks</span>
           </div>
-          <div className="user-info" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
             <span>Welcome, {user?.name}</span>
             <button 
               onClick={async () => {
@@ -133,81 +150,43 @@ export default function StaffDashboard() {
         </div>
       </header>
 
-      <nav className="home-nav" style={{ background: 'linear-gradient(90deg, #e3ffe8 0%, #eaf6ff 100%)', borderRadius: '12px', padding: '0.5rem 0.5rem 0.5rem 0.5rem', marginBottom: '1.5rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-        <button
+      <nav className="dashboard-nav">
+        <button 
+          className={activeTab === 'task-list' ? 'nav-btn active' : 'nav-btn'}
+          onClick={() => setActiveTab('task-list')}
+        >
+          Task List
+        </button>
+        <button 
           className={activeTab === 'my-tasks' ? 'nav-btn active' : 'nav-btn'}
           onClick={() => setActiveTab('my-tasks')}
-          style={{
-            background: activeTab === 'my-tasks' ? 'linear-gradient(90deg, #4caf50 60%, #81c784 100%)' : 'white',
-            color: activeTab === 'my-tasks' ? '#fff' : '#333',
-            border: activeTab === 'my-tasks' ? 'none' : '1px solid #e0e0e0',
-            marginRight: '0.5rem',
-            fontWeight: 600,
-            boxShadow: activeTab === 'my-tasks' ? '0 2px 8px rgba(76,175,80,0.10)' : 'none',
-            transition: 'all 0.2s'
-          }}
         >
-          <span role="img" aria-label="tasks" style={{ marginRight: 6 }}>📋</span>
           My Tasks
         </button>
-        <button
-          className={activeTab === 'requests' ? 'nav-btn active' : 'nav-btn'}
-          onClick={() => setActiveTab('requests')}
-          style={{
-            background: activeTab === 'requests' ? 'linear-gradient(90deg, #2196f3 60%, #90caf9 100%)' : 'white',
-            color: activeTab === 'requests' ? '#fff' : '#333',
-            border: activeTab === 'requests' ? 'none' : '1px solid #e0e0e0',
-            marginRight: '0.5rem',
-            fontWeight: 600,
-            boxShadow: activeTab === 'requests' ? '0 2px 8px rgba(33,150,243,0.10)' : 'none',
-            transition: 'all 0.2s'
-          }}
-        >
-          <span role="img" aria-label="requests" style={{ marginRight: 6 }}>📝</span>
-          Requests
-        </button>
-        <button
+        <button 
           className={activeTab === 'history' ? 'nav-btn active' : 'nav-btn'}
           onClick={() => setActiveTab('history')}
-          style={{
-            background: activeTab === 'history' ? 'linear-gradient(90deg, #2196f3 60%, #90caf9 100%)' : 'white',
-            color: activeTab === 'history' ? '#fff' : '#333',
-            border: activeTab === 'history' ? 'none' : '1px solid #e0e0e0',
-            marginRight: '0.5rem',
-            fontWeight: 600,
-            boxShadow: activeTab === 'history' ? '0 2px 8px rgba(33,150,243,0.10)' : 'none',
-            transition: 'all 0.2s'
-          }}
         >
-          <span role="img" aria-label="history" style={{ marginRight: 6 }}>🕘</span>
           History
         </button>
-        <button
+        <button 
           className={activeTab === 'profile' ? 'nav-btn active' : 'nav-btn'}
           onClick={() => setActiveTab('profile')}
-          style={{
-            background: activeTab === 'profile' ? 'linear-gradient(90deg, #ff9800 60%, #ffe0b2 100%)' : 'white',
-            color: activeTab === 'profile' ? '#fff' : '#333',
-            border: activeTab === 'profile' ? 'none' : '1px solid #e0e0e0',
-            fontWeight: 600,
-            boxShadow: activeTab === 'profile' ? '0 2px 8px rgba(255,152,0,0.10)' : 'none',
-            transition: 'all 0.2s'
-          }}
         >
-          <span role="img" aria-label="profile" style={{ marginRight: 6 }}>👤</span>
           Profile
         </button>
       </nav>
 
-      <main className="home-main">
+      <main className="dashboard-main">
         {error && <div className="error-message">{error}</div>}
         <StaffDashboardTabs
           activeTab={activeTab}
           tasks={tasks}
-          requests={requests}
+          availableTasks={availableTasks}
           loading={loading}
           error={error}
-          onRefresh={activeTab === 'my-tasks' ? loadTasks : loadRequests}
+          onRefresh={activeTab === 'task-list' ? loadAvailableTasks : loadTasks}
+          onPickTask={handlePickTask}
           onUpdateStatus={openStatusModal}
           onViewDetails={openDetailsModal}
           user={user}

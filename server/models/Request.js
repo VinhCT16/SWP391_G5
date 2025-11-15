@@ -12,6 +12,10 @@ const requestSchema = new mongoose.Schema({
     required: true 
   },
   
+  // Customer info (for querying by phone)
+  customerName: { type: String },
+  customerPhone: { type: String },
+  
   // Move Details
   moveDetails: {
     fromAddress: { type: String, required: true },
@@ -62,54 +66,12 @@ const requestSchema = new mongoose.Schema({
     notes: String
   }],
   
-  // Tasks
-  tasks: [
-    {
-      taskId: { type: mongoose.Schema.Types.ObjectId, default: new mongoose.Types.ObjectId() },
-      taskType: { 
-        type: String, 
-        enum: ["packing", "loading", "transporting", "unloading", "unpacking"],
-        required: true 
-      },
-      assignedStaff: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-      transporter: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-      status: { 
-        type: String, 
-        enum: ["pending", "assigned", "in-progress", "blocked", "overdue", "completed", "cancelled"], 
-        default: "pending" 
-      },
-      estimatedDuration: Number, // in hours
-      actualDuration: Number,
-      priority: { 
-        type: String, 
-        enum: ["low", "medium", "high"], 
-        default: "medium" 
-      },
-      description: String,
-      deadline: Date,
-      managerNotes: String,
-      customerNotes: String,
-      attachments: [{
-        name: String,
-        url: String,
-        uploadedAt: { type: Date, default: Date.now }
-      }],
-      taskHistory: [
-        {
-          historyId: { type: mongoose.Schema.Types.ObjectId, default: new mongoose.Types.ObjectId() },
-          status: String,
-          notes: String,
-          updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-          updatedAt: { type: Date, default: Date.now }
-        }
-      ]
-    }
-  ],
+  // Tasks are now in a separate Task model, referenced by requestId
   
   // Request Status
   status: { 
     type: String, 
-    enum: ["draft", "submitted", "under_review", "approved", "rejected", "contract_created", "in_progress", "completed", "cancelled"], 
+    enum: ["draft", "submitted", "under_review", "approved", "rejected", "contract_created", "in_progress", "completed", "cancelled", "UNDER_SURVEY", "PENDING", "PENDING_CONFIRMATION", "WAITING_PAYMENT", "IN_PROGRESS", "DONE", "CANCELLED", "REJECTED", "PENDING_REVIEW"], 
     default: "draft" 
   },
   
@@ -130,6 +92,39 @@ const requestSchema = new mongoose.Schema({
       price: Number
     }],
     totalPrice: Number
+  },
+
+  // Survey fee (for staff survey requests)
+  surveyFee: { type: Number, default: undefined },
+  
+  // Payment Information
+  paymentMethod: {
+    type: String,
+    enum: ["cash", "online_banking"],
+    default: "cash"
+  },
+  paymentStatus: {
+    type: String,
+    enum: ["pending", "deposit_paid", "fully_paid", "not_paid"],
+    default: "pending"
+  },
+  depositPaid: {
+    type: Boolean,
+    default: false
+  },
+  depositPaidAt: Date,
+  depositPaidBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User" // Staff who marked deposit as paid
+  },
+  // VNPay transaction info
+  vnpayTransaction: {
+    transactionId: String,
+    amount: Number,
+    orderInfo: String,
+    paymentDate: Date,
+    responseCode: String,
+    transactionStatus: String
   }
 }, { timestamps: true });
 

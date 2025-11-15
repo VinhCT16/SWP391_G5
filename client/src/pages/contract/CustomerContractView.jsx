@@ -14,22 +14,123 @@ const CustomerContractView = () => {
   const [error, setError] = useState('');
   const [signModalOpen, setSignModalOpen] = useState(false);
   const [signing, setSigning] = useState(false);
+  
+  // Get email from URL query params
+  const urlParams = new URLSearchParams(window.location.search);
+  const emailFromUrl = urlParams.get('email');
 
   const loadContract = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await getContractById(id);
-      setContract(response.data.contract);
+      setError('');
+      
+      const BASE = process.env.REACT_APP_API_URL || "http://localhost:3000/api";
+      
+      // If user is not logged in, use public route directly
+      if (!user) {
+        const publicUrl = emailFromUrl 
+          ? `${BASE}/contracts/${id}/public?email=${encodeURIComponent(emailFromUrl)}`
+          : `${BASE}/contracts/${id}/public`;
+        
+        try {
+          const publicResponse = await fetch(publicUrl, {
+            credentials: 'include'
+          });
+          
+            if (publicResponse.ok) {
+              const publicData = await publicResponse.json();
+              setContract(publicData.contract);
+              // Show info message that they should login to sign
+                const contractCustomerEmail = publicData.contract?.customerId?.email;
+                if (emailFromUrl && contractCustomerEmail && emailFromUrl.toLowerCase() === contractCustomerEmail.toLowerCase()) {
+                  setError('info: Please log in with the account associated with this contract to sign it.');
+                } else {
+                  setError('info: Please log in to view and sign this contract.');
+                }
+            } else {
+            const errorData = await publicResponse.json().catch(() => ({}));
+            const errorMsg = errorData.message || 'Failed to load contract';
+            console.error('Public route error:', errorMsg, publicResponse.status);
+            setError(errorMsg);
+          }
+        } catch (fetchErr) {
+          setError('Failed to load contract. Please login to view.');
+          console.error('Public contract fetch error:', fetchErr);
+        }
+      } else {
+        // User is logged in, try authenticated route first
+        try {
+          const response = await getContractById(id);
+          const contractData = response.data?.contract || response.contract;
+          setContract(contractData);
+          
+          // Check if user's email matches contract customer email - if yes, clear any info messages
+          const contractCustomerEmail = contractData?.customerId?.email?.toLowerCase();
+          const loggedInUserEmail = user?.email?.toLowerCase();
+          
+          if (loggedInUserEmail && contractCustomerEmail && loggedInUserEmail === contractCustomerEmail) {
+            // User is logged in with correct account - clear info messages
+            setError('');
+          } else if (loggedInUserEmail && contractCustomerEmail && loggedInUserEmail !== contractCustomerEmail) {
+            // User is logged in but wrong account
+            setError(`info: You are logged in as ${user.email}, but this contract belongs to ${contractData.customerId.email}. Please log out and log in with the correct account to sign the contract.`);
+          }
+        } catch (authErr) {
+          console.error('Authenticated route error:', authErr);
+          // If authenticated route fails (403/401), try public route as fallback
+          if (authErr.message.includes('403') || authErr.message.includes('401') || authErr.message.includes('Forbidden')) {
+            console.log('Falling back to public route...');
+            const publicUrl = emailFromUrl 
+              ? `${BASE}/contracts/${id}/public?email=${encodeURIComponent(emailFromUrl)}`
+              : `${BASE}/contracts/${id}/public`;
+            
+            try {
+              const publicResponse = await fetch(publicUrl, {
+                credentials: 'include'
+              });
+              
+              if (publicResponse.ok) {
+                const publicData = await publicResponse.json();
+                setContract(publicData.contract);
+                
+                // Check if logged-in user's email matches contract customer email
+                const contractCustomerEmail = publicData.contract?.customerId?.email?.toLowerCase();
+                const loggedInUserEmail = user?.email?.toLowerCase();
+                const emailFromUrlLower = emailFromUrl?.toLowerCase();
+                
+                if (loggedInUserEmail && contractCustomerEmail && loggedInUserEmail === contractCustomerEmail) {
+                  // User is logged in with correct account - clear info message
+                  setError('');
+                } else if (loggedInUserEmail && contractCustomerEmail && loggedInUserEmail !== contractCustomerEmail) {
+                  setError(`info: You are logged in as ${user.email}, but this contract belongs to ${publicData.contract.customerId.email}. Please log out and log in with the correct account to sign the contract.`);
+                } else if (emailFromUrlLower && contractCustomerEmail && emailFromUrlLower === contractCustomerEmail) {
+                  setError('info: Please log in with the account associated with this contract to sign it.');
+                } else {
+                  setError('info: Please log in to sign this contract.');
+                }
+              } else {
+                const errorData = await publicResponse.json().catch(() => ({}));
+                setError(errorData.message || authErr.message || 'Failed to load contract');
+              }
+            } catch (fetchErr) {
+              setError(authErr.message || 'Failed to load contract');
+            }
+          } else {
+            setError(authErr.message || 'Failed to load contract');
+          }
+        }
+      }
     } catch (err) {
-      setError('Failed to load contract');
+      setError('Failed to load contract. Please login to view.');
+      console.error('Contract load error:', err);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, user, emailFromUrl]);
 
   useEffect(() => {
     loadContract();
-  }, [loadContract]);
+  }, [loadContract, user]); // Reload when user changes (e.g., after login)
 
   const handleExportPDF = async () => {
     try {
@@ -103,13 +204,60 @@ const CustomerContractView = () => {
     );
   }
 
-  if (error) {
+  // Check if error is actually an info message
+  const isInfoMessage = error && error.startsWith('info:');
+  const displayMessage = isInfoMessage ? error.replace('info: ', '') : error;
+  
+  if (error && !contract) {
+    // Only show error page if we don't have contract data
     return (
       <div className="contract-view-container">
-        <div className="error-message">{error}</div>
-        <button onClick={() => navigate('/customer/dashboard')} className="back-btn">
-          Back to Dashboard
-        </button>
+        <div className={isInfoMessage ? "info-message" : "error-message"} style={{
+          padding: '16px',
+          borderRadius: '4px',
+          marginBottom: '16px',
+          background: isInfoMessage ? '#e3f2fd' : '#ffebee',
+          color: isInfoMessage ? '#1976d2' : '#c62828',
+          border: `1px solid ${isInfoMessage ? '#2196f3' : '#ef5350'}`
+        }}>
+          {displayMessage}
+          {isInfoMessage && (
+            <div style={{ marginTop: '12px' }}>
+              <button 
+                onClick={() => navigate(`/login?redirect=/contracts/${id}${emailFromUrl ? `?email=${encodeURIComponent(emailFromUrl)}` : ''}`)}
+                style={{
+                  padding: '8px 16px',
+                  background: '#2196f3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  marginRight: '8px'
+                }}
+              >
+                Log In
+              </button>
+              <button 
+                onClick={() => navigate('/customer-dashboard')}
+                style={{
+                  padding: '8px 16px',
+                  background: '#757575',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Back to Dashboard
+              </button>
+            </div>
+          )}
+        </div>
+        {!isInfoMessage && (
+          <button onClick={() => navigate('/customer-dashboard')} className="back-btn">
+            Back to Dashboard
+          </button>
+        )}
       </div>
     );
   }
@@ -127,8 +275,64 @@ const CustomerContractView = () => {
     );
   }
 
+  // Display info message banner if contract is loaded but there's an info message
+  const showInfoBanner = isInfoMessage && contract;
+
   return (
     <div className="contract-view-container">
+      {/* Info message banner */}
+      {showInfoBanner && (
+        <div style={{
+          padding: '16px',
+          borderRadius: '4px',
+          marginBottom: '16px',
+          background: '#e3f2fd',
+          color: '#1976d2',
+          border: '1px solid #2196f3',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <span>{displayMessage}</span>
+          <div>
+            <button 
+              onClick={() => navigate(`/login?redirect=/contracts/${id}${emailFromUrl ? `?email=${encodeURIComponent(emailFromUrl)}` : ''}`)}
+              style={{
+                padding: '8px 16px',
+                background: '#2196f3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                marginRight: '8px'
+              }}
+            >
+              Log In
+            </button>
+            {user && (
+              <button 
+                onClick={() => {
+                  // Logout and redirect to login
+                  navigate('/login?redirect=/contracts/' + id + (emailFromUrl ? `?email=${encodeURIComponent(emailFromUrl)}` : ''));
+                }}
+                style={{
+                  padding: '8px 16px',
+                  background: '#757575',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Switch Account
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      
       <div className="contract-view-header">
         <div className="header-content">
           <h1>Contract Details</h1>

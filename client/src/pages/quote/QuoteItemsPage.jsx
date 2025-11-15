@@ -1,7 +1,8 @@
 // client/src/pages/quote/QuoteItemsPage.jsx - Màn 1: Thêm đồ dùng
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fileToBase64 } from "../../utils/toBase64";
+import { updateRequestItems } from "../../api/requestApi";
 
 const MAX_IMAGES_PER_ITEM = 4;
 const MAX_FILE_MB = 1.5;
@@ -13,6 +14,7 @@ export default function QuoteItemsPage() {
   const [items, setItems] = useState([
     { name: "", weight: "", length: "", width: "", height: "", images: [], isApartment: false }
   ]);
+  const [depositPaid, setDepositPaid] = useState(false);
 
   const addItem = () => {
     setItems([...items, { name: "", weight: "", length: "", width: "", height: "", images: [], isApartment: false }]);
@@ -60,7 +62,7 @@ export default function QuoteItemsPage() {
     ));
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     // Validate: ít nhất 1 đồ dùng có tên
     const hasValidItem = items.some(it => it.name.trim());
     if (!hasValidItem) {
@@ -68,9 +70,25 @@ export default function QuoteItemsPage() {
       return;
     }
 
+    const validItems = items.filter(it => it.name.trim());
+
+    // If this is a staff review, save items to request and navigate back
+    if (state?.isStaffReview && state?.requestId && state?.taskId) {
+      try {
+        await updateRequestItems(state.requestId, validItems, state.taskId, depositPaid);
+        alert("✅ Đã lưu danh sách đồ dùng thành công!");
+        nav("/dashboard/staff"); // Navigate back to staff dashboard
+        return;
+      } catch (err) {
+        alert("❌ Lỗi khi lưu danh sách đồ dùng: " + (err.message || "Unknown error"));
+        return;
+      }
+    }
+
+    // Normal flow: continue to service selection
     const payload = {
       ...state,
-      items: items.filter(it => it.name.trim()), // Chỉ lấy items có tên
+      items: validItems,
     };
     
     nav("/quote/service", { state: payload });
@@ -78,11 +96,24 @@ export default function QuoteItemsPage() {
 
   const hasApartment = items.some(it => it.isApartment);
 
+  const isStaffReview = state?.isStaffReview;
+  const paymentMethod = state?.paymentMethod || 'cash';
+  const showDepositCheckbox = isStaffReview && paymentMethod === 'cash';
+  
+  // Initialize depositPaid from state if available
+  useEffect(() => {
+    if (state?.depositPaid !== undefined) {
+      setDepositPaid(state.depositPaid);
+    }
+  }, [state?.depositPaid]);
+
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: "auto" }}>
-      <h1>Thêm đồ dùng cần vận chuyển</h1>
+      <h1>{isStaffReview ? "📋 Khảo sát và liệt kê đồ dùng" : "Thêm đồ dùng cần vận chuyển"}</h1>
       <p style={{ color: "#666", marginBottom: 20 }}>
-        Nhập thông tin các đồ dùng bạn muốn chuyển. Bạn có thể thêm nhiều đồ dùng.
+        {isStaffReview 
+          ? "Vui lòng khảo sát và nhập thông tin các đồ dùng khách hàng cần vận chuyển. Bạn có thể thêm nhiều đồ dùng."
+          : "Nhập thông tin các đồ dùng bạn muốn chuyển. Bạn có thể thêm nhiều đồ dùng."}
       </p>
 
       {items.map((item, idx) => (
@@ -224,13 +255,47 @@ export default function QuoteItemsPage() {
           Quay lại
         </button>
         <button onClick={handleNext} style={{ ...btnStyle, background: "#111", flex: 1 }}>
-          Tiếp theo: Chọn xe và dịch vụ →
+          {isStaffReview ? "✅ Lưu danh sách đồ dùng" : "Tiếp theo: Chọn xe và dịch vụ →"}
         </button>
       </div>
 
       {hasApartment && (
         <div style={{ marginTop: 12, padding: 12, background: "#fff3cd", borderRadius: 6, color: "#856404" }}>
           ⚠️ Bạn đã chọn nhà chung cư/tầng cao. Có thể tính thêm phí vận chuyển tầng cao.
+        </div>
+      )}
+
+      {showDepositCheckbox && (
+        <div style={{ 
+          marginTop: 20, 
+          padding: 16, 
+          background: "#e8f5e9", 
+          borderRadius: 8, 
+          border: "1px solid #4caf50" 
+        }}>
+          <label style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            cursor: "pointer",
+            fontSize: 16,
+            fontWeight: 500
+          }}>
+            <input
+              type="checkbox"
+              checked={depositPaid}
+              onChange={(e) => setDepositPaid(e.target.checked)}
+              style={{ 
+                width: 20, 
+                height: 20, 
+                marginRight: 12,
+                cursor: "pointer"
+              }}
+            />
+            <span>💵 Khách hàng đã thanh toán tiền cọc (deposit)</span>
+          </label>
+          <p style={{ marginTop: 8, marginLeft: 32, fontSize: 14, color: "#666" }}>
+            Đánh dấu nếu khách hàng đã thanh toán tiền cọc khi bạn đến khảo sát
+          </p>
         </div>
       )}
     </div>

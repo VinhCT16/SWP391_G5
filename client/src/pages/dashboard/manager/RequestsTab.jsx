@@ -15,21 +15,32 @@ export default function RequestsTab({
   onReject,
   onAssignStaff,
   onCreateContract,
-  onCreateTasks,
   onViewContract
 }) {
   const navigate = useNavigate();
   const [localFilters, setLocalFilters] = useState(filters);
 
-  const filteredRequests = requests.filter(request => {
-    const matchesStatus = !localFilters.status || request.status === localFilters.status;
-    const matchesSearch = !localFilters.search || 
-      request.requestId.toLowerCase().includes(localFilters.search.toLowerCase()) ||
-      request.moveDetails.fromAddress.toLowerCase().includes(localFilters.search.toLowerCase()) ||
-      request.moveDetails.toAddress.toLowerCase().includes(localFilters.search.toLowerCase());
-    
-    return matchesStatus && matchesSearch;
-  });
+  // Group requests by status for display
+  const groupedRequests = {
+    pending: requests.filter(r => r.status === 'pending' || r.status === 'PENDING'),
+    under_survey: requests.filter(r => r.status === 'UNDER_SURVEY' || r.status === 'under_survey'),
+    contract_created: requests.filter(r => r.status === 'contract_created')
+  };
+
+  // Apply search filter to all groups
+  const applySearchFilter = (requestList) => {
+    if (!localFilters.search) return requestList;
+    const searchLower = localFilters.search.toLowerCase();
+    return requestList.filter(request => 
+      request.requestId.toLowerCase().includes(searchLower) ||
+      request.moveDetails?.fromAddress?.toLowerCase().includes(searchLower) ||
+      request.moveDetails?.toAddress?.toLowerCase().includes(searchLower)
+    );
+  };
+
+  const filteredPending = applySearchFilter(groupedRequests.pending);
+  const filteredUnderSurvey = applySearchFilter(groupedRequests.under_survey);
+  const filteredContractCreated = applySearchFilter(groupedRequests.contract_created);
 
   return (
     <div className="dashboard-section">
@@ -59,6 +70,8 @@ export default function RequestsTab({
         >
           <option value="">All Status</option>
           <option value="submitted">Submitted</option>
+          <option value="PENDING">Pending</option>
+          <option value="UNDER_SURVEY">Under Survey</option>
           <option value="under_review">Under Review</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
@@ -80,87 +93,119 @@ export default function RequestsTab({
       {loading ? (
         <div className="loading-state"><p>Loading requests...</p></div>
       ) : (
-        <div className="requests-grid">
-          {filteredRequests.map((request) => (
-            <Card key={request._id}>
-              <CardHeader>
-                <h3>Request #{request.requestId}</h3>
-                <StatusBadge status={request.status} />
-              </CardHeader>
-              <CardBody>
-                <div className="request-details">
-                  <div className="detail-row"><strong>Customer:</strong> {request.customerId?.name}</div>
-                  <div className="detail-row"><strong>Email:</strong> {request.customerId?.email}</div>
-                  <div className="detail-row"><strong>Phone:</strong> {request.moveDetails.phone}</div>
-                  <div className="detail-row"><strong>From:</strong> {request.moveDetails.fromAddress}</div>
-                  <div className="detail-row"><strong>To:</strong> {request.moveDetails.toAddress}</div>
-                  <div className="detail-row"><strong>Date:</strong> {new Date(request.moveDetails.moveDate).toLocaleDateString()}</div>
-                  <div className="detail-row"><strong>Service:</strong> {request.moveDetails.serviceType}</div>
-                  <div className="detail-row"><strong>Submitted:</strong> {new Date(request.createdAt).toLocaleDateString()}</div>
-                </div>
-
-                {request.approval && (
-                  <div className="approval-info">
-                    <h4>Review Details:</h4>
-                    <p><strong>Status:</strong> {request.approval.approved ? 'Approved' : 'Rejected'}</p>
-                    {request.approval.rejectionReason && (
-                      <p><strong>Reason:</strong> {request.approval.rejectionReason}</p>
-                    )}
-                    {request.approval.notes && (
-                      <p><strong>Notes:</strong> {request.approval.notes}</p>
-                    )}
-                    <p><strong>Reviewed:</strong> {new Date(request.approval.reviewedAt).toLocaleDateString()}</p>
-                  </div>
-                )}
-              </CardBody>
-              <CardActions>
-                {request.status === 'submitted' && (
-                  <>
-                    <Button variant="success" onClick={() => onApprove(request)}>Approve</Button>
-                    <Button variant="danger" onClick={() => onReject(request)}>Reject</Button>
-                  </>
-                )}
-                {request.status === 'approved' && (
-                  <>
-                    {!request.contractId ? (
-                      <Button onClick={() => navigate(`/contract-form/${request._id}`)} disabled={loading}>
-                        Create Contract
+        <div className="requests-sections">
+          {/* Waiting for Manager Section */}
+          {filteredPending.length > 0 && (
+            <div className="request-section">
+              <h3 className="section-title">⏳ Waiting for Manager</h3>
+              <div className="requests-grid">
+                {filteredPending.map((request) => (
+                  <Card key={request._id}>
+                    <CardHeader>
+                      <h3>Request #{request.requestId}</h3>
+                      <StatusBadge status={request.status} />
+                    </CardHeader>
+                    <CardBody>
+                      <div className="request-details">
+                        <div className="detail-row"><strong>Customer:</strong> {request.customerId?.name}</div>
+                        <div className="detail-row"><strong>Email:</strong> {request.customerId?.email}</div>
+                        <div className="detail-row"><strong>Phone:</strong> {request.moveDetails.phone}</div>
+                        <div className="detail-row"><strong>From:</strong> {request.moveDetails.fromAddress}</div>
+                        <div className="detail-row"><strong>To:</strong> {request.moveDetails.toAddress}</div>
+                        <div className="detail-row"><strong>Date:</strong> {new Date(request.moveDetails.moveDate).toLocaleDateString()}</div>
+                        <div className="detail-row"><strong>Service:</strong> {request.moveDetails.serviceType}</div>
+                        <div className="detail-row"><strong>Submitted:</strong> {new Date(request.createdAt).toLocaleDateString()}</div>
+                      </div>
+                    </CardBody>
+                    <CardActions>
+                      <Button variant="info" onClick={() => navigate(`/manager/requests/${request._id}/detail`)}>
+                        📋 View Details
                       </Button>
-                    ) : (
+                    </CardActions>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Waiting for Surveyor Section */}
+          {filteredUnderSurvey.length > 0 && (
+            <div className="request-section">
+              <h3 className="section-title">🔍 Waiting for Surveyor</h3>
+              <div className="requests-grid">
+                {filteredUnderSurvey.map((request) => (
+                  <Card key={request._id}>
+                    <CardHeader>
+                      <h3>Request #{request.requestId}</h3>
+                      <StatusBadge status={request.status} />
+                    </CardHeader>
+                    <CardBody>
+                      <div className="request-details">
+                        <div className="detail-row"><strong>Customer:</strong> {request.customerId?.name}</div>
+                        <div className="detail-row"><strong>Email:</strong> {request.customerId?.email}</div>
+                        <div className="detail-row"><strong>Phone:</strong> {request.moveDetails.phone}</div>
+                        <div className="detail-row"><strong>From:</strong> {request.moveDetails.fromAddress}</div>
+                        <div className="detail-row"><strong>To:</strong> {request.moveDetails.toAddress}</div>
+                        <div className="detail-row"><strong>Date:</strong> {new Date(request.moveDetails.moveDate).toLocaleDateString()}</div>
+                        <div className="detail-row"><strong>Service:</strong> {request.moveDetails.serviceType}</div>
+                        <div className="detail-row"><strong>Submitted:</strong> {new Date(request.createdAt).toLocaleDateString()}</div>
+                      </div>
+                    </CardBody>
+                    <CardActions>
+                      <Button variant="info" onClick={() => navigate(`/manager/requests/${request._id}/detail`)}>
+                        📋 View Details
+                      </Button>
+                    </CardActions>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Manager Approved Section */}
+          {filteredContractCreated.length > 0 && (
+            <div className="request-section">
+              <h3 className="section-title">✅ Manager Approved</h3>
+              <div className="requests-grid">
+                {filteredContractCreated.map((request) => (
+                  <Card key={request._id}>
+                    <CardHeader>
+                      <h3>Request #{request.requestId}</h3>
+                      <StatusBadge status={request.status} />
+                    </CardHeader>
+                    <CardBody>
+                      <div className="request-details">
+                        <div className="detail-row"><strong>Customer:</strong> {request.customerId?.name}</div>
+                        <div className="detail-row"><strong>Email:</strong> {request.customerId?.email}</div>
+                        <div className="detail-row"><strong>Phone:</strong> {request.moveDetails.phone}</div>
+                        <div className="detail-row"><strong>From:</strong> {request.moveDetails.fromAddress}</div>
+                        <div className="detail-row"><strong>To:</strong> {request.moveDetails.toAddress}</div>
+                        <div className="detail-row"><strong>Date:</strong> {new Date(request.moveDetails.moveDate).toLocaleDateString()}</div>
+                        <div className="detail-row"><strong>Service:</strong> {request.moveDetails.serviceType}</div>
+                        <div className="detail-row"><strong>Submitted:</strong> {new Date(request.createdAt).toLocaleDateString()}</div>
+                      </div>
+                    </CardBody>
+                    <CardActions>
+                      <Button variant="info" onClick={() => navigate(`/manager/requests/${request._id}/detail`)}>
+                        📋 View Details
+                      </Button>
                       <Button variant="secondary" onClick={() => onViewContract(request)}>
-                        View Details
+                        View Contract
                       </Button>
-                    )}
-                    <Button variant="info" onClick={() => onAssignStaff(request)}>
-                      Assign Staff
-                    </Button>
-                  </>
-                )}
-                {request.status === 'contract_created' && (
-                  <>
-                    <Button variant="warning" onClick={() => onCreateTasks(request)} disabled={loading}>
-                      Create Tasks
-                    </Button>
-                    <Button variant="secondary" onClick={() => onViewContract(request)}>
-                      View Contract
-                    </Button>
-                  </>
-                )}
-                {request.status === 'in_progress' && (
-                  <Button variant="secondary" onClick={() => onViewContract(request)}>
-                    View Tasks
-                  </Button>
-                )}
-              </CardActions>
-            </Card>
-          ))}
-        </div>
-      )}
+                    </CardActions>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {filteredRequests.length === 0 && !loading && (
-        <div className="empty-state">
-          <h3>No requests found</h3>
-          <p>No requests match your current filters.</p>
+          {/* Empty state */}
+          {filteredPending.length === 0 && filteredUnderSurvey.length === 0 && filteredContractCreated.length === 0 && !loading && (
+            <div className="empty-state">
+              <h3>No requests found</h3>
+              <p>No requests match your current filters.</p>
+            </div>
+          )}
         </div>
       )}
     </div>

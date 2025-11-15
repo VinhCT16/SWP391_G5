@@ -34,7 +34,7 @@ router.post("/register", async (req, res) => {
       name, 
       email: email.toLowerCase(), 
       password: hashed,
-      role,
+      role: "customer", // Force customer role for public registration
       phone: phone || null
     };
     
@@ -48,7 +48,15 @@ router.post("/register", async (req, res) => {
     };
     return res.status(201).json({ user: safeUser });
   } catch (err) {
-    return res.status(500).json({ message: "Server error" });
+    console.error("Registration error:", err);
+    // Return more specific error messages
+    if (err.name === 'ValidationError') {
+      return res.status(400).json({ message: err.message || "Validation error" });
+    }
+    if (err.code === 11000) {
+      return res.status(409).json({ message: "Email already in use" });
+    }
+    return res.status(500).json({ message: "Server error: " + (err.message || "Unknown error") });
   }
 });
 

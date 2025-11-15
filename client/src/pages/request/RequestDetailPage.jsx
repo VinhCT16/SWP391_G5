@@ -1,10 +1,13 @@
 // client/src/pages/request/RequestDetailPage.jsx - Chi tiết Request đầy đủ
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getRequest } from "../../api/requestApi";
+import { useAuth } from "../../context/AuthContext";
+import { getRequest, cancelRequest, updateRequestStatus } from "../../api/requestApi";
+import { createVNPayPayment } from "../../api/paymentApi";
 import { fmtDateTime24 } from "../../utils/datetime";
 import { fmtAddress } from "../../utils/address";
 import RouteMapLibre from "../../components/map/RouteMapLibre";
+import ApprovalModal from "../../components/dashboard/ApprovalModal";
 
 const getStatusLabel = (status) => {
   const statusMap = {
@@ -49,15 +52,22 @@ function toLatLng(geo) {
 export default function RequestDetailPage() {
   const { id } = useParams();
   const nav = useNavigate();
+  const { user } = useAuth();
   const [req, setReq] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [approvalActionType, setApprovalActionType] = useState('approve');
+  const [processing, setProcessing] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-      const r = await getRequest(id);
-      setReq(r);
+        const response = await getRequest(id);
+        // getRequest returns { request: {...} } or direct request object
+        const requestData = response.request || response;
+        setReq(requestData);
       } catch (e) {
         setError("Không tải được request");
         console.error("Request detail error:", e);
@@ -96,6 +106,29 @@ export default function RequestDetailPage() {
   const pickupLoc = toLatLng(req.pickupLocation || req.location);
   const deliveryLoc = toLatLng(req.deliveryLocation || req.location);
 
+  const handlePayment = async () => {
+    try {
+      if (!window.confirm(`Bạn có chắc chắn muốn thanh toán cho request này?`)) {
+        return;
+      }
+      
+      setPaying(true);
+      const response = await createVNPayPayment(req._id);
+      
+      if (response.paymentUrl) {
+        // Redirect to VNPay payment page
+        window.location.href = response.paymentUrl;
+      } else {
+        alert("❌ Không thể tạo link thanh toán. Vui lòng thử lại.");
+      }
+    } catch (err) {
+      console.error("Payment error:", err);
+      alert("❌ Lỗi khi tạo thanh toán: " + (err.message || "Vui lòng thử lại"));
+    } finally {
+      setPaying(false);
+    }
+  };
+
   return (
     <div style={{ padding: 24, maxWidth: 1000, margin: "auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
@@ -129,10 +162,10 @@ export default function RequestDetailPage() {
         <h2 style={{ marginTop: 0, marginBottom: 16 }}>Thông tin khách hàng</h2>
         <div style={{ display: "grid", gap: 12 }}>
           <div>
-            <strong>Họ và tên:</strong> {req.customerName}
+            <strong>Họ và tên:</strong> {req.customerName || "N/A"}
           </div>
           <div>
-            <strong>Số điện thoại:</strong> {req.customerPhone}
+            <strong>Số điện thoại:</strong> {req.customerPhone || req.moveDetails?.phone || "N/A"}
           </div>
         </div>
       </div>
@@ -144,7 +177,11 @@ export default function RequestDetailPage() {
           <div>
             <strong style={{ color: "#4caf50" }}>📍 Lấy hàng:</strong>
             <div style={{ marginTop: 4, padding: 8, background: "#fff", borderRadius: 4 }}>
-              {fmtAddress(req.pickupAddress || req.address)}
+              {req.pickupAddress 
+                ? fmtAddress(req.pickupAddress) 
+                : req.moveDetails?.fromAddress 
+                ? req.moveDetails.fromAddress 
+                : fmtAddress(req.address) || "N/A"}
             </div>
             {pickupLoc && (
               <div style={{ fontSize: "0.85em", color: "#666", marginTop: 4 }}>
@@ -155,7 +192,11 @@ export default function RequestDetailPage() {
           <div>
             <strong style={{ color: "#f44336" }}>🎯 Giao hàng:</strong>
             <div style={{ marginTop: 4, padding: 8, background: "#fff", borderRadius: 4 }}>
-              {fmtAddress(req.deliveryAddress || req.address)}
+              {req.deliveryAddress 
+                ? fmtAddress(req.deliveryAddress) 
+                : req.moveDetails?.toAddress 
+                ? req.moveDetails.toAddress 
+                : fmtAddress(req.address) || "N/A"}
             </div>
             {deliveryLoc && (
               <div style={{ fontSize: "0.85em", color: "#666", marginTop: 4 }}>
@@ -183,10 +224,14 @@ export default function RequestDetailPage() {
         <h2 style={{ marginTop: 0, marginBottom: 16 }}>Thông tin dịch vụ</h2>
         <div style={{ display: "grid", gap: 12 }}>
           <div>
-            <strong>Thời gian chuyển:</strong> {fmtDateTime24(req.movingTime)}
+            <strong>Thời gian chuyển:</strong> {fmtDateTime24(req.movingTime || req.moveDetails?.moveDate)}
           </div>
           <div>
-            <strong>Loại dịch vụ:</strong> {req.serviceType === "EXPRESS" ? "Hỏa tốc" : "Thường"}
+            <strong>Loại dịch vụ:</strong> {
+              req.serviceType === "EXPRESS" || req.moveDetails?.serviceType === "Long Distance" 
+                ? "Hỏa tốc" 
+                : req.moveDetails?.serviceType || "Thường"
+            }
           </div>
           {req.surveyFee && (
             <div>
@@ -196,23 +241,31 @@ export default function RequestDetailPage() {
         </div>
       </div>
 
-      {/* Đồ dùng (nếu có trong quoteInfo) */}
-      {quoteInfo?.items && quoteInfo.items.length > 0 && (
+      {/* Đồ dùng - Check both quoteInfo and request.items */}
+      {((quoteInfo?.items && quoteInfo.items.length > 0) || (req.items && req.items.length > 0)) && (
         <div style={{ marginBottom: 24, padding: 16, background: "#f5f5f5", borderRadius: 8 }}>
-          <h2 style={{ marginTop: 0, marginBottom: 16 }}>Đồ dùng ({quoteInfo.items.length} món)</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>
+            Đồ dùng ({(quoteInfo?.items?.length || req.items?.length || 0)} món)
+          </h2>
           <div style={{ display: "grid", gap: 8 }}>
-            {quoteInfo.items.map((item, idx) => (
+            {(req.items || quoteInfo?.items || []).map((item, idx) => (
               <div key={idx} style={{ padding: 12, background: "#fff", borderRadius: 6, border: "1px solid #ddd" }}>
-                <strong>{item.name}</strong>
+                <strong>{item.description || item.name || `Item ${idx + 1}`}</strong>
+                {item.quantity && <span> • Số lượng: {item.quantity}</span>}
+                {item.category && <span> • Loại: {item.category}</span>}
                 {item.weight && <span> • {item.weight}kg</span>}
+                {item.dimensions?.weight && <span> • {item.dimensions.weight}kg</span>}
                 {item.length && item.width && item.height && (
                   <span> • {item.length}×{item.width}×{item.height}cm</span>
                 )}
-                {item.isApartment && <span> • Nhà chung cư</span>}
-                {item.images && item.images.length > 0 && (
+                {item.dimensions?.length && item.dimensions.width && item.dimensions.height && (
+                  <span> • {item.dimensions.length}×{item.dimensions.width}×{item.dimensions.height}cm</span>
+                )}
+                {(item.isApartment || item.requiresSpecialHandling) && <span> • ⚠️ Cần xử lý đặc biệt</span>}
+                {(item.images && item.images.length > 0) && (
                   <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {item.images.map((img, imgIdx) => (
-                      <img key={imgIdx} src={img} alt={`${item.name} ${imgIdx + 1}`} style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 4, border: "1px solid #ddd" }} />
+                      <img key={imgIdx} src={img} alt={`${item.description || item.name} ${imgIdx + 1}`} style={{ width: 60, height: 60, objectFit: "cover", borderRadius: 4, border: "1px solid #ddd" }} />
                     ))}
                   </div>
                 )}
@@ -288,6 +341,43 @@ export default function RequestDetailPage() {
         </div>
       )}
 
+      {/* Payment Information */}
+      {req.paymentMethod && (
+        <div style={{ marginBottom: 24, padding: 16, background: "#f5f5f5", borderRadius: 8 }}>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>Thông tin thanh toán</h2>
+          <div style={{ display: "grid", gap: 12 }}>
+            <div>
+              <strong>Phương thức:</strong> {
+                req.paymentMethod === "online_banking" ? "🏦 Thanh toán online (VNPay)" : "💵 Thanh toán bằng tiền mặt"
+              }
+            </div>
+            <div>
+              <strong>Trạng thái thanh toán:</strong> {
+                req.paymentStatus === "deposit_paid" ? "✅ Đã thanh toán cọc" :
+                req.paymentStatus === "fully_paid" ? "✅ Đã thanh toán đủ" :
+                req.paymentStatus === "not_paid" ? "❌ Thanh toán thất bại" :
+                "⏳ Chờ thanh toán"
+              }
+            </div>
+            {req.depositPaid && req.depositPaidAt && (
+              <div>
+                <strong>Đã thanh toán cọc lúc:</strong> {new Date(req.depositPaidAt).toLocaleString("vi-VN")}
+              </div>
+            )}
+            {req.vnpayTransaction && (
+              <div style={{ padding: 12, background: "#fff", borderRadius: 6, marginTop: 8 }}>
+                <strong>Thông tin giao dịch VNPay:</strong>
+                <div style={{ marginTop: 8, fontSize: "0.9em" }}>
+                  <div>Mã giao dịch: {req.vnpayTransaction.transactionId}</div>
+                  <div>Số tiền: {req.vnpayTransaction.amount?.toLocaleString('vi-VN')} ₫</div>
+                  <div>Ngày thanh toán: {req.vnpayTransaction.paymentDate ? new Date(req.vnpayTransaction.paymentDate).toLocaleString("vi-VN") : "N/A"}</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Ghi chú */}
       {req.notes && !quoteInfo && (
         <div style={{ marginBottom: 24, padding: 16, background: "#f5f5f5", borderRadius: 8 }}>
@@ -314,28 +404,53 @@ export default function RequestDetailPage() {
             </div>
           )}
           <div>
-            <strong>Thời gian chuyển:</strong> {fmtDateTime24(req.movingTime)}
+            <strong>Thời gian chuyển:</strong> {fmtDateTime24(req.movingTime || req.moveDetails?.moveDate)}
           </div>
         </div>
       </div>
 
       {/* Hành động */}
-      <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
-        {["PENDING_CONFIRMATION", "PENDING_REVIEW"].includes(req.status) && (
+      <div style={{ display: "flex", gap: 12, marginTop: 24, flexWrap: "wrap" }}>
+        {/* Manager actions for PENDING requests */}
+        {user?.role === 'manager' && (req.status === 'PENDING' || req.status === 'submitted') && (
+          <>
+            <button
+              onClick={() => {
+                setApprovalActionType('approve');
+                setShowApprovalModal(true);
+              }}
+              style={{ ...btnStyle, background: "#4caf50" }}
+            >
+              ✅ Approve Request
+            </button>
+            <button
+              onClick={() => {
+                setApprovalActionType('reject');
+                setShowApprovalModal(true);
+              }}
+              style={{ ...btnStyle, background: "#f44336" }}
+            >
+              ❌ Deny Request
+            </button>
+          </>
+        )}
+        
+        {/* Customer actions */}
+        {user?.role === 'customer' && ["PENDING_CONFIRMATION", "PENDING_REVIEW"].includes(req.status) && (
           <button
             onClick={() => nav(`/requests/${id}/edit`)}
             style={{ ...btnStyle, background: "#2196f3" }}
           >
-            Sửa request
+            ✏️ Sửa request
           </button>
         )}
-        {["PENDING_CONFIRMATION", "UNDER_SURVEY", "WAITING_PAYMENT", "PENDING_REVIEW"].includes(req.status) && (
+        {user?.role === 'customer' && ["PENDING_CONFIRMATION", "UNDER_SURVEY", "WAITING_PAYMENT", "PENDING_REVIEW"].includes(req.status) && (
           <button
             onClick={async () => {
               if (!window.confirm("Bạn có chắc chắn muốn hủy request này không?")) return;
               try {
-                const { cancelRequest } = await import("../api/requestApi");
                 await cancelRequest(id);
+                alert("Đã hủy request thành công");
                 nav("/my-requests");
               } catch (err) {
                 alert("Lỗi khi hủy: " + (err.message || "Vui lòng thử lại"));
@@ -343,10 +458,59 @@ export default function RequestDetailPage() {
             }}
             style={{ ...btnStyle, background: "#f44336" }}
           >
-            Hủy request
+            🗑️ Hủy request
+          </button>
+        )}
+        {/* Payment button for online banking requests */}
+        {user?.role === 'customer' && 
+         (req.status === "WAITING_PAYMENT" || req.status === "UNDER_SURVEY" || req.status === "PENDING") && 
+         req.paymentMethod === "online_banking" && 
+         req.paymentStatus !== "deposit_paid" && 
+         req.paymentStatus !== "fully_paid" && (
+          <button
+            onClick={handlePayment}
+            disabled={paying}
+            style={{ 
+              ...btnStyle, 
+              background: paying ? "#ccc" : "#4caf50",
+              cursor: paying ? "not-allowed" : "pointer"
+            }}
+          >
+            {paying ? "Đang xử lý..." : "💳 Thanh toán VNPay"}
           </button>
         )}
       </div>
+
+      {/* Approval Modal for Managers */}
+      {user?.role === 'manager' && (
+        <ApprovalModal
+          isOpen={showApprovalModal}
+          onClose={() => {
+            setShowApprovalModal(false);
+            setProcessing(false);
+          }}
+          request={req}
+          actionType={approvalActionType}
+          loading={processing}
+          onApprove={async (requestId, approvalData) => {
+            try {
+              setProcessing(true);
+              await updateRequestStatus(requestId, approvalData);
+              const successMessage = approvalActionType === 'approve' 
+                ? 'Request approved successfully! Email with contract PDF has been sent to customer.'
+                : 'Request denied successfully! Email notification has been sent to customer.';
+              alert(successMessage);
+              setShowApprovalModal(false);
+              // Navigate back to manager dashboard
+              nav('/manager-dashboard');
+            } catch (err) {
+              alert('Error: ' + (err.message || `Failed to ${approvalActionType} request`));
+            } finally {
+              setProcessing(false);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -54,7 +54,9 @@ export default function EditRequestPage() {
   useEffect(() => {
     (async () => {
       try {
-        const data = await getRequest(id);
+        const response = await getRequest(id);
+        // getRequest returns { request: {...} }
+        const data = response.request || response;
         setForm({
           customerName: data.customerName || "",
           customerPhone: data.customerPhone || "",
@@ -62,7 +64,7 @@ export default function EditRequestPage() {
           pickupLocation: toLatLng(data.pickupLocation || data.location) || { lat: 21.0278, lng: 105.8342 },
           deliveryAddress: data.deliveryAddress || data.address || { province: null, district: null, ward: null, street: "" },
           deliveryLocation: toLatLng(data.deliveryLocation || data.location) || { lat: 21.0278, lng: 105.8342 },
-          movingTime: toInputLocal(data.movingTime),
+          movingTime: toInputLocal(data.movingTime || data.moveDetails?.moveDate),
           status: data.status
         });
       } catch (e) {

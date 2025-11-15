@@ -3,11 +3,106 @@ const Request = require("../models/Request");
 const Contract = require("../models/Contract");
 const Service = require("../models/Service");
 const User = require("../models/User");
+const Task = require("../models/Task");
+const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
+// Role-based assignment temporarily disabled
+// const { autoAssignStaffToTask } = require("../utils/staffAssignment");
 
 // Generate unique contract ID
 const generateContractId = () => {
   return `CONT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+};
+
+// Automatically create tasks when contract is approved
+const autoCreateTasksFromContract = async (requestId) => {
+  try {
+    console.log('🔄 [autoCreateTasksFromContract] Starting for requestId:', requestId);
+    
+    const request = await Request.findById(requestId);
+    if (!request) {
+      console.error('❌ [autoCreateTasksFromContract] Request not found:', requestId);
+      return;
+    }
+
+    // Check if request has a contract
+    if (!request.contractId) {
+      console.error('❌ [autoCreateTasksFromContract] Request has no contract:', requestId);
+      return;
+    }
+
+    // Check if tasks already exist for this request (excluding review tasks)
+    const existingTasks = await Task.find({ 
+      requestId: request._id,
+      taskType: { $ne: 'Review' } // Exclude review tasks
+    });
+    
+    if (existingTasks.length > 0) {
+      console.log('ℹ️ [autoCreateTasksFromContract] Tasks already exist for request:', requestId);
+      return;
+    }
+
+    // Create tasks: Packaging, Transporting, Unpackaging
+    // Order matters: Packaging → Transporting → Unpackaging (dependencies)
+    const tasksToCreate = [
+      {
+        requestId: request._id,
+        taskType: 'Packaging',
+        assignedStaff: null, // No assignment - staff will pick it
+        transporter: null,
+        status: 'waiting', // Initial status: waiting (maps to pending)
+        estimatedDuration: 4, // 4 hours for packaging
+        priority: 'high',
+        description: 'Pack items for moving',
+        deadline: request.moveDetails?.moveDate ? new Date(request.moveDetails.moveDate) : null
+      },
+      {
+        requestId: request._id,
+        taskType: 'Transporting',
+        assignedStaff: null, // No assignment - staff will pick it
+        transporter: null,
+        status: 'waiting', // Initial status: waiting (depends on Packaging)
+        estimatedDuration: 6, // 6 hours for transporting
+        priority: 'high',
+        description: 'Transport items from pickup to delivery location',
+        deadline: request.moveDetails?.moveDate ? new Date(request.moveDetails.moveDate) : null
+      },
+      {
+        requestId: request._id,
+        taskType: 'Unpackaging',
+        assignedStaff: null, // No assignment - staff will pick it
+        transporter: null,
+        status: 'waiting', // Initial status: waiting (depends on Transporting)
+        estimatedDuration: 3, // 3 hours for unpackaging
+        priority: 'medium',
+        description: 'Unpack items at delivery location',
+        deadline: request.moveDetails?.moveDate ? new Date(new Date(request.moveDetails.moveDate).getTime() + 24 * 60 * 60 * 1000) : null // 1 day after move date
+      }
+    ];
+
+    const createdTasks = await Task.insertMany(
+      tasksToCreate.map(taskData => ({
+        ...taskData,
+        taskHistory: [{
+          historyId: new mongoose.Types.ObjectId(),
+          status: taskData.status || 'waiting',
+          notes: 'Task created automatically when customer signed contract',
+          updatedAt: new Date()
+        }]
+      }))
+    );
+
+    console.log('✅ [autoCreateTasksFromContract] Tasks created:', {
+      requestId: request.requestId,
+      tasksCreated: createdTasks.length,
+      taskIds: createdTasks.map(t => t._id)
+    });
+
+    return createdTasks;
+  } catch (err) {
+    console.error('❌ [autoCreateTasksFromContract] Error:', err);
+    throw err;
+  }
 };
 
 // Helper function to automatically create contract from approved request
@@ -97,7 +192,8 @@ const autoCreateContractFromRequest = async (requestId, managerUserId) => {
         fromAddress: request.moveDetails.fromAddress,
         toAddress: request.moveDetails.toAddress,
         moveDate: request.moveDetails.moveDate,
-        serviceType: contractServiceType
+        serviceType: contractServiceType,
+        phone: request.moveDetails.phone || undefined
       },
       pricing: {
         basePrice: basePrice,
@@ -122,6 +218,8 @@ const autoCreateContractFromRequest = async (requestId, managerUserId) => {
         status: 'pending',
         notes: a.notes || ''
       })),
+      items: request.items || [], // Copy items from request
+      surveyFee: request.surveyFee || undefined, // Copy survey fee if exists
       status: 'pending_approval', // Contract needs manager approval
       approval: {
         approvedBy: null,
@@ -146,6 +244,9 @@ const autoCreateContractFromRequest = async (requestId, managerUserId) => {
     request.status = 'contract_created';
     await request.save();
     console.log('Request updated with contract reference');
+
+    // Tasks will be created automatically when contract is approved
+    // (not when contract is created)
 
     return contract;
   } catch (err) {
@@ -336,7 +437,8 @@ const createContractFromRequest = async (req, res) => {
         fromAddress: request.moveDetails.fromAddress,
         toAddress: request.moveDetails.toAddress,
         moveDate: request.moveDetails.moveDate,
-        serviceType: contractServiceType
+        serviceType: contractServiceType,
+        phone: request.moveDetails.phone || undefined
       },
       pricing: {
         basePrice: basePrice,
@@ -361,6 +463,8 @@ const createContractFromRequest = async (req, res) => {
         status: 'pending',
         notes: a.notes || ''
       })),
+      items: request.items || [], // Copy items from request
+      surveyFee: request.surveyFee || undefined, // Copy survey fee if exists
       status: 'approved',
       approval: {
         approvedBy: managerId,
@@ -507,6 +611,9 @@ const approveContract = async (req, res) => {
     };
 
     await contract.save();
+
+    // Note: Tasks are now created when customer signs the contract, not when manager approves
+    // Tasks will be created automatically in customerSignContract function
 
     // Populate contract details for response
     await contract.populate([
@@ -704,6 +811,57 @@ const getAllContracts = async (req, res) => {
 };
 
 // Get contract by ID
+// Public contract view (for email links - no auth required)
+const getContractByIdPublic = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { token, email } = req.query; // Optional token or email verification
+
+    console.log(`[getContractByIdPublic] Accessing contract ${id}, email: ${email || 'none'}`);
+
+    const contract = await Contract.findById(id)
+      .populate('customerId', 'name email phone role')
+      .populate('managerId', 'name email phone role')
+      .populate('serviceId', 'name price')
+      .populate('assignedStaff.staffId', 'name email phone role')
+      .populate('requestId');
+
+    if (!contract) {
+      console.log(`[getContractByIdPublic] Contract ${id} not found`);
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    console.log(`[getContractByIdPublic] Contract found, status: ${contract.status}`);
+
+    // Only allow public access to approved contracts
+    // Also allow access to contracts that are pending_approval (just created)
+    if (contract.status !== 'approved' && contract.status !== 'pending_approval') {
+      console.log(`[getContractByIdPublic] Contract ${id} status is ${contract.status}, access denied`);
+      return res.status(403).json({ 
+        message: `Contract is ${contract.status}. Only approved contracts can be viewed publicly.` 
+      });
+    }
+
+    // If email is provided, verify it matches the contract's customer email
+    if (email && contract.customerId?.email) {
+      const emailMatch = email.toLowerCase() === contract.customerId.email.toLowerCase();
+      console.log(`[getContractByIdPublic] Email verification: ${emailMatch ? 'match' : 'no match'}`);
+      if (!emailMatch) {
+        return res.status(403).json({ message: "Access denied: Email does not match contract customer" });
+      }
+    }
+
+    // If token is provided, verify it (optional - can implement token generation later)
+    // For now, just allow access to approved contracts
+
+    console.log(`[getContractByIdPublic] Contract ${id} access granted`);
+    res.json({ contract });
+  } catch (err) {
+    console.error("[getContractByIdPublic] Error fetching contract:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 const getContractById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1226,6 +1384,15 @@ const customerSignContract = async (req, res) => {
 
     await contract.save();
 
+    // Automatically create tasks after customer signs contract
+    try {
+      await autoCreateTasksFromContract(contract.requestId);
+      console.log('✅ [customerSignContract] Tasks created automatically after customer signed contract:', contract._id);
+    } catch (taskErr) {
+      console.error('❌ [customerSignContract] Error creating tasks:', taskErr);
+      // Continue even if task creation fails - don't block contract signing
+    }
+
     // Populate contract details
     await contract.populate([
       { path: 'customerId', select: 'name email phone role' },
@@ -1243,11 +1410,168 @@ const customerSignContract = async (req, res) => {
   }
 };
 
+// OLD FUNCTION - REMOVED - Use the one at the top of the file instead
+// This old function is kept for reference but should not be used
+const _old_autoCreateTasksFromContract = async (requestId, contract) => {
+  try {
+    console.log('🔄 [autoCreateTasksFromContract] Starting for requestId:', requestId);
+
+    // Find the request
+    const request = await Request.findById(requestId);
+    if (!request) {
+      throw new Error("Request not found");
+    }
+
+    // Check if tasks already exist for this request
+    const existingTasks = await Task.find({ requestId: request._id });
+    if (existingTasks.length > 0) {
+      console.log('ℹ️ [autoCreateTasksFromContract] Tasks already exist for this request, skipping');
+      return existingTasks;
+    }
+
+    // Calculate move date for deadlines
+    const moveDate = contract.moveDetails?.moveDate || request.moveDetails?.moveDate || new Date();
+    const moveDateObj = new Date(moveDate);
+
+    // Define tasks to create with their configurations (simplified: only packing and transporting)
+    const taskConfigs = [
+      {
+        taskType: 'packing',
+        estimatedDuration: 2,
+        priority: 'high',
+        description: 'Pack items for moving',
+        deadlineOffset: -1, // 1 day before move
+      },
+      {
+        taskType: 'transporting',
+        estimatedDuration: 3,
+        priority: 'high',
+        description: 'Transport items to destination',
+        deadlineOffset: 0, // On move date
+      }
+    ];
+
+    const createdTasks = [];
+    const assignedStaffIds = new Set(); // Track assigned staff to avoid duplicate assignments
+
+    // Create and assign each task
+    for (const config of taskConfigs) {
+      try {
+        // Calculate deadline
+        const deadline = new Date(moveDateObj);
+        deadline.setDate(deadline.getDate() + config.deadlineOffset);
+        deadline.setHours(17, 0, 0, 0); // Set to 5 PM
+
+        // Find and assign any available staff (no role filtering for now)
+        // Find any active staff with availability
+        let availableStaff = await User.find({
+          role: 'staff',
+          isActive: true,
+          'availability.isAvailable': true,
+          _id: { $nin: Array.from(assignedStaffIds) }
+        })
+        .select('name email phone employeeId currentTasks')
+        .lean();
+
+        // If no staff with availability, try any active staff
+        if (availableStaff.length === 0) {
+          availableStaff = await User.find({
+            role: 'staff',
+            isActive: true,
+            _id: { $nin: Array.from(assignedStaffIds) }
+          })
+          .select('name email phone employeeId currentTasks')
+          .lean();
+        }
+
+        // Calculate task load for each staff
+        const staffWithLoad = await Promise.all(
+          availableStaff.map(async (staff) => {
+            const activeTaskCount = await Task.countDocuments({
+              $or: [
+                { assignedStaff: staff._id },
+                { transporter: staff._id }
+              ],
+              status: { $nin: ['completed', 'cancelled'] }
+            });
+            return {
+              ...staff,
+              currentTaskCount: activeTaskCount
+            };
+          })
+        );
+
+        // Sort by task count and pick the first one
+        staffWithLoad.sort((a, b) => a.currentTaskCount - b.currentTaskCount);
+        const selectedStaff = staffWithLoad.length > 0 ? staffWithLoad[0] : null;
+
+        if (!selectedStaff) {
+          console.warn(`⚠️ [autoCreateTasksFromContract] No available staff found for ${config.taskType}, creating task without assignment`);
+        } else {
+          assignedStaffIds.add(selectedStaff._id.toString());
+        }
+
+        // Create task
+        const taskData = {
+          requestId: request._id,
+          taskType: config.taskType,
+          assignedStaff: selectedStaff ? selectedStaff._id : null,
+          transporter: config.taskType === 'transporting' && selectedStaff ? selectedStaff._id : null, // For transporting tasks, also set transporter field
+          status: selectedStaff ? 'assigned' : 'pending',
+          estimatedDuration: config.estimatedDuration,
+          priority: config.priority,
+          description: config.description,
+          deadline: deadline,
+          taskHistory: [{
+            historyId: new mongoose.Types.ObjectId(),
+            status: selectedStaff ? 'assigned' : 'pending',
+            notes: selectedStaff 
+              ? `Auto-assigned to staff (${selectedStaff.name})`
+              : 'Created automatically, awaiting staff assignment',
+            updatedAt: new Date()
+          }]
+        };
+
+        const task = await Task.create(taskData);
+        createdTasks.push(task);
+
+        // Update staff's current tasks if assigned
+        if (selectedStaff) {
+          await User.findByIdAndUpdate(selectedStaff._id, {
+            $addToSet: { currentTasks: request._id }
+          });
+          console.log(`✅ [autoCreateTasksFromContract] ${config.taskType} task assigned to ${selectedStaff.name}`);
+        } else {
+          console.log(`⚠️ [autoCreateTasksFromContract] ${config.taskType} task created but not assigned`);
+        }
+      } catch (taskErr) {
+        console.error(`❌ [autoCreateTasksFromContract] Error creating ${config.taskType} task:`, taskErr);
+        // Continue with other tasks even if one fails
+      }
+    }
+
+    // Update request status to in_progress if tasks were created
+    if (createdTasks.length > 0) {
+      request.status = 'in_progress';
+      await request.save();
+      console.log('✅ [autoCreateTasksFromContract] Request status updated to in_progress');
+    }
+
+    console.log(`✅ [autoCreateTasksFromContract] Created ${createdTasks.length} tasks for request ${requestId}`);
+    return createdTasks;
+  } catch (err) {
+    console.error('❌ [autoCreateTasksFromContract] Error:', err);
+    throw err;
+  }
+};
+
 module.exports = {
+  autoCreateTasksFromContract,
   createContractFromRequest,
   autoCreateContractFromRequest,
   getContractsForApproval,
   approveContract,
+  getContractByIdPublic,
   rejectContract,
   getCustomerContracts,
   getContractProgress,

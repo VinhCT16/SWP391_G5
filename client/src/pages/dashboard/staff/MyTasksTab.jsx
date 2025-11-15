@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Card, { CardHeader, CardBody, CardActions } from '../../../components/shared/Card';
 import StatusBadge from '../../../components/shared/StatusBadge';
 import Button from '../../../components/shared/Button';
 
 export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateStatus, onViewDetails }) {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState({
     status: '',
     taskType: '',
@@ -28,16 +30,41 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
 
   const getTaskTypeIcon = (taskType) => {
     switch (taskType) {
-      case 'packing': return '📦';
-      case 'loading': return '⬆️';
-      case 'transporting': return '🚚';
-      case 'unloading': return '⬇️';
-      case 'unpacking': return '📋';
+      case 'Review': return '🔍';
+      case 'Packaging': return '📦';
+      case 'Unpackaging': return '📋';
+      case 'Transporting': return '🚚';
       default: return '📝';
     }
   };
 
-  const filteredTasks = tasks.filter(task => {
+  const handleReviewItems = (task) => {
+    // Navigate to QuoteItemsPage with request data
+    // task.requestId is the request's _id (MongoDB ObjectId)
+    const requestData = {
+      requestId: task.requestId || task.request?._id || task._id,
+      requestNumber: task.requestNumber || task.request?.requestId,
+      customerName: task.customer?.name || task.request?.customerName,
+      customerPhone: task.customer?.phone || task.request?.customerPhone,
+      pickupAddress: task.moveDetails?.fromAddress || task.request?.moveDetails?.fromAddress,
+      deliveryAddress: task.moveDetails?.toAddress || task.request?.moveDetails?.toAddress,
+      movingTime: task.moveDetails?.moveDate || task.request?.moveDetails?.moveDate,
+      serviceType: task.moveDetails?.serviceType || task.request?.moveDetails?.serviceType,
+      paymentMethod: task.request?.paymentMethod || task.requestId?.paymentMethod,
+      depositPaid: task.request?.depositPaid || task.requestId?.depositPaid || false,
+      taskId: task.taskId || task._id, // Use taskId or _id for the task
+      isStaffReview: true // Flag to indicate this is a staff review
+    };
+    
+    navigate('/quote/items', { state: requestData });
+  };
+
+  // Filter to show only assigned tasks (exclude completed and cancelled)
+  const assignedTasks = tasks.filter(task => {
+    return task.status !== 'completed' && task.status !== 'cancelled';
+  });
+
+  const filteredTasks = assignedTasks.filter(task => {
     const matchesStatus = !filters.status || task.status === filters.status;
     const matchesType = !filters.taskType || task.taskType === filters.taskType;
     const matchesPriority = !filters.priority || (task.priority && task.priority === filters.priority);
@@ -88,8 +115,7 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
             <option value="assigned">Assigned</option>
             <option value="in-progress">In Progress</option>
             <option value="blocked">Blocked</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="overdue">Overdue</option>
           </select>
           <select 
             value={filters.taskType} 
@@ -97,11 +123,10 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
             className="filter-select"
           >
             <option value="">All Types</option>
-            <option value="packing">Packing</option>
-            <option value="loading">Loading</option>
-            <option value="transporting">Transporting</option>
-            <option value="unloading">Unloading</option>
-            <option value="unpacking">Unpacking</option>
+            <option value="Review">Review</option>
+            <option value="Packaging">Packaging</option>
+            <option value="Unpackaging">Unpackaging</option>
+            <option value="Transporting">Transporting</option>
           </select>
           <select
             value={filters.priority}
@@ -145,14 +170,36 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
               </CardHeader>
               <CardBody>
                 <div className="task-details">
-                  <div className="detail-row"><strong>Request #:</strong> {task.requestNumber}</div>
-                  <div className="detail-row"><strong>Customer:</strong> {task.customer?.name}</div>
-                  <div className="detail-row"><strong>Email:</strong> {task.customer?.email}</div>
-                  <div className="detail-row"><strong>Phone:</strong> {task.customer?.phone}</div>
-                  <div className="detail-row"><strong>From:</strong> {task.moveDetails?.fromAddress}</div>
-                  <div className="detail-row"><strong>To:</strong> {task.moveDetails?.toAddress}</div>
-                  <div className="detail-row"><strong>Move Date:</strong> {task.moveDetails?.moveDate ? new Date(task.moveDetails.moveDate).toLocaleDateString() : 'N/A'}</div>
-                  <div className="detail-row"><strong>Duration:</strong> {task.estimatedDuration} hours</div>
+                  <div className="detail-row">
+                    <strong>Request #:</strong> {task.requestNumber || task.requestId || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Customer:</strong> {task.customer?.name || task.request?.customerName || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Email:</strong> {task.customer?.email || task.request?.customerEmail || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Phone:</strong> {task.customer?.phone || task.request?.customerPhone || task.moveDetails?.phone || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>From:</strong> {task.moveDetails?.fromAddress || task.request?.moveDetails?.fromAddress || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>To:</strong> {task.moveDetails?.toAddress || task.request?.moveDetails?.toAddress || 'N/A'}
+                  </div>
+                  <div className="detail-row">
+                    <strong>Move Date:</strong> {
+                      task.moveDetails?.moveDate 
+                        ? new Date(task.moveDetails.moveDate).toLocaleDateString() 
+                        : task.request?.moveDetails?.moveDate
+                        ? new Date(task.request.moveDetails.moveDate).toLocaleDateString()
+                        : 'N/A'
+                    }
+                  </div>
+                  <div className="detail-row">
+                    <strong>Duration:</strong> {task.estimatedDuration ? `${task.estimatedDuration} hours` : 'N/A'}
+                  </div>
                   {task.isTransporter && (
                     <div className="detail-row">
                       <strong>Role:</strong> <span className="role-badge">Transporter</span>
@@ -161,24 +208,19 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
                 </div>
               </CardBody>
               <CardActions>
-                {task.status === 'pending' && (
-                  <Button variant="success" onClick={() => onUpdateStatus(task, 'in-progress')}>
-                    Start Task
-                  </Button>
-                )}
-                {task.status === 'assigned' && (
-                  <Button variant="success" onClick={() => onUpdateStatus(task, 'in-progress')}>
-                    Start Task
-                  </Button>
-                )}
-                {task.status === 'in-progress' && (
-                  <Button variant="info" onClick={() => onUpdateStatus(task, 'completed')}>
-                    Done
+                {/* Special button for review tasks */}
+                {task.taskType === 'Review' && (
+                  <Button 
+                    variant="primary" 
+                    onClick={() => handleReviewItems(task)}
+                    style={{ background: '#2196f3', color: 'white' }}
+                  >
+                    📋 List Items
                   </Button>
                 )}
                 {(task.status !== 'completed' && task.status !== 'cancelled') && (
-                  <Button variant="warning" onClick={() => onUpdateStatus(task, 'blocked')}>
-                    Blocked
+                  <Button variant="info" onClick={() => onUpdateStatus(task)}>
+                    🔄 Update Task Status
                   </Button>
                 )}
                 <Button variant="secondary" onClick={() => onViewDetails(task)}>

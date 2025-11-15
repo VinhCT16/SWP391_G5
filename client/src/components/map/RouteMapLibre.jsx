@@ -25,7 +25,7 @@ export default function RouteMapLibre({ routeGeojson, height = 320, pickup, deli
       sources: {
         "osm-tiles": {
           type: "raster",
-          tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+          tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png?"],
           tileSize: 256,
           attribution: "© OpenStreetMap contributors",
         },
