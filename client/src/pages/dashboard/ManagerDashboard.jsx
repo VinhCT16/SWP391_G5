@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getAllRequests, updateRequestStatus, getAvailableStaffForRequest, assignStaffToRequest } from '../../api/requestApi';
-import { createTasksFromContract } from '../../api/taskApi';
 import { getContractsForApproval, approveContract, rejectContract } from '../../api/contractApi';
 import ManagerDashboardTabs from './manager/ManagerDashboardTabs';
 import ApprovalModal from '../../components/dashboard/ApprovalModal';
@@ -75,31 +74,6 @@ export default function ManagerDashboard() {
     }
   };
 
-  const handleCreateTasks = async (request) => {
-    try {
-      setLoading(true);
-      const tasksData = {
-        tasks: [
-          { taskType: 'packing', estimatedDuration: 2 },
-          { taskType: 'loading', estimatedDuration: 1 },
-          { taskType: 'transporting', estimatedDuration: 3 },
-          { taskType: 'unloading', estimatedDuration: 1 },
-          { taskType: 'unpacking', estimatedDuration: 2 }
-        ]
-      };
-      await createTasksFromContract(request._id, tasksData);
-      await loadRequests();
-      alert('Tasks created successfully!');
-    } catch (err) {
-      console.error('Error creating tasks:', err);
-      // Handle both axios errors and fetch errors
-      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to create tasks';
-      setError(errorMessage);
-      alert(`Error: ${errorMessage}`);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleContractApproval = async (contractId, notes) => {
     try {
@@ -254,10 +228,9 @@ export default function ManagerDashboard() {
             setShowApprovalModal(true);
           }}
           onAssignStaff={openAssignStaffModal}
-          onCreateTasks={handleCreateTasks}
           onViewContract={openContractDetail}
           onView={(contract) => {
-            window.location.href = `/contracts/${contract._id}`;
+            navigate(`/contracts/${contract._id}`);
           }}
           onApproveContract={(contract) => {
             const notes = prompt('Enter approval notes (optional):');

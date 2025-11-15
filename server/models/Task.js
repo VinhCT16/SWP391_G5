@@ -39,7 +39,7 @@ const taskSchema = new mongoose.Schema(
     // Task Type
     taskType: {
       type: String,
-      enum: ["packing", "transporting", "review"], // Temporarily simplified: only packing and transporting (review kept for existing review tasks)
+      enum: ["Review", "Packaging", "Unpackaging", "Transporting"], // Updated task types
       required: true
     },
     
@@ -57,9 +57,10 @@ const taskSchema = new mongoose.Schema(
     },
     
     // Status
+    // Note: "waiting" maps to "pending", "ongoing" maps to "in-progress", "done" maps to "completed"
     status: {
       type: String,
-      enum: ["pending", "assigned", "in-progress", "blocked", "overdue", "completed", "cancelled"],
+      enum: ["pending", "assigned", "in-progress", "blocked", "overdue", "completed", "cancelled", "waiting", "ongoing", "done"],
       default: "pending",
       index: true
     },

@@ -30,12 +30,10 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
 
   const getTaskTypeIcon = (taskType) => {
     switch (taskType) {
-      case 'packing': return '📦';
-      case 'loading': return '⬆️';
-      case 'transporting': return '🚚';
-      case 'unloading': return '⬇️';
-      case 'unpacking': return '📋';
-      case 'review': return '🔍';
+      case 'Review': return '🔍';
+      case 'Packaging': return '📦';
+      case 'Unpackaging': return '📋';
+      case 'Transporting': return '🚚';
       default: return '📝';
     }
   };
@@ -52,6 +50,8 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
       deliveryAddress: task.moveDetails?.toAddress || task.request?.moveDetails?.toAddress,
       movingTime: task.moveDetails?.moveDate || task.request?.moveDetails?.moveDate,
       serviceType: task.moveDetails?.serviceType || task.request?.moveDetails?.serviceType,
+      paymentMethod: task.request?.paymentMethod || task.requestId?.paymentMethod,
+      depositPaid: task.request?.depositPaid || task.requestId?.depositPaid || false,
       taskId: task.taskId || task._id, // Use taskId or _id for the task
       isStaffReview: true // Flag to indicate this is a staff review
     };
@@ -59,7 +59,12 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
     navigate('/quote/items', { state: requestData });
   };
 
-  const filteredTasks = tasks.filter(task => {
+  // Filter to show only assigned tasks (exclude completed and cancelled)
+  const assignedTasks = tasks.filter(task => {
+    return task.status !== 'completed' && task.status !== 'cancelled';
+  });
+
+  const filteredTasks = assignedTasks.filter(task => {
     const matchesStatus = !filters.status || task.status === filters.status;
     const matchesType = !filters.taskType || task.taskType === filters.taskType;
     const matchesPriority = !filters.priority || (task.priority && task.priority === filters.priority);
@@ -110,8 +115,7 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
             <option value="assigned">Assigned</option>
             <option value="in-progress">In Progress</option>
             <option value="blocked">Blocked</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="overdue">Overdue</option>
           </select>
           <select 
             value={filters.taskType} 
@@ -119,12 +123,10 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
             className="filter-select"
           >
             <option value="">All Types</option>
-            <option value="packing">Packing</option>
-            <option value="loading">Loading</option>
-            <option value="transporting">Transporting</option>
-            <option value="unloading">Unloading</option>
-            <option value="unpacking">Unpacking</option>
-            <option value="review">Review</option>
+            <option value="Review">Review</option>
+            <option value="Packaging">Packaging</option>
+            <option value="Unpackaging">Unpackaging</option>
+            <option value="Transporting">Transporting</option>
           </select>
           <select
             value={filters.priority}
@@ -207,7 +209,7 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
               </CardBody>
               <CardActions>
                 {/* Special button for review tasks */}
-                {task.taskType === 'review' && (
+                {task.taskType === 'Review' && (
                   <Button 
                     variant="primary" 
                     onClick={() => handleReviewItems(task)}
@@ -216,24 +218,9 @@ export default function MyTasksTab({ tasks, loading, error, onRefresh, onUpdateS
                     📋 List Items
                   </Button>
                 )}
-                {task.status === 'pending' && (
-                  <Button variant="success" onClick={() => onUpdateStatus(task, 'in-progress')}>
-                    Start Task
-                  </Button>
-                )}
-                {task.status === 'assigned' && (
-                  <Button variant="success" onClick={() => onUpdateStatus(task, 'in-progress')}>
-                    Start Task
-                  </Button>
-                )}
-                {task.status === 'in-progress' && (
-                  <Button variant="info" onClick={() => onUpdateStatus(task, 'completed')}>
-                    Done
-                  </Button>
-                )}
                 {(task.status !== 'completed' && task.status !== 'cancelled') && (
-                  <Button variant="warning" onClick={() => onUpdateStatus(task, 'blocked')}>
-                    Blocked
+                  <Button variant="info" onClick={() => onUpdateStatus(task)}>
+                    🔄 Update Task Status
                   </Button>
                 )}
                 <Button variant="secondary" onClick={() => onViewDetails(task)}>

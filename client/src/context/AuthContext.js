@@ -53,10 +53,10 @@ export const AuthProvider = ({ children }) => {
       setUser(response.data.user);
       return { success: true };
     } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Registration failed' 
-      };
+      const errorMessage = error.response?.data?.message || error.message || 'Registration failed';
+      console.error('Registration error:', errorMessage);
+      // Throw error so it can be caught by try-catch in components
+      throw new Error(errorMessage);
     }
   };
 

@@ -2,9 +2,12 @@
 const Request = require("../models/Request");
 const Task = require("../models/Task");
 const User = require("../models/User");
+const Contract = require("../models/Contract");
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 const { autoCreateContractFromRequest } = require("./contractController");
+const { sendApprovalEmail, sendRejectionEmail } = require("../utils/emailService");
+const { generateContractPDFBuffer } = require("../utils/pdfGenerator");
 // Role-based assignment temporarily disabled
 // const { autoAssignStaffToTask } = require("../utils/staffAssignment");
 
@@ -210,7 +213,8 @@ const createRequest = async (req, res) => {
         serviceType,
         notes,
         status,
-        surveyFee
+        surveyFee,
+        paymentMethod
       } = formData;
 
       // Validate required fields
@@ -323,7 +327,9 @@ const createRequest = async (req, res) => {
           additionalServices: [],
           totalPrice: 0
         },
-        status: status || 'submitted'
+        status: status || 'submitted',
+        paymentMethod: paymentMethod || 'cash',
+        paymentStatus: 'pending'
       };
 
       // Add surveyFee if provided
@@ -645,16 +651,74 @@ const updateRequestStatus = async (req, res) => {
 
     await request.save();
     
+    // Get customer email for sending notifications
+    const customer = await User.findById(request.customerId).select('email name');
+    const customerEmail = customer?.email;
+    const customerName = customer?.name || request.customerName || 'Customer';
+    
     // Automatically create contract when request is approved
     if (status === 'approved') {
       try {
         console.log('Request approved, automatically creating contract...');
         const contract = await autoCreateContractFromRequest(request._id, managerId);
         console.log('Contract created automatically:', contract._id);
+        
+        // Populate contract with request data for PDF generation
+        const populatedContract = await Contract.findById(contract._id)
+          .populate('customerId', 'name email phone')
+          .populate('managerId', 'name email phone')
+          .populate({
+            path: 'requestId',
+            select: 'requestId customerId customerName customerPhone moveDetails contractId status createdAt items'
+          });
+        
+        // Ensure request items are available
+        if (populatedContract.requestId && !populatedContract.requestId.items) {
+          const requestWithItems = await Request.findById(populatedContract.requestId._id).select('items');
+          if (requestWithItems) {
+            populatedContract.requestId.items = requestWithItems.items;
+          }
+        }
+        
+        // Generate PDF with items list
+        let pdfBuffer;
+        try {
+          pdfBuffer = await generateContractPDFBuffer(populatedContract);
+          console.log('✅ PDF generated successfully');
+        } catch (pdfErr) {
+          console.error('❌ Error generating PDF:', pdfErr);
+          pdfBuffer = null; // Continue without PDF if generation fails
+        }
+        
+        // Send approval email with PDF attachment
+        if (customerEmail) {
+          try {
+            await sendApprovalEmail(customerEmail, customerName, request, populatedContract, pdfBuffer);
+            console.log('✅ Approval email sent successfully');
+          } catch (emailErr) {
+            console.error('❌ Error sending approval email:', emailErr);
+            // Don't fail the approval if email fails
+          }
+        } else {
+          console.warn('⚠️ Customer email not found, skipping email notification');
+        }
       } catch (contractErr) {
         // Log error but don't fail the request approval
         console.error('Error automatically creating contract:', contractErr);
         // Contract creation can be done manually later if automatic creation fails
+      }
+    } else if (status === 'rejected' || status === 'denied') {
+      // Send rejection email
+      if (customerEmail) {
+        try {
+          await sendRejectionEmail(customerEmail, customerName, request, rejectionReason || 'No specific reason provided.');
+          console.log('✅ Rejection email sent successfully');
+        } catch (emailErr) {
+          console.error('❌ Error sending rejection email:', emailErr);
+          // Don't fail the rejection if email fails
+        }
+      } else {
+        console.warn('⚠️ Customer email not found, skipping email notification');
       }
     }
     
@@ -791,102 +855,41 @@ const autoAssignReviewTask = async (requestId) => {
     // Check if review task already exists
     const existingReviewTask = await Task.findOne({ 
       requestId: request._id, 
-      taskType: 'review' 
+      taskType: 'Review' 
     });
     if (existingReviewTask) {
       console.log("ℹ️ [autoAssignReviewTask] Review task already exists for request:", requestId, "Task ID:", existingReviewTask._id);
       return;
     }
 
-    // Find any available staff (no role filtering - temporarily disabled)
-    // Find any active staff with availability
-    let availableStaff = await User.find({
-      role: 'staff',
-      isActive: true,
-      'availability.isAvailable': true
-    })
-    .select('name email phone employeeId currentTasks')
-    .lean();
-
-    // If no staff with availability, try any active staff
-    if (availableStaff.length === 0) {
-      availableStaff = await User.find({
-        role: 'staff',
-        isActive: true
-      })
-      .select('name email phone employeeId currentTasks')
-      .lean();
-    }
-
-    // If still no staff found, silently return (warning disabled)
-    if (availableStaff.length === 0) {
-      // Warning temporarily disabled
-      // console.warn("⚠️ [autoAssignReviewTask] No available staff found for review task, request:", requestId);
-      return;
-    }
-
-    // Calculate task load for each staff
-    const staffWithLoad = await Promise.all(
-      availableStaff.map(async (staff) => {
-        const activeTaskCount = await Task.countDocuments({
-          $or: [
-            { assignedStaff: staff._id },
-            { transporter: staff._id }
-          ],
-          status: { $nin: ['completed', 'cancelled'] }
-        });
-        return {
-          ...staff,
-          currentTaskCount: activeTaskCount
-        };
-      })
-    );
-
-    // Sort by task count and pick the first one
-    staffWithLoad.sort((a, b) => a.currentTaskCount - b.currentTaskCount);
-    const selectedStaff = staffWithLoad[0];
-
-    console.log("✅ [autoAssignReviewTask] Selected staff:", {
-      staffId: selectedStaff._id,
-      name: selectedStaff.name,
-      currentTaskCount: selectedStaff.currentTaskCount
-    });
-
-    // Create review task using Task model
+    // Create review task using Task model (without assignment - staff will pick it)
     const reviewTask = await Task.create({
       requestId: request._id,
-      taskType: 'review',
-      assignedStaff: selectedStaff._id,
-      status: 'assigned',
+      taskType: 'Review',
+      assignedStaff: null, // No assignment - staff will pick it
+      status: 'pending', // Pending until staff picks it
       estimatedDuration: 2, // 2 hours for review
       priority: 'high',
       description: 'Review and list items for customer request',
       deadline: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
       taskHistory: [{
         historyId: new mongoose.Types.ObjectId(),
-        status: 'assigned',
-        notes: `Auto-assigned to staff (${selectedStaff.name}) for survey request`,
+        status: 'pending',
+        notes: 'Review task created automatically for survey request',
         updatedAt: new Date()
       }]
     });
 
-    console.log("✅ [autoAssignReviewTask] Task created:", {
+    console.log("✅ [autoAssignReviewTask] Review task created (not assigned):", {
       taskId: reviewTask._id,
       requestId: reviewTask.requestId,
-      assignedStaff: reviewTask.assignedStaff
+      status: reviewTask.status
     });
 
-    // Update staff's current tasks
-    await User.findByIdAndUpdate(selectedStaff._id, {
-      $addToSet: { currentTasks: request._id }
-    });
-
-    console.log("✅ [autoAssignReviewTask] Review task created and assigned successfully:", {
+    console.log("✅ [autoAssignReviewTask] Review task created successfully (available for staff to pick):", {
       requestId: request.requestId,
       requestObjectId: request._id,
-      taskId: reviewTask._id,
-      staffId: selectedStaff._id,
-      staffName: selectedStaff.name
+      taskId: reviewTask._id
     });
   } catch (err) {
     console.error("❌ [autoAssignReviewTask] Error:", err);
@@ -895,11 +898,11 @@ const autoAssignReviewTask = async (requestId) => {
   }
 };
 
-// Update request items (for staff review tasks)
+    // Update request items (for staff review tasks)
 const updateRequestItems = async (req, res) => {
   try {
     const { id } = req.params;
-    const { items, taskId } = req.body;
+    const { items, taskId, depositPaid } = req.body;
     const staffId = req.userId;
 
     // Find the request
@@ -912,7 +915,7 @@ const updateRequestItems = async (req, res) => {
     const reviewTask = await Task.findOne({
       _id: taskId,
       requestId: request._id,
-      taskType: 'review'
+      taskType: 'Review'
     });
 
     if (!reviewTask) {
@@ -947,13 +950,23 @@ const updateRequestItems = async (req, res) => {
     // Update request items
     request.items = requestItems;
 
+    // Handle deposit payment if provided (for cash payments)
+    if (depositPaid !== undefined && request.paymentMethod === 'cash') {
+      request.depositPaid = depositPaid;
+      if (depositPaid) {
+        request.depositPaidAt = new Date();
+        request.depositPaidBy = staffId;
+        request.paymentStatus = 'deposit_paid';
+      }
+    }
+
     // Update task status to in-progress if it's still assigned
     if (reviewTask.status === 'assigned') {
       reviewTask.status = 'in-progress';
       reviewTask.taskHistory.push({
         historyId: new mongoose.Types.ObjectId(),
         status: 'in-progress',
-        notes: 'Started reviewing items',
+        notes: depositPaid ? 'Started reviewing items and marked deposit as paid' : 'Started reviewing items',
         updatedBy: staffId,
         updatedAt: new Date()
       });

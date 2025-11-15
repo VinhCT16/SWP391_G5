@@ -11,7 +11,6 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState('customer');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -37,10 +36,10 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      await register({ name, email, password, phone, role });
+      await register({ name, email, password, phone, role: 'customer' });
       navigate('/login');
     } catch (err) {
-      setError(err?.response?.data?.message || 'Registration failed');
+      setError(err?.response?.data?.message || err?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -129,21 +128,6 @@ export default function Register() {
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="Enter your phone number"
                 />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="role">Account Type</label>
-                <select
-                  id="role"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  required
-                >
-                  <option value="customer">Customer</option>
-                  <option value="manager">Manager</option>
-                  <option value="staff">Staff</option>
-                  <option value="admin">Admin</option>
-                </select>
               </div>
 
               <div className="form-group">

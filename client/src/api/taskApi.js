@@ -24,9 +24,27 @@ export async function createTasksFromContract(requestId, tasksData) {
   return data;
 }
 
-// Get staff tasks
+// Get all available tasks (for Task List tab)
+export async function getAllAvailableTasks() {
+  const res = await fetchWithAuth(`${BASE}/tasks/available`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || data.message || res.statusText);
+  return data;
+}
+
+// Get staff tasks (assigned tasks only)
 export async function getStaffTasks() {
   const res = await fetchWithAuth(`${BASE}/tasks/my-tasks`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || data.message || res.statusText);
+  return data;
+}
+
+// Staff picks a task
+export async function pickTask(taskId) {
+  const res = await fetchWithAuth(`${BASE}/tasks/${taskId}/pick`, {
+    method: 'PUT'
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || data.message || res.statusText);
   return data;

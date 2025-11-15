@@ -137,10 +137,10 @@ export async function assignStaffToRequest(requestId, data) {
 }
 
 // Update request items (for staff review tasks)
-export async function updateRequestItems(requestId, items, taskId) {
+export async function updateRequestItems(requestId, items, taskId, depositPaid = false) {
   const res = await fetchWithAuth(`${BASE}/requests/${requestId}/items`, {
     method: 'PATCH',
-    body: JSON.stringify({ items, taskId })
+    body: JSON.stringify({ items, taskId, depositPaid })
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || res.statusText);

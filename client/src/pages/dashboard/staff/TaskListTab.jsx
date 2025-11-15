@@ -4,17 +4,12 @@ import Card, { CardHeader, CardBody, CardActions } from '../../../components/sha
 import StatusBadge from '../../../components/shared/StatusBadge';
 import Button from '../../../components/shared/Button';
 
-export default function HistoryTab({ tasks, loading, onRefresh, onViewDetails }) {
+export default function TaskListTab({ availableTasks, loading, error, onRefresh, onPickTask, onViewDetails }) {
   const navigate = useNavigate();
   const [filters, setFilters] = useState({
-    status: '',
     taskType: '',
+    priority: '',
     search: ''
-  });
-
-  // Filter to show only completed and cancelled tasks
-  const historyTasks = tasks.filter(task => {
-    return task.status === 'completed' || task.status === 'cancelled';
   });
 
   const getTaskTypeIcon = (taskType) => {
@@ -27,9 +22,10 @@ export default function HistoryTab({ tasks, loading, onRefresh, onViewDetails })
     }
   };
 
-  const filteredTasks = historyTasks.filter(task => {
-    const matchesStatus = !filters.status || task.status === filters.status;
+
+  const filteredTasks = availableTasks.filter(task => {
     const matchesType = !filters.taskType || task.taskType === filters.taskType;
+    const matchesPriority = !filters.priority || (task.priority && task.priority === filters.priority);
     const searchText = filters.search.trim().toLowerCase();
     const matchesSearch = !searchText || [
       task.requestNumber,
@@ -39,24 +35,19 @@ export default function HistoryTab({ tasks, loading, onRefresh, onViewDetails })
       task.taskType
     ].some(v => (v || '').toString().toLowerCase().includes(searchText));
 
-    return matchesStatus && matchesType && matchesSearch;
+    return matchesType && matchesPriority && matchesSearch;
   });
-
-  const stats = {
-    total: historyTasks.length,
-    completed: historyTasks.filter(t => t.status === 'completed').length,
-    cancelled: historyTasks.filter(t => t.status === 'cancelled').length
-  };
 
   return (
     <div className="dashboard-section">
       <div className="dashboard-header-section">
-        <h2>Task History</h2>
+        <h2>Available Tasks</h2>
+        <p>Pick tasks you want to work on</p>
         <div className="dashboard-actions">
           <Button variant="info" onClick={onRefresh} disabled={loading}>
             🔄 Refresh
           </Button>
-          <Button variant="secondary" onClick={() => setFilters({status: '', taskType: '', search: ''})}>
+          <Button variant="secondary" onClick={() => setFilters({taskType: '', priority: '', search: ''})}>
             🗂️ Clear Filters
           </Button>
         </div>
@@ -69,15 +60,6 @@ export default function HistoryTab({ tasks, loading, onRefresh, onViewDetails })
             className="filter-input"
           />
           <select 
-            value={filters.status} 
-            onChange={(e) => setFilters({...filters, status: e.target.value})}
-            className="filter-select"
-          >
-            <option value="">All Status</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-          <select 
             value={filters.taskType} 
             onChange={(e) => setFilters({...filters, taskType: e.target.value})}
             className="filter-select"
@@ -88,17 +70,23 @@ export default function HistoryTab({ tasks, loading, onRefresh, onViewDetails })
             <option value="Unpackaging">Unpackaging</option>
             <option value="Transporting">Transporting</option>
           </select>
+          <select
+            value={filters.priority}
+            onChange={(e) => setFilters({...filters, priority: e.target.value})}
+            className="filter-select"
+          >
+            <option value="">All Priority</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
         </div>
       </div>
 
-      <div className="stats-grid" style={{ marginBottom: '20px' }}>
-        <div className="stat-card"><span>Total History</span><strong>{stats.total}</strong></div>
-        <div className="stat-card"><span>Completed</span><strong>{stats.completed}</strong></div>
-        <div className="stat-card"><span>Cancelled</span><strong>{stats.cancelled}</strong></div>
-      </div>
+      {error && <div className="error-message">{error}</div>}
 
       {loading ? (
-        <div className="loading-state"><p>Loading history...</p></div>
+        <div className="loading-state"><p>Loading available tasks...</p></div>
       ) : (
         <div className="tasks-grid">
           {filteredTasks.map((task) => (
@@ -106,7 +94,7 @@ export default function HistoryTab({ tasks, loading, onRefresh, onViewDetails })
               <CardHeader>
                 <div className="task-title">
                   <span className="task-icon">{getTaskTypeIcon(task.taskType)}</span>
-                  <h3>{task.taskType?.charAt(0).toUpperCase() + task.taskType?.slice(1)}</h3>
+                  <h3>{task.taskType}</h3>
                 </div>
                 <StatusBadge status={task.status} />
               </CardHeader>
@@ -140,17 +128,25 @@ export default function HistoryTab({ tasks, loading, onRefresh, onViewDetails })
                     }
                   </div>
                   <div className="detail-row">
-                    <strong>Completed At:</strong> {
-                      task.updatedAt 
-                        ? new Date(task.updatedAt).toLocaleDateString() 
-                        : task.createdAt
-                        ? new Date(task.createdAt).toLocaleDateString()
-                        : 'N/A'
-                    }
+                    <strong>Duration:</strong> {task.estimatedDuration ? `${task.estimatedDuration} hours` : 'N/A'}
                   </div>
+                  <div className="detail-row">
+                    <strong>Priority:</strong> <span style={{ 
+                      color: task.priority === 'high' ? '#f44336' : task.priority === 'medium' ? '#ff9800' : '#4caf50',
+                      fontWeight: 'bold'
+                    }}>{task.priority || 'medium'}</span>
+                  </div>
+                  {task.description && (
+                    <div className="detail-row">
+                      <strong>Description:</strong> {task.description}
+                    </div>
+                  )}
                 </div>
               </CardBody>
               <CardActions>
+                <Button variant="primary" onClick={() => onPickTask(task._id || task.taskId)}>
+                  Pick Task
+                </Button>
                 <Button variant="secondary" onClick={() => onViewDetails(task)}>
                   View Details
                 </Button>
@@ -162,8 +158,8 @@ export default function HistoryTab({ tasks, loading, onRefresh, onViewDetails })
 
       {filteredTasks.length === 0 && !loading && (
         <div className="empty-state">
-          <h3>No history found</h3>
-          <p>No completed or cancelled tasks match your current filters.</p>
+          <h3>No available tasks</h3>
+          <p>No tasks match your current filters or all tasks have been picked.</p>
         </div>
       )}
     </div>

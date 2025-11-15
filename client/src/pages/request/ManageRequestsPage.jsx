@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getMyRequests, cancelRequest } from "../../api/requestApi";
+import { createVNPayPayment } from "../../api/paymentApi";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { fmtDateTime24 } from "../../utils/datetime";
@@ -109,6 +110,36 @@ export default function ManageRequestsPage() {
     if (!window.confirm("Bạn có chắc chắn muốn hủy request này không?")) return;
     await cancelRequest(id);
     load();
+  };
+
+  const handlePayment = async (request) => {
+    try {
+      if (!window.confirm(`Bạn có chắc chắn muốn thanh toán cho request ${request.requestId || request._id}?`)) {
+        return;
+      }
+      
+      setLoading(true);
+      console.log('🔄 [Payment] Creating VNPay payment for request:', request._id);
+      
+      const response = await createVNPayPayment(request._id);
+      
+      console.log('✅ [Payment] Payment URL received:', response);
+      
+      if (response.paymentUrl) {
+        // Redirect to VNPay payment page
+        console.log('🔄 [Payment] Redirecting to VNPay...');
+        window.location.href = response.paymentUrl;
+      } else {
+        console.error('❌ [Payment] No paymentUrl in response:', response);
+        alert("❌ Không thể tạo link thanh toán. Vui lòng thử lại.");
+      }
+    } catch (err) {
+      console.error("❌ [Payment] Payment error:", err);
+      const errorMessage = err.message || "Vui lòng thử lại";
+      alert("❌ Lỗi khi tạo thanh toán:\n" + errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Lọc rows theo status
@@ -284,6 +315,27 @@ export default function ManageRequestsPage() {
                           className="btn btn-success"
                         >
                           Xem báo giá
+                        </button>
+                      )}
+                      {/* Payment button for online banking requests */}
+                      {(r.status === "WAITING_PAYMENT" || r.status === "UNDER_SURVEY" || r.status === "PENDING") && 
+                       r.paymentMethod === "online_banking" && 
+                       r.paymentStatus !== "deposit_paid" && 
+                       r.paymentStatus !== "fully_paid" && (
+                        <button
+                          onClick={() => handlePayment(r)}
+                          className="btn btn-success"
+                          disabled={loading}
+                          style={{ 
+                            background: "#4caf50",
+                            color: "white",
+                            border: "none",
+                            padding: "8px 16px",
+                            borderRadius: "4px",
+                            cursor: loading ? "not-allowed" : "pointer"
+                          }}
+                        >
+                          💳 Thanh toán VNPay
                         </button>
                       )}
                     </div>

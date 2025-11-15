@@ -16,6 +16,7 @@ const {
   getAllServices,
   getAllContracts,
   getContractById,
+  getContractByIdPublic,
   updateContractStatus
 } = require("../controllers/contractController");
 const auth = require("../utils/authMiddleware");
@@ -72,6 +73,9 @@ router.post("/:id/reject-assignment", auth, requireStaff, rejectAssignment);
 
 // PDF Export routes
 router.get("/:id/export", auth, exportContractPDF);
+
+// Public contract view (for email links - no auth required, but only for approved contracts)
+router.get("/:id/public", getContractByIdPublic);
 
 // General routes (must be last)
 router.get("/:id", auth, getContractById);

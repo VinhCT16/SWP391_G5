@@ -14,6 +14,97 @@ const generateContractId = () => {
   return `CONT-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 };
 
+// Automatically create tasks when contract is approved
+const autoCreateTasksFromContract = async (requestId) => {
+  try {
+    console.log('🔄 [autoCreateTasksFromContract] Starting for requestId:', requestId);
+    
+    const request = await Request.findById(requestId);
+    if (!request) {
+      console.error('❌ [autoCreateTasksFromContract] Request not found:', requestId);
+      return;
+    }
+
+    // Check if request has a contract
+    if (!request.contractId) {
+      console.error('❌ [autoCreateTasksFromContract] Request has no contract:', requestId);
+      return;
+    }
+
+    // Check if tasks already exist for this request (excluding review tasks)
+    const existingTasks = await Task.find({ 
+      requestId: request._id,
+      taskType: { $ne: 'Review' } // Exclude review tasks
+    });
+    
+    if (existingTasks.length > 0) {
+      console.log('ℹ️ [autoCreateTasksFromContract] Tasks already exist for request:', requestId);
+      return;
+    }
+
+    // Create tasks: Packaging, Transporting, Unpackaging
+    // Order matters: Packaging → Transporting → Unpackaging (dependencies)
+    const tasksToCreate = [
+      {
+        requestId: request._id,
+        taskType: 'Packaging',
+        assignedStaff: null, // No assignment - staff will pick it
+        transporter: null,
+        status: 'waiting', // Initial status: waiting (maps to pending)
+        estimatedDuration: 4, // 4 hours for packaging
+        priority: 'high',
+        description: 'Pack items for moving',
+        deadline: request.moveDetails?.moveDate ? new Date(request.moveDetails.moveDate) : null
+      },
+      {
+        requestId: request._id,
+        taskType: 'Transporting',
+        assignedStaff: null, // No assignment - staff will pick it
+        transporter: null,
+        status: 'waiting', // Initial status: waiting (depends on Packaging)
+        estimatedDuration: 6, // 6 hours for transporting
+        priority: 'high',
+        description: 'Transport items from pickup to delivery location',
+        deadline: request.moveDetails?.moveDate ? new Date(request.moveDetails.moveDate) : null
+      },
+      {
+        requestId: request._id,
+        taskType: 'Unpackaging',
+        assignedStaff: null, // No assignment - staff will pick it
+        transporter: null,
+        status: 'waiting', // Initial status: waiting (depends on Transporting)
+        estimatedDuration: 3, // 3 hours for unpackaging
+        priority: 'medium',
+        description: 'Unpack items at delivery location',
+        deadline: request.moveDetails?.moveDate ? new Date(new Date(request.moveDetails.moveDate).getTime() + 24 * 60 * 60 * 1000) : null // 1 day after move date
+      }
+    ];
+
+    const createdTasks = await Task.insertMany(
+      tasksToCreate.map(taskData => ({
+        ...taskData,
+        taskHistory: [{
+          historyId: new mongoose.Types.ObjectId(),
+          status: taskData.status || 'waiting',
+          notes: 'Task created automatically when customer signed contract',
+          updatedAt: new Date()
+        }]
+      }))
+    );
+
+    console.log('✅ [autoCreateTasksFromContract] Tasks created:', {
+      requestId: request.requestId,
+      tasksCreated: createdTasks.length,
+      taskIds: createdTasks.map(t => t._id)
+    });
+
+    return createdTasks;
+  } catch (err) {
+    console.error('❌ [autoCreateTasksFromContract] Error:', err);
+    throw err;
+  }
+};
+
 // Helper function to automatically create contract from approved request
 // This is called when a request is approved to automatically create a contract
 const autoCreateContractFromRequest = async (requestId, managerUserId) => {
@@ -154,16 +245,8 @@ const autoCreateContractFromRequest = async (requestId, managerUserId) => {
     await request.save();
     console.log('Request updated with contract reference');
 
-    // Automatically create and assign tasks for this contract
-    try {
-      console.log('Creating tasks automatically for contract:', contract._id);
-      await autoCreateTasksFromContract(request._id, contract);
-      console.log('Tasks created and assigned successfully');
-    } catch (taskErr) {
-      // Log error but don't fail contract creation
-      console.error('Error automatically creating tasks:', taskErr);
-      console.error('Contract created but tasks need to be created manually');
-    }
+    // Tasks will be created automatically when contract is approved
+    // (not when contract is created)
 
     return contract;
   } catch (err) {
@@ -529,6 +612,9 @@ const approveContract = async (req, res) => {
 
     await contract.save();
 
+    // Note: Tasks are now created when customer signs the contract, not when manager approves
+    // Tasks will be created automatically in customerSignContract function
+
     // Populate contract details for response
     await contract.populate([
       { path: 'customerId', select: 'name email phone role' },
@@ -725,6 +811,57 @@ const getAllContracts = async (req, res) => {
 };
 
 // Get contract by ID
+// Public contract view (for email links - no auth required)
+const getContractByIdPublic = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { token, email } = req.query; // Optional token or email verification
+
+    console.log(`[getContractByIdPublic] Accessing contract ${id}, email: ${email || 'none'}`);
+
+    const contract = await Contract.findById(id)
+      .populate('customerId', 'name email phone role')
+      .populate('managerId', 'name email phone role')
+      .populate('serviceId', 'name price')
+      .populate('assignedStaff.staffId', 'name email phone role')
+      .populate('requestId');
+
+    if (!contract) {
+      console.log(`[getContractByIdPublic] Contract ${id} not found`);
+      return res.status(404).json({ message: "Contract not found" });
+    }
+
+    console.log(`[getContractByIdPublic] Contract found, status: ${contract.status}`);
+
+    // Only allow public access to approved contracts
+    // Also allow access to contracts that are pending_approval (just created)
+    if (contract.status !== 'approved' && contract.status !== 'pending_approval') {
+      console.log(`[getContractByIdPublic] Contract ${id} status is ${contract.status}, access denied`);
+      return res.status(403).json({ 
+        message: `Contract is ${contract.status}. Only approved contracts can be viewed publicly.` 
+      });
+    }
+
+    // If email is provided, verify it matches the contract's customer email
+    if (email && contract.customerId?.email) {
+      const emailMatch = email.toLowerCase() === contract.customerId.email.toLowerCase();
+      console.log(`[getContractByIdPublic] Email verification: ${emailMatch ? 'match' : 'no match'}`);
+      if (!emailMatch) {
+        return res.status(403).json({ message: "Access denied: Email does not match contract customer" });
+      }
+    }
+
+    // If token is provided, verify it (optional - can implement token generation later)
+    // For now, just allow access to approved contracts
+
+    console.log(`[getContractByIdPublic] Contract ${id} access granted`);
+    res.json({ contract });
+  } catch (err) {
+    console.error("[getContractByIdPublic] Error fetching contract:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 const getContractById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1247,6 +1384,15 @@ const customerSignContract = async (req, res) => {
 
     await contract.save();
 
+    // Automatically create tasks after customer signs contract
+    try {
+      await autoCreateTasksFromContract(contract.requestId);
+      console.log('✅ [customerSignContract] Tasks created automatically after customer signed contract:', contract._id);
+    } catch (taskErr) {
+      console.error('❌ [customerSignContract] Error creating tasks:', taskErr);
+      // Continue even if task creation fails - don't block contract signing
+    }
+
     // Populate contract details
     await contract.populate([
       { path: 'customerId', select: 'name email phone role' },
@@ -1264,10 +1410,9 @@ const customerSignContract = async (req, res) => {
   }
 };
 
-// Automatically create and assign tasks when a contract is created
-// This function creates tasks for: packing, loading, transporting, unloading, unpacking
-// and assigns them to appropriate staff based on their roles
-const autoCreateTasksFromContract = async (requestId, contract) => {
+// OLD FUNCTION - REMOVED - Use the one at the top of the file instead
+// This old function is kept for reference but should not be used
+const _old_autoCreateTasksFromContract = async (requestId, contract) => {
   try {
     console.log('🔄 [autoCreateTasksFromContract] Starting for requestId:', requestId);
 
@@ -1426,6 +1571,7 @@ module.exports = {
   autoCreateContractFromRequest,
   getContractsForApproval,
   approveContract,
+  getContractByIdPublic,
   rejectContract,
   getCustomerContracts,
   getContractProgress,

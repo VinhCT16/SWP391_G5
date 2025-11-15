@@ -20,6 +20,7 @@ export default function CreateRequestPage() {
     deliveryLocation: null,
     movingTime: "",
     requestType: null, // "SELF_SERVICE" hoặc "STAFF_SURVEY"
+    paymentMethod: "cash", // "cash" or "online_banking"
   });
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
@@ -280,6 +281,7 @@ export default function CreateRequestPage() {
       pickupAddressText: joinAddress(form.pickupAddress),
       deliveryAddressText: joinAddress(form.deliveryAddress),
       movingTime: form.movingTime,
+      paymentMethod: form.paymentMethod || "cash",
     };
 
     if (form.requestType === "SELF_SERVICE") {
@@ -436,6 +438,45 @@ export default function CreateRequestPage() {
                   min={nowForDatetimeLocal()}
                   required
                 />
+              </div>
+            </div>
+
+            <div className="form-section">
+              <h3>Phương thức thanh toán</h3>
+              <div className="radio-group">
+                <label
+                  className={`radio-option ${form.paymentMethod === "cash" ? "selected" : ""}`}
+                  style={{ cursor: "pointer" }}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="cash"
+                    checked={form.paymentMethod === "cash"}
+                    onChange={(e) => setForm((s) => ({ ...s, paymentMethod: e.target.value }))}
+                  />
+                  <div>
+                    <h4>💵 Thanh toán bằng tiền mặt</h4>
+                    <p>Thanh toán khi nhân viên đến khảo sát hoặc khi nhận hàng</p>
+                  </div>
+                </label>
+                
+                <label
+                  className={`radio-option ${form.paymentMethod === "online_banking" ? "selected" : ""}`}
+                  style={{ cursor: "pointer" }}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="online_banking"
+                    checked={form.paymentMethod === "online_banking"}
+                    onChange={(e) => setForm((s) => ({ ...s, paymentMethod: e.target.value }))}
+                  />
+                  <div>
+                    <h4>🏦 Thanh toán online (VNPay)</h4>
+                    <p>Thanh toán trực tuyến qua VNPay - an toàn và tiện lợi</p>
+                  </div>
+                </label>
               </div>
             </div>
 

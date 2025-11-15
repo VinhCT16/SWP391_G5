@@ -22,11 +22,14 @@ import CreateRequestPage from "./pages/request/CreateRequestPage";
 import ManageRequestsPage from "./pages/request/ManageRequestsPage";
 import EditRequestPage from "./pages/request/EditRequestPage";
 import RequestDetailPage from "./pages/request/RequestDetailPage";
+import ManagerRequestDetailPage from "./pages/request/ManagerRequestDetailPage";
 import QuoteItemsPage from "./pages/quote/QuoteItemsPage";
 import QuoteServicePage from "./pages/quote/QuoteServicePage";
 import QuoteSummaryPage from "./pages/quote/QuoteSummaryPage";
 import QuotePage from "./pages/quote/QuotePage";
 import CustomerContractView from "./pages/contract/CustomerContractView";
+import PaymentSuccessPage from "./pages/payment/PaymentSuccessPage";
+import PaymentFailedPage from "./pages/payment/PaymentFailedPage";
 
 export default function App() {
   return (
@@ -90,6 +93,7 @@ export default function App() {
             <Route path="/contract-form/:requestId" element={<ContractForm />} />
             <Route path="/contract-approval" element={<ContractApproval />} />
             <Route path="/contracts/:id" element={<ContractDetailView />} />
+            <Route path="/manager/requests/:id/detail" element={<ManagerRequestDetailPage />} />
           </Route>
           
           {/* Staff routes */}
@@ -109,6 +113,10 @@ export default function App() {
             <Route path="/quote/summary" element={<QuoteSummaryPage />} />
             <Route path="/quote" element={<QuotePage />} />
           </Route>
+          
+          {/* Payment routes - public for VNPay redirects */}
+          <Route path="/payment/success" element={<PaymentSuccessPage />} />
+          <Route path="/payment/failed" element={<PaymentFailedPage />} />
           
           {/* 404 - redirect to home */}
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,0 +1,282 @@
+// Database Schema for SWP391_G5 Moving Service Application
+// Generated from Mongoose models
+// Compatible with dbdiagram.io
+
+Project SWP391_G5 {
+  database_type: 'MongoDB'
+  Note: 'Moving Service Management System Database Schema'
+}
+
+// ============================================
+// USER MODEL
+// ============================================
+Table users {
+  _id varchar [pk, note: 'MongoDB ObjectId']
+  name varchar [not null]
+  email varchar [not null, unique]
+  password varchar [not null]
+  role varchar [not null, note: 'customer, manager, staff, admin']
+  phone varchar
+  
+  isActive boolean [default: true]
+  
+  // Customer-specific fields
+  chatHistory json [note: 'Array of chat objects']
+  reviews json [note: 'Array of review objects']
+  requestHistory json [note: 'Array of request history objects']
+  
+  // Manager-specific fields
+  employeeId varchar [unique, note: 'Sparse index - only for managers']
+  department varchar [note: 'Operations, Customer Service, Logistics']
+  managerPermissions json [note: 'Array of permission strings']
+  
+  // Staff-specific fields
+  staffRole varchar [note: 'packager, transporter, supervisor, loader, unloader, reviewer']
+  specialization json [note: 'Array of specialization strings']
+  availability json [note: 'Object with isAvailable, workingHours, workDays']
+  rating decimal [default: 5, note: '1-5']
+  currentTasks varchar[] [note: 'Array of request ObjectIds']
+  
+  // Admin-specific fields
+  adminId varchar [unique, note: 'Sparse index - only for admins']
+  adminPermissions json [note: 'Object with userManagement, staffManagement, systemManagement']
+  
+  // Common employee fields
+  hireDate timestamp
+  lastLogin timestamp
+  createdAt timestamp
+  updatedAt timestamp
+  
+  Note: 'Main user model supporting multiple roles (customer, manager, staff, admin)'
+}
+
+// ============================================
+// REQUEST MODEL
+// ============================================
+Table requests {
+  _id varchar [pk, note: 'MongoDB ObjectId']
+  requestId varchar [not null, unique]
+  customerId varchar [not null, ref: > users._id]
+  customerName varchar
+  customerPhone varchar
+  
+  // Move Details
+  moveDetails json [not null, note: 'fromAddress, toAddress, moveDate, serviceType, phone']
+  
+  // Items to Move
+  items json [note: 'Array of item objects with description, quantity, category, etc.']
+  
+  // Contract Reference
+  contractId varchar [ref: > contracts._id]
+  
+  // Staff Assignment
+  assignedStaff json [note: 'Array of staff assignment objects']
+  
+  // Request Status
+  status varchar [default: 'draft', note: 'draft, submitted, under_review, approved, rejected, contract_created, in_progress, completed, cancelled, etc.']
+  
+  // Approval
+  approval json [note: 'reviewedBy, reviewedAt, approved, rejectionReason, notes']
+  
+  // Pricing Estimate
+  estimatedPrice json [note: 'basePrice, additionalServices, totalPrice']
+  surveyFee decimal
+  
+  // Payment Information
+  paymentMethod varchar [default: 'cash', note: 'cash, online_banking']
+  paymentStatus varchar [default: 'pending', note: 'pending, deposit_paid, fully_paid, not_paid']
+  depositPaid boolean [default: false]
+  depositPaidAt timestamp
+  depositPaidBy varchar [ref: > users._id]
+  vnpayTransaction json [note: 'VNPay payment transaction details']
+  
+  createdAt timestamp
+  updatedAt timestamp
+  
+  Note: 'Moving service requests from customers'
+}
+
+// ============================================
+// CONTRACT MODEL
+// ============================================
+Table contracts {
+  _id varchar [pk, note: 'MongoDB ObjectId']
+  contractId varchar [not null, unique]
+  requestId varchar [not null, ref: > requests._id]
+  customerId varchar [not null, ref: > users._id]
+  managerId varchar [not null, ref: > users._id]
+  serviceId varchar [not null, ref: > services._id]
+  
+  // Staff Assignment
+  assignedStaff json [note: 'Array of staff assignment objects with status']
+  
+  // Contract Details
+  moveDetails json [not null, note: 'fromAddress, toAddress, moveDate, serviceType, phone']
+  
+  // Pricing
+  pricing json [not null, note: 'basePrice, additionalServices, totalPrice, deposit, balance']
+  
+  // Payment
+  paymentMethod json [not null, note: 'type and details']
+  
+  // Contract Status
+  status varchar [default: 'draft', note: 'draft, pending_approval, approved, signed, staff_pending, active, in_progress, completed, cancelled']
+  
+  // Approval Process
+  approval json [note: 'approvedBy, approvedAt, rejectionReason, notes']
+  
+  // Signatures
+  signatures json [note: 'customerSigned, managerSigned, signedAt']
+  
+  // Terms and Conditions
+  terms json [note: 'liability, cancellation, additionalTerms']
+  
+  // Items to Move
+  items json [note: 'Array of item objects']
+  surveyFee decimal
+  
+  createdAt timestamp
+  updatedAt timestamp
+  
+  Note: 'Contracts created from approved requests'
+}
+
+// ============================================
+// TASK MODEL
+// ============================================
+Table tasks {
+  _id varchar [pk, note: 'MongoDB ObjectId']
+  requestId varchar [not null, ref: > requests._id]
+  taskType varchar [not null, note: 'Review, Packaging, Unpackaging, Transporting']
+  assignedStaff varchar [ref: > users._id]
+  transporter varchar [ref: > users._id]
+  status varchar [default: 'pending', note: 'pending, assigned, in-progress, blocked, overdue, completed, cancelled, waiting, ongoing, done']
+  estimatedDuration decimal [note: 'in hours']
+  actualDuration decimal [note: 'in hours']
+  priority varchar [default: 'medium', note: 'low, medium, high']
+  description text
+  managerNotes text
+  customerNotes text
+  deadline timestamp
+  attachments json [note: 'Array of attachment objects']
+  taskHistory json [note: 'Array of task history objects']
+  createdAt timestamp
+  updatedAt timestamp
+  
+  Note: 'Tasks assigned to staff for completing requests'
+}
+
+// ============================================
+// REVIEW MODEL
+// ============================================
+Table reviews {
+  _id varchar [pk, note: 'MongoDB ObjectId']
+  user varchar [not null, note: 'User name or ID']
+  rating decimal [not null, note: '1-5']
+  comment text [not null]
+  requestId varchar [ref: > requests._id]
+  createdAt timestamp
+  updatedAt timestamp
+  
+  Note: 'Customer reviews and ratings'
+}
+
+// ============================================
+// COMPLAINT MODEL
+// ============================================
+Table complaints {
+  _id varchar [pk, note: 'MongoDB ObjectId']
+  complaintId varchar [note: 'MongoDB ObjectId']
+  customerId varchar [not null, ref: > users._id]
+  customerName varchar [not null]
+  customerEmail varchar [not null]
+  subject varchar [not null]
+  description text [not null]
+  status varchar [default: 'pending', note: 'pending, in_progress, resolved, closed']
+  priority varchar [default: 'medium', note: 'low, medium, high, urgent']
+  category varchar [default: 'general', note: 'service_quality, billing, technical, general, other']
+  adminResponse json [note: 'response, adminId, adminName, respondedAt']
+  adminNotes text
+  resolution json [note: 'resolution, resolvedAt, adminId']
+  attachments json [note: 'Array of attachment objects']
+  createdAt timestamp
+  updatedAt timestamp
+  
+  Note: 'Customer complaints and support tickets'
+}
+
+// ============================================
+// SERVICE MODEL
+// ============================================
+Table services {
+  _id varchar [pk, note: 'MongoDB ObjectId']
+  name varchar [not null]
+  price decimal [not null]
+  
+  Note: 'Service types and pricing'
+}
+
+// ============================================
+// QUOTE MODEL
+// ============================================
+Table quotes {
+  _id varchar [pk, note: 'MongoDB ObjectId']
+  requestId varchar [ref: > requests._id]
+  distanceKm decimal [not null]
+  durationMin decimal [not null]
+  serviceType varchar [default: 'STANDARD', note: 'STANDARD, EXPRESS']
+  vehicleType varchar [default: '1T', note: '0.5T, 1T, 1.25T, 2T, 3.5T']
+  helpers decimal [default: 0]
+  extras varchar[] [note: 'Array of extra service strings']
+  perKm decimal
+  total decimal
+  negotiationHistory json [note: 'Array of negotiation objects']
+  status varchar [default: 'PENDING', note: 'PENDING, NEGOTIATING, STAFF_CONFIRMED']
+  finalPrice decimal
+  createdAt timestamp
+  updatedAt timestamp
+  
+  Note: 'Price quotes and estimates for requests'
+}
+
+// ============================================
+// REQUEST HISTORY MODEL
+// ============================================
+Table request_history {
+  _id varchar [pk, note: 'MongoDB ObjectId']
+  requestId varchar [not null, ref: > requests._id]
+  statusChange varchar [not null, note: 'PENDING, ASSIGNED, IN_PROGRESS, PAUSED, DONE, CANCELED']
+  changeDate timestamp [default: 'now()']
+  notes text
+  
+  Note: 'History of request status changes'
+}
+
+// ============================================
+// RELATIONSHIPS
+// ============================================
+
+Ref: requests.customerId > users._id [delete: cascade]
+Ref: requests.contractId > contracts._id
+Ref: requests.depositPaidBy > users._id
+Ref: contracts.requestId > requests._id [delete: cascade]
+Ref: contracts.customerId > users._id [delete: cascade]
+Ref: contracts.managerId > users._id
+Ref: contracts.serviceId > services._id
+Ref: tasks.requestId > requests._id [delete: cascade]
+Ref: tasks.assignedStaff > users._id
+Ref: tasks.transporter > users._id
+Ref: reviews.requestId > requests._id
+Ref: complaints.customerId > users._id [delete: cascade]
+Ref: quotes.requestId > requests._id [delete: cascade]
+Ref: request_history.requestId > requests._id [delete: cascade]
+
+// ============================================
+// INDEXES (for reference)
+// ============================================
+// Note: MongoDB indexes are defined in the models but shown here for reference
+// - users: email, role, role+isActive, employeeId, adminId, currentTasks
+// - requests: customerId, contractId, status
+// - contracts: requestId, customerId, managerId, status
+// - tasks: requestId+status, assignedStaff+status, transporter+status, taskType+status
+// - complaints: customerId+status, status+priority, createdAt

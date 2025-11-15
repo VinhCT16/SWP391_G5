@@ -74,7 +74,154 @@ const createTasksFromContract = async (req, res) => {
   }
 };
 
-// Get all tasks for a staff member
+// Get all available tasks (for Task List tab - staff can pick)
+const getAllAvailableTasks = async (req, res) => {
+  try {
+    console.log('🔄 [getAllAvailableTasks] Starting...');
+    
+    // Get all pending tasks that are not assigned (no assignedStaff)
+    // Tasks should be pending and not have an assigned staff member
+    let tasks;
+    try {
+      tasks = await Task.find({
+        status: 'pending',
+        assignedStaff: null
+      })
+      .populate({
+        path: 'requestId',
+        select: 'requestId customerId customerName customerPhone moveDetails contractId status createdAt paymentMethod paymentStatus depositPaid',
+        populate: {
+          path: 'customerId',
+          select: 'name email phone'
+        }
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+      
+      console.log(`✅ [getAllAvailableTasks] Found ${tasks.length} tasks`);
+    } catch (queryErr) {
+      console.error('❌ [getAllAvailableTasks] Query error:', queryErr);
+      // Try without populate if populate fails
+      console.log('🔄 [getAllAvailableTasks] Retrying without populate...');
+      tasks = await Task.find({
+        status: 'pending',
+        assignedStaff: null
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+      
+      // Manually populate requestId for each task
+      for (let i = 0; i < tasks.length; i++) {
+        if (tasks[i].requestId) {
+          try {
+            const request = await Request.findById(tasks[i].requestId)
+              .populate('customerId', 'name email phone')
+              .select('requestId customerId customerName customerPhone moveDetails contractId status createdAt paymentMethod paymentStatus depositPaid')
+              .lean();
+            tasks[i].requestId = request;
+          } catch (populateErr) {
+            console.error(`❌ [getAllAvailableTasks] Error populating request for task ${tasks[i]._id}:`, populateErr);
+            tasks[i].requestId = null;
+          }
+        }
+      }
+    }
+
+    // Format tasks with request information
+    const formattedTasks = tasks.map(task => {
+      try {
+        const request = task.requestId;
+        // Handle case where request might be null or undefined
+        if (!request || !request._id) {
+          return {
+            _id: task._id,
+            taskId: task._id,
+            requestId: task.requestId?._id || task.requestId || null,
+            requestNumber: 'N/A',
+            customer: null,
+            request: null,
+            taskType: task.taskType,
+            status: task.status,
+            estimatedDuration: task.estimatedDuration,
+            priority: task.priority,
+            description: task.description,
+            deadline: task.deadline,
+            managerNotes: task.managerNotes,
+            customerNotes: task.customerNotes,
+            attachments: task.attachments || [],
+            contractId: null,
+            moveDetails: null,
+            createdAt: task.createdAt,
+            assignedStaff: task.assignedStaff,
+            transporter: task.transporter
+          };
+        }
+
+        const customer = request?.customerId || (request?.customerName ? {
+          name: request.customerName,
+          email: null,
+          phone: request.customerPhone
+        } : null);
+        
+        return {
+          _id: task._id,
+          taskId: task._id,
+          requestId: request?._id,
+          requestNumber: request?.requestId || 'N/A',
+          customer: customer,
+          request: request,
+          taskType: task.taskType,
+          status: task.status,
+          estimatedDuration: task.estimatedDuration,
+          priority: task.priority,
+          description: task.description,
+          deadline: task.deadline,
+          managerNotes: task.managerNotes,
+          customerNotes: task.customerNotes,
+          attachments: task.attachments || [],
+          contractId: request?.contractId,
+          moveDetails: request?.moveDetails,
+          createdAt: task.createdAt,
+          assignedStaff: task.assignedStaff,
+          transporter: task.transporter
+        };
+      } catch (mapErr) {
+        console.error(`Error formatting task ${task._id}:`, mapErr);
+        // Return a minimal task object if formatting fails
+        return {
+          _id: task._id,
+          taskId: task._id,
+          requestId: null,
+          requestNumber: 'N/A',
+          customer: null,
+          request: null,
+          taskType: task.taskType || 'Unknown',
+          status: task.status,
+          estimatedDuration: task.estimatedDuration,
+          priority: task.priority,
+          description: task.description,
+          deadline: task.deadline,
+          managerNotes: task.managerNotes,
+          customerNotes: task.customerNotes,
+          attachments: task.attachments || [],
+          contractId: null,
+          moveDetails: null,
+          createdAt: task.createdAt,
+          assignedStaff: task.assignedStaff,
+          transporter: task.transporter
+        };
+      }
+    });
+
+    res.json({ tasks: formattedTasks });
+  } catch (err) {
+    console.error("Error fetching available tasks:", err);
+    console.error("Error stack:", err.stack);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// Get all tasks for a staff member (assigned tasks only)
 const getStaffTasks = async (req, res) => {
   try {
     const staffId = req.userId;
@@ -214,14 +361,70 @@ const updateTaskStatus = async (req, res) => {
       return res.status(403).json({ message: "You are not assigned to this task" });
     }
 
-    // Update task status
-    task.status = status;
+    // Map status values: waiting → pending, ongoing → in-progress, done → completed
+    let mappedStatus = status;
+    if (status === 'waiting') mappedStatus = 'pending';
+    else if (status === 'ongoing') mappedStatus = 'in-progress';
+    else if (status === 'done') mappedStatus = 'completed';
+
+    // Check task dependencies before allowing status change
+    // Dependencies: Packaging → Transporting → Unpackaging
+    if (task.taskType === 'Transporting' && (mappedStatus === 'in-progress' || mappedStatus === 'ongoing' || mappedStatus === 'completed' || mappedStatus === 'done')) {
+      // Check if Packaging task is completed
+      const packagingTask = await Task.findOne({
+        requestId: task.requestId,
+        taskType: 'Packaging'
+      });
+      
+      if (!packagingTask) {
+        return res.status(400).json({ 
+          message: "Packaging task not found. Cannot proceed with Transporting task." 
+        });
+      }
+      
+      const packagingStatus = packagingTask.status === 'done' ? 'completed' : 
+                              packagingTask.status === 'waiting' ? 'pending' :
+                              packagingTask.status === 'ongoing' ? 'in-progress' : packagingTask.status;
+      
+      if (packagingStatus !== 'completed' && (mappedStatus === 'in-progress' || mappedStatus === 'ongoing')) {
+        return res.status(400).json({ 
+          message: "Cannot start Transporting task. Packaging task must be completed first." 
+        });
+      }
+    }
     
-    // Add to task history
+    if (task.taskType === 'Unpackaging' && (mappedStatus === 'in-progress' || mappedStatus === 'ongoing' || mappedStatus === 'completed' || mappedStatus === 'done')) {
+      // Check if Transporting task is completed
+      const transportingTask = await Task.findOne({
+        requestId: task.requestId,
+        taskType: 'Transporting'
+      });
+      
+      if (!transportingTask) {
+        return res.status(400).json({ 
+          message: "Transporting task not found. Cannot proceed with Unpackaging task." 
+        });
+      }
+      
+      const transportingStatus = transportingTask.status === 'done' ? 'completed' : 
+                                  transportingTask.status === 'waiting' ? 'pending' :
+                                  transportingTask.status === 'ongoing' ? 'in-progress' : transportingTask.status;
+      
+      if (transportingStatus !== 'completed' && (mappedStatus === 'in-progress' || mappedStatus === 'ongoing')) {
+        return res.status(400).json({ 
+          message: "Cannot start Unpackaging task. Transporting task must be completed first." 
+        });
+      }
+    }
+
+    // Update task status (use mapped status)
+    task.status = mappedStatus;
+    
+    // Add to task history (use original status for display, but store mapped status)
     task.taskHistory.push({
       historyId: new mongoose.Types.ObjectId(),
-      status: status,
-      notes: notes || '',
+      status: mappedStatus, // Store mapped status in history
+      notes: notes || `Status changed to ${status}`,
       updatedBy: staffId,
       updatedAt: new Date()
     });
@@ -229,7 +432,7 @@ const updateTaskStatus = async (req, res) => {
     await task.save();
 
     // Special handling for review tasks: when completed, update request status
-    if (task.taskType === 'review' && status === 'completed') {
+    if (task.taskType === 'Review' && mappedStatus === 'completed') {
       try {
         const request = await Request.findById(task.requestId);
         if (request && request.status === 'UNDER_SURVEY') {
@@ -245,18 +448,23 @@ const updateTaskStatus = async (req, res) => {
     }
 
     // Check if all tasks for this request are completed, then update request status to "Done"
-    if (status === 'completed') {
+    if (mappedStatus === 'completed' || mappedStatus === 'done') {
       try {
         const request = await Request.findById(task.requestId);
         if (request) {
           // Get all tasks for this request (excluding review tasks)
           const allTasks = await Task.find({
             requestId: request._id,
-            taskType: { $in: ['packing', 'transporting'] } // Only check packing and transporting tasks
+            taskType: { $in: ['Packaging', 'Transporting', 'Unpackaging'] } // Check all moving tasks
           });
 
-          // Check if all tasks are completed
-          const allCompleted = allTasks.length > 0 && allTasks.every(t => t.status === 'completed');
+          // Check if all tasks are completed (handle both 'completed' and 'done' statuses)
+          const allCompleted = allTasks.length > 0 && allTasks.every(t => {
+            const taskStatus = t.status === 'done' ? 'completed' : 
+                              t.status === 'waiting' ? 'pending' :
+                              t.status === 'ongoing' ? 'in-progress' : t.status;
+            return taskStatus === 'completed';
+          });
 
           if (allCompleted && request.status !== 'DONE' && request.status !== 'completed') {
             console.log(`[TaskController] All tasks completed for request ${request._id}. Updating status to DONE`);
@@ -298,7 +506,79 @@ const getAllStaff = async (req, res) => {
   }
 };
 
-// Assign staff to task
+// Staff picks a task (assigns themselves)
+const pickTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const staffId = req.userId;
+
+    // Find the task
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    // Check if task is already assigned
+    if (task.assignedStaff) {
+      return res.status(400).json({ message: "Task is already assigned to another staff member" });
+    }
+
+    // Check if task is completed or cancelled
+    if (task.status === 'completed' || task.status === 'cancelled') {
+      return res.status(400).json({ message: "Cannot pick a completed or cancelled task" });
+    }
+
+    // Find the staff member
+    const staff = await User.findById(staffId);
+    if (!staff || staff.role !== 'staff') {
+      return res.status(403).json({ message: "Only staff members can pick tasks" });
+    }
+
+    // Get the request to update staff's current tasks
+    const request = await Request.findById(task.requestId);
+    if (!request) {
+      return res.status(404).json({ message: "Request not found" });
+    }
+
+    // Assign staff to task
+    task.assignedStaff = staffId;
+    
+    // Update task status
+    if (task.status === 'pending') {
+      task.status = 'assigned';
+    }
+
+    // Add to staff's current tasks
+    await User.findByIdAndUpdate(staffId, {
+      $addToSet: { currentTasks: request._id }
+    });
+
+    // Add to task history
+    task.taskHistory.push({
+      historyId: new mongoose.Types.ObjectId(),
+      status: 'assigned',
+      notes: `Picked by ${staff.name}`,
+      updatedBy: staffId,
+      updatedAt: new Date()
+    });
+
+    await task.save();
+
+    res.json({
+      message: "Task picked successfully",
+      task: {
+        _id: task._id,
+        assignedStaff: task.assignedStaff,
+        status: task.status
+      }
+    });
+  } catch (err) {
+    console.error("Error picking task:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Assign staff to task (manager assigns)
 const assignStaffToTask = async (req, res) => {
   try {
     const { id } = req.params;
@@ -315,13 +595,6 @@ const assignStaffToTask = async (req, res) => {
     if (!staff || staff.role !== 'staff') {
       return res.status(404).json({ message: "Staff member not found" });
     }
-
-    // Role validation temporarily disabled - any staff can handle any task
-    // if (!canStaffHandleTask(staff.staffRole, task.taskType)) {
-    //   return res.status(400).json({ 
-    //     message: `Staff with role '${staff.staffRole}' cannot be assigned to '${task.taskType}' tasks. Compatible roles required.` 
-    //   });
-    // }
 
     // Get the request to update staff's current tasks
     const request = await Request.findById(task.requestId);
@@ -352,7 +625,7 @@ const assignStaffToTask = async (req, res) => {
     task.taskHistory.push({
       historyId: new mongoose.Types.ObjectId(),
       status: 'assigned',
-      notes: `Assigned to ${staff.staffRole}`,
+      notes: `Assigned by manager to ${staff.name}`,
       updatedBy: req.userId,
       updatedAt: new Date()
     });
@@ -512,10 +785,12 @@ module.exports = {
   createTasksFromContract,
   getTaskById,
   getTasksByRequest,
+  getAllAvailableTasks,
   getStaffTasks,
   updateTaskStatus,
   updateTaskDetails,
   getAllStaff,
+  pickTask,
   assignStaffToTask,
   deleteTask
 };

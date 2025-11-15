@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { getStaffTasks as getStaffTasksFromTaskApi, updateTaskStatus } from '../../api/taskApi';
-import { getStaffTasks as getStaffTasksFromRequestApi } from '../../api/requestApi';
+import { getStaffTasks as getStaffTasksFromTaskApi, getAllAvailableTasks, pickTask, updateTaskStatus } from '../../api/taskApi';
 import StaffDashboardTabs from './staff/StaffDashboardTabs';
 import ProfileModal from '../../components/dashboard/ProfileModal';
 import PasswordModal from '../../components/dashboard/PasswordModal';
@@ -14,9 +13,9 @@ import './StaffDashboard.css';
 export default function StaffDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('my-tasks');
+  const [activeTab, setActiveTab] = useState('task-list');
   const [tasks, setTasks] = useState([]);
-  const [requests, setRequests] = useState([]);
+  const [availableTasks, setAvailableTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -40,24 +39,25 @@ export default function StaffDashboard() {
     }
   };
 
-  const loadRequests = async () => {
-    setLoading(true);
+  const loadAvailableTasks = async () => {
     try {
-      const data = await getStaffTasksFromRequestApi();
-      setRequests(Array.isArray(data) ? data : []);
+      setLoading(true);
+      setError(null);
+      const response = await getAllAvailableTasks();
+      setAvailableTasks(response.tasks || response.data?.tasks || []);
     } catch (err) {
-      console.error("Error loading staff tasks:", err);
-      setRequests([]);
+      console.error('Error loading available tasks:', err);
+      setError('Failed to load available tasks');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (activeTab === 'my-tasks') {
+    if (activeTab === 'task-list') {
+      loadAvailableTasks();
+    } else if (activeTab === 'my-tasks' || activeTab === 'history') {
       loadTasks();
-    } else if (activeTab === 'requests') {
-      loadRequests();
     }
   }, [activeTab]);
 
@@ -66,7 +66,6 @@ export default function StaffDashboard() {
       setLoading(true);
       await updateTaskStatus(taskId, statusData);
       await loadTasks();
-      alert('Task status updated successfully!');
     } catch (err) {
       console.error('Error updating task status:', err);
       // Handle both axios errors and fetch errors
@@ -78,7 +77,7 @@ export default function StaffDashboard() {
   };
 
   const openStatusModal = (task, newStatus) => {
-    setSelectedTask({ ...task, status: newStatus });
+    setSelectedTask(newStatus !== undefined ? { ...task, status: newStatus } : task);
     setShowStatusModal(true);
   };
 
@@ -87,9 +86,24 @@ export default function StaffDashboard() {
     setShowDetailsModal(true);
   };
 
+  const handlePickTask = async (taskId) => {
+    try {
+      setLoading(true);
+      await pickTask(taskId);
+      await loadAvailableTasks(); // Refresh available tasks
+      await loadTasks(); // Refresh assigned tasks
+    } catch (err) {
+      console.error('Error picking task:', err);
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to pick task';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleProfileSuccess = () => {
     loadTasks();
-    loadRequests();
+    loadAvailableTasks();
   };
 
   return (
@@ -138,16 +152,16 @@ export default function StaffDashboard() {
 
       <nav className="dashboard-nav">
         <button 
+          className={activeTab === 'task-list' ? 'nav-btn active' : 'nav-btn'}
+          onClick={() => setActiveTab('task-list')}
+        >
+          Task List
+        </button>
+        <button 
           className={activeTab === 'my-tasks' ? 'nav-btn active' : 'nav-btn'}
           onClick={() => setActiveTab('my-tasks')}
         >
           My Tasks
-        </button>
-        <button 
-          className={activeTab === 'requests' ? 'nav-btn active' : 'nav-btn'}
-          onClick={() => setActiveTab('requests')}
-        >
-          Requests
         </button>
         <button 
           className={activeTab === 'history' ? 'nav-btn active' : 'nav-btn'}
@@ -168,10 +182,11 @@ export default function StaffDashboard() {
         <StaffDashboardTabs
           activeTab={activeTab}
           tasks={tasks}
-          requests={requests}
+          availableTasks={availableTasks}
           loading={loading}
           error={error}
-          onRefresh={activeTab === 'my-tasks' ? loadTasks : loadRequests}
+          onRefresh={activeTab === 'task-list' ? loadAvailableTasks : loadTasks}
+          onPickTask={handlePickTask}
           onUpdateStatus={openStatusModal}
           onViewDetails={openDetailsModal}
           user={user}

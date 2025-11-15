@@ -1,5 +1,5 @@
 // client/src/pages/quote/QuoteItemsPage.jsx - Màn 1: Thêm đồ dùng
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { fileToBase64 } from "../../utils/toBase64";
 import { updateRequestItems } from "../../api/requestApi";
@@ -14,6 +14,7 @@ export default function QuoteItemsPage() {
   const [items, setItems] = useState([
     { name: "", weight: "", length: "", width: "", height: "", images: [], isApartment: false }
   ]);
+  const [depositPaid, setDepositPaid] = useState(false);
 
   const addItem = () => {
     setItems([...items, { name: "", weight: "", length: "", width: "", height: "", images: [], isApartment: false }]);
@@ -74,7 +75,7 @@ export default function QuoteItemsPage() {
     // If this is a staff review, save items to request and navigate back
     if (state?.isStaffReview && state?.requestId && state?.taskId) {
       try {
-        await updateRequestItems(state.requestId, validItems, state.taskId);
+        await updateRequestItems(state.requestId, validItems, state.taskId, depositPaid);
         alert("✅ Đã lưu danh sách đồ dùng thành công!");
         nav("/dashboard/staff"); // Navigate back to staff dashboard
         return;
@@ -96,6 +97,15 @@ export default function QuoteItemsPage() {
   const hasApartment = items.some(it => it.isApartment);
 
   const isStaffReview = state?.isStaffReview;
+  const paymentMethod = state?.paymentMethod || 'cash';
+  const showDepositCheckbox = isStaffReview && paymentMethod === 'cash';
+  
+  // Initialize depositPaid from state if available
+  useEffect(() => {
+    if (state?.depositPaid !== undefined) {
+      setDepositPaid(state.depositPaid);
+    }
+  }, [state?.depositPaid]);
 
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: "auto" }}>
@@ -252,6 +262,40 @@ export default function QuoteItemsPage() {
       {hasApartment && (
         <div style={{ marginTop: 12, padding: 12, background: "#fff3cd", borderRadius: 6, color: "#856404" }}>
           ⚠️ Bạn đã chọn nhà chung cư/tầng cao. Có thể tính thêm phí vận chuyển tầng cao.
+        </div>
+      )}
+
+      {showDepositCheckbox && (
+        <div style={{ 
+          marginTop: 20, 
+          padding: 16, 
+          background: "#e8f5e9", 
+          borderRadius: 8, 
+          border: "1px solid #4caf50" 
+        }}>
+          <label style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            cursor: "pointer",
+            fontSize: 16,
+            fontWeight: 500
+          }}>
+            <input
+              type="checkbox"
+              checked={depositPaid}
+              onChange={(e) => setDepositPaid(e.target.checked)}
+              style={{ 
+                width: 20, 
+                height: 20, 
+                marginRight: 12,
+                cursor: "pointer"
+              }}
+            />
+            <span>💵 Khách hàng đã thanh toán tiền cọc (deposit)</span>
+          </label>
+          <p style={{ marginTop: 8, marginLeft: 32, fontSize: 14, color: "#666" }}>
+            Đánh dấu nếu khách hàng đã thanh toán tiền cọc khi bạn đến khảo sát
+          </p>
         </div>
       )}
     </div>

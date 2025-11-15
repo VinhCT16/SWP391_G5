@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getMyRequests } from '../../api/requestApi';
-import { getAllContracts } from '../../api/contractApi';
+import { getCustomerContracts } from '../../api/contractApi';
 import CustomerDashboardTabs from './customer/CustomerDashboardTabs';
 import ProfileModal from '../../components/dashboard/ProfileModal';
 import PasswordModal from '../../components/dashboard/PasswordModal';
@@ -36,8 +36,9 @@ export default function CustomerDashboard() {
   const loadContracts = async () => {
     try {
       setLoading(true);
-      const response = await getAllContracts();
-      // getAllContracts returns data directly, check both formats
+      // Use getCustomerContracts which is specifically for customers
+      const response = await getCustomerContracts(user?._id || user?.id);
+      // getCustomerContracts returns data directly, check both formats
       setContracts(response.contracts || response.data?.contracts || []);
     } catch (err) {
       console.error('Error loading contracts:', err);
@@ -49,8 +50,10 @@ export default function CustomerDashboard() {
 
   useEffect(() => {
     loadRequests();
-    loadContracts();
-  }, []);
+    if (user?._id || user?.id) {
+      loadContracts();
+    }
+  }, [user]);
 
   const handleRequestSuccess = () => {
     loadRequests();

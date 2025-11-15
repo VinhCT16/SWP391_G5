@@ -95,7 +95,37 @@ const requestSchema = new mongoose.Schema({
   },
 
   // Survey fee (for staff survey requests)
-  surveyFee: { type: Number, default: undefined }
+  surveyFee: { type: Number, default: undefined },
+  
+  // Payment Information
+  paymentMethod: {
+    type: String,
+    enum: ["cash", "online_banking"],
+    default: "cash"
+  },
+  paymentStatus: {
+    type: String,
+    enum: ["pending", "deposit_paid", "fully_paid", "not_paid"],
+    default: "pending"
+  },
+  depositPaid: {
+    type: Boolean,
+    default: false
+  },
+  depositPaidAt: Date,
+  depositPaidBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User" // Staff who marked deposit as paid
+  },
+  // VNPay transaction info
+  vnpayTransaction: {
+    transactionId: String,
+    amount: Number,
+    orderInfo: String,
+    paymentDate: Date,
+    responseCode: String,
+    transactionStatus: String
+  }
 }, { timestamps: true });
 
 module.exports = mongoose.model("Request", requestSchema);
