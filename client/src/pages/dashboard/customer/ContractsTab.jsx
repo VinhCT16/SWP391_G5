@@ -32,7 +32,7 @@ export default function ContractsTab({ contracts, loading }) {
             </CardHeader>
             <CardBody>
               <p><strong>Service:</strong> {contract.serviceId?.name || 'N/A'}</p>
-              <p><strong>Total Price:</strong> ${contract.pricing?.totalPrice || 0}</p>
+              <p><strong>Total Price:</strong> {new Intl.NumberFormat('vi-VN').format(contract.pricing?.totalPrice || 0)} đ</p>
               <p><strong>Status:</strong> {contract.status}</p>
               <p><strong>Created:</strong> {new Date(contract.createdAt).toLocaleDateString()}</p>
             </CardBody>

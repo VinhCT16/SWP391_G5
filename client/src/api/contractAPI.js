@@ -139,6 +139,43 @@ export async function getAllServices() {
   return data;
 }
 
+// Service Management APIs
+export async function createService(serviceData) {
+  const res = await fetchWithAuth(`${BASE}/contracts/services`, {
+    method: 'POST',
+    body: JSON.stringify(serviceData)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || res.statusText);
+  return data;
+}
+
+export async function updateService(serviceId, serviceData) {
+  const res = await fetchWithAuth(`${BASE}/contracts/services/${serviceId}`, {
+    method: 'PUT',
+    body: JSON.stringify(serviceData)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || res.statusText);
+  return data;
+}
+
+export async function deleteService(serviceId) {
+  const res = await fetchWithAuth(`${BASE}/contracts/services/${serviceId}`, {
+    method: 'DELETE'
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || res.statusText);
+  return data;
+}
+
+export async function getServiceById(serviceId) {
+  const res = await fetchWithAuth(`${BASE}/contracts/services/${serviceId}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || res.statusText);
+  return data;
+}
+
 export async function updateContractStatus(contractId, statusData) {
   const res = await fetchWithAuth(`${BASE}/contracts/${contractId}/status`, {
     method: 'PUT',

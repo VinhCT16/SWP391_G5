@@ -142,7 +142,7 @@ const autoCreateContractFromRequest = async (requestId, managerUserId) => {
       // Create a default service if none exists
       service = await Service.create({
         name: 'Standard Moving Service',
-        price: 500
+        price: 5000000 // 5,000,000 VND
       });
       console.log('Created default service:', service._id);
     }
@@ -158,7 +158,7 @@ const autoCreateContractFromRequest = async (requestId, managerUserId) => {
 
     // Calculate pricing - use request estimated price if available, otherwise use service price
     const estimatedPrice = request.estimatedPrice || {};
-    const basePrice = Number(estimatedPrice.basePrice) || Number(service.price) || 500;
+    const basePrice = Number(estimatedPrice.basePrice) || Number(service.price) || 5000000; // Default: 5,000,000 VND
     const additionalServices = estimatedPrice.additionalServices || [];
     const additionalTotal = additionalServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
     const totalPrice = Number(estimatedPrice.totalPrice) || (basePrice + additionalTotal);
@@ -291,9 +291,9 @@ const getAllServices = async (req, res) => {
     if (!services || services.length === 0) {
       console.log('No services found in database. Creating default services...');
       const defaultServices = [
-        { name: 'Local Move', price: 500 },
-        { name: 'Long Distance Move', price: 1500 },
-        { name: 'Commercial Move', price: 800 }
+        { name: 'Local Move', price: 5000000 },      // 5,000,000 VND
+        { name: 'Long Distance Move', price: 15000000 }, // 15,000,000 VND
+        { name: 'Commercial Move', price: 8000000 }      // 8,000,000 VND
       ];
       
       try {
@@ -390,7 +390,7 @@ const createContractFromRequest = async (req, res) => {
     
     console.log('Service found:', { serviceId: service._id, name: service.name, price: service.price });
 
-    // Calculate pricing with fallbacks
+    // Calculate pricing with fallbacks (all prices in VND)
     let basePrice = Number(pricing?.basePrice) || Number(service.price) || 0;
     const additionalTotal = (pricing?.additionalServices || []).reduce((sum, s) => {
       return sum + (Number(s.price) || 0);
@@ -401,19 +401,19 @@ const createContractFromRequest = async (req, res) => {
     const balance = totalPrice - deposit;
 
     // Map serviceType to match Contract enum
-    const validServiceTypes = ["Local Move", "Long Distance", "Commercial"];
-    let contractServiceType = request.moveDetails?.serviceType || 'Local Move';
+    const validServiceTypes = ["Chuyển nhà nội thành", "Chuyển nhà ngoại thành", "Vận chuyển văn phòng"];
+    let contractServiceType = request.moveDetails?.serviceType || 'Chuyển nhà nội thành';
     
     if (!validServiceTypes.includes(contractServiceType)) {
       const serviceTypeLower = contractServiceType.toLowerCase();
       if (serviceTypeLower.includes('local')) {
-        contractServiceType = 'Local Move';
+        contractServiceType = 'Chuyển nhà nội thành';
       } else if (serviceTypeLower.includes('long') || serviceTypeLower.includes('distance')) {
-        contractServiceType = 'Long Distance';
+        contractServiceType = 'Chuyển nhà ngoại thành"';
       } else if (serviceTypeLower.includes('commercial')) {
-        contractServiceType = 'Commercial';
+        contractServiceType = 'Vận chuyển văn phòng';
       } else {
-        contractServiceType = 'Local Move';
+        contractServiceType = 'Chuyển nhà nội thành';
       }
     }
 
@@ -1565,6 +1565,189 @@ const _old_autoCreateTasksFromContract = async (requestId, contract) => {
   }
 };
 
+// ============================================
+// SERVICE MANAGEMENT FUNCTIONS
+// ============================================
+
+// Create new service
+const createService = async (req, res) => {
+  try {
+    const { name, price } = req.body;
+
+    if (!name || !price) {
+      return res.status(400).json({ 
+        message: "Service name and price are required" 
+      });
+    }
+
+    if (typeof price !== 'number' && isNaN(Number(price))) {
+      return res.status(400).json({ 
+        message: "Price must be a valid number" 
+      });
+    }
+
+    const priceNum = Number(price);
+    if (priceNum < 0) {
+      return res.status(400).json({ 
+        message: "Price must be a positive number" 
+      });
+    }
+
+    // Check if service with same name already exists
+    const existingService = await Service.findOne({ 
+      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } 
+    });
+
+    if (existingService) {
+      return res.status(409).json({ 
+        message: "Service with this name already exists" 
+      });
+    }
+
+    const service = await Service.create({
+      name: name.trim(),
+      price: priceNum
+    });
+
+    res.status(201).json({
+      message: "Service created successfully",
+      service: {
+        _id: service._id,
+        name: service.name,
+        price: service.price
+      }
+    });
+  } catch (err) {
+    console.error("Error creating service:", err);
+    res.status(500).json({ 
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+};
+
+// Update service
+const updateService = async (req, res) => {
+  try {
+    const { serviceId } = req.params;
+    const { name, price } = req.body;
+
+    const service = await Service.findById(serviceId);
+    if (!service) {
+      return res.status(404).json({ message: "Service not found" });
+    }
+
+    // Update fields if provided
+    if (name !== undefined && name !== null) {
+      // Check if another service with same name exists
+      const existingService = await Service.findOne({ 
+        _id: { $ne: serviceId },
+        name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } 
+      });
+
+      if (existingService) {
+        return res.status(409).json({ 
+          message: "Service with this name already exists" 
+        });
+      }
+      service.name = name.trim();
+    }
+
+    if (price !== undefined && price !== null) {
+      if (isNaN(Number(price))) {
+        return res.status(400).json({ 
+          message: "Price must be a valid number" 
+        });
+      }
+      const priceNum = Number(price);
+      if (priceNum < 0) {
+        return res.status(400).json({ 
+          message: "Price must be a positive number" 
+        });
+      }
+      service.price = priceNum;
+    }
+
+    await service.save();
+
+    res.json({
+      message: "Service updated successfully",
+      service: {
+        _id: service._id,
+        name: service.name,
+        price: service.price
+      }
+    });
+  } catch (err) {
+    console.error("Error updating service:", err);
+    res.status(500).json({ 
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+};
+
+// Delete service
+const deleteService = async (req, res) => {
+  try {
+    const { serviceId } = req.params;
+
+    const service = await Service.findById(serviceId);
+    if (!service) {
+      return res.status(404).json({ message: "Service not found" });
+    }
+
+    // Check if service is being used in any contracts
+    const contractsUsingService = await Contract.countDocuments({ 
+      serviceId: serviceId 
+    });
+
+    if (contractsUsingService > 0) {
+      return res.status(400).json({ 
+        message: `Cannot delete service. It is being used in ${contractsUsingService} contract(s). Please update or remove those contracts first.` 
+      });
+    }
+
+    await Service.findByIdAndDelete(serviceId);
+
+    res.json({
+      message: "Service deleted successfully"
+    });
+  } catch (err) {
+    console.error("Error deleting service:", err);
+    res.status(500).json({ 
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+};
+
+// Get service by ID
+const getServiceById = async (req, res) => {
+  try {
+    const { serviceId } = req.params;
+
+    const service = await Service.findById(serviceId);
+    if (!service) {
+      return res.status(404).json({ message: "Service not found" });
+    }
+
+    res.json({
+      service: {
+        _id: service._id,
+        name: service.name,
+        price: service.price
+      }
+    });
+  } catch (err) {
+    console.error("Error fetching service:", err);
+    res.status(500).json({ 
+      message: "Server error",
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
+  }
+};
+
 module.exports = {
   autoCreateTasksFromContract,
   createContractFromRequest,
@@ -1587,5 +1770,10 @@ module.exports = {
   approveAndAssign,
   managerSignContract,
   customerSignContract,
-  getAllServices
+  getAllServices,
+  // Service management functions
+  createService,
+  updateService,
+  deleteService,
+  getServiceById
 };

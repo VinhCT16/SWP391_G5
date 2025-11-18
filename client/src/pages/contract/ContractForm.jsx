@@ -36,9 +36,9 @@ const ContractForm = () => {
 
   const loadDefaultServices = () => {
     const mockServices = [
-      { _id: '1', name: 'Local Move', price: 500 },
-      { _id: '2', name: 'Long Distance Move', price: 1500 },
-      { _id: '3', name: 'Commercial Move', price: 800 }
+      { _id: '1', name: 'Chuyển nhà nội thành', price: 7000000 },
+      { _id: '2', name: 'Chuyển nhà ngoại thành', price: 10000000 },
+      { _id: '3', name: 'Vận chuyển văn phòng', price: 12000000 }
     ];
     setServices(mockServices);
     setError('Failed to load services from server. Using default services. Note: These services may not exist in the database.');
@@ -317,7 +317,7 @@ const ContractForm = () => {
             <option value="">Select a service</option>
             {services.map(service => (
               <option key={service._id} value={service._id}>
-                {service.name} - ${service.price}
+                {service.name} - {new Intl.NumberFormat('vi-VN').format(service.price || 0)} đ
               </option>
             ))}
           </select>
@@ -328,7 +328,7 @@ const ContractForm = () => {
           <h3>Pricing Details</h3>
           
           <div className="form-group">
-            <label htmlFor="pricing.basePrice">Base Price ($)</label>
+            <label htmlFor="pricing.basePrice">Base Price (VND)</label>
             <input
               type="number"
               id="pricing.basePrice"
@@ -336,7 +336,7 @@ const ContractForm = () => {
               value={formData.pricing.basePrice}
               onChange={handleInputChange}
               min="0"
-              step="0.01"
+              step="1000"
               required
             />
           </div>
@@ -354,11 +354,11 @@ const ContractForm = () => {
                 />
                 <input
                   type="number"
-                  placeholder="Price"
+                  placeholder="Price (VND)"
                   value={service.price}
                   onChange={(e) => handleAdditionalServiceChange(index, 'price', parseFloat(e.target.value) || 0)}
                   min="0"
-                  step="0.01"
+                  step="1000"
                 />
                 <button
                   type="button"
@@ -379,7 +379,7 @@ const ContractForm = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="pricing.deposit">Deposit ($)</label>
+            <label htmlFor="pricing.deposit">Deposit (VND)</label>
             <input
               type="number"
               id="pricing.deposit"
@@ -387,30 +387,30 @@ const ContractForm = () => {
               value={formData.pricing.deposit}
               onChange={handleInputChange}
               min="0"
-              step="0.01"
+              step="1000"
             />
           </div>
 
           <div className="pricing-summary">
             <div className="summary-item">
               <span>Base Price:</span>
-              <span>${formData.pricing.basePrice}</span>
+              <span>{new Intl.NumberFormat('vi-VN').format(formData.pricing.basePrice || 0)} đ</span>
             </div>
             <div className="summary-item">
               <span>Additional Services:</span>
-              <span>${formData.pricing.additionalServices.reduce((sum, service) => sum + (service.price || 0), 0)}</span>
+              <span>{new Intl.NumberFormat('vi-VN').format(formData.pricing.additionalServices.reduce((sum, service) => sum + (service.price || 0), 0))} đ</span>
             </div>
             <div className="summary-item total">
               <span>Total:</span>
-              <span>${formData.pricing.totalPrice}</span>
+              <span>{new Intl.NumberFormat('vi-VN').format(formData.pricing.totalPrice || 0)} đ</span>
             </div>
             <div className="summary-item">
               <span>Deposit:</span>
-              <span>${formData.pricing.deposit}</span>
+              <span>{new Intl.NumberFormat('vi-VN').format(formData.pricing.deposit || 0)} đ</span>
             </div>
             <div className="summary-item balance">
               <span>Balance:</span>
-              <span>${formData.pricing.balance}</span>
+              <span>{new Intl.NumberFormat('vi-VN').format(formData.pricing.balance || 0)} đ</span>
             </div>
           </div>
         </div>

@@ -40,7 +40,7 @@ export default function ContractsTab({
                   <p><strong>Customer:</strong> {contract.customerId?.name}</p>
                   <p><strong>From:</strong> {contract.moveDetails?.fromAddress}</p>
                   <p><strong>To:</strong> {contract.moveDetails?.toAddress}</p>
-                  <p><strong>Total Price:</strong> ${contract.pricing?.totalPrice}</p>
+                  <p><strong>Total Price:</strong> {new Intl.NumberFormat('vi-VN').format(contract.pricing?.totalPrice || 0)} đ</p>
                   <p><strong>Created:</strong> {new Date(contract.createdAt).toLocaleDateString()}</p>
                 </div>
               </CardBody>

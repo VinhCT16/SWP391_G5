@@ -17,7 +17,11 @@ const {
   getAllContracts,
   getContractById,
   getContractByIdPublic,
-  updateContractStatus
+  updateContractStatus,
+  createService,
+  updateService,
+  deleteService,
+  getServiceById
 } = require("../controllers/contractController");
 const auth = require("../utils/authMiddleware");
 const { requireManager, requireCustomer, requireStaff } = require("../utils/authMiddleware");
@@ -27,8 +31,14 @@ const router = express.Router();
 
 // Specific routes (must be defined before parameterized routes)
 router.get("/", auth, getAllContracts);
-router.get("/services", auth, getAllServices);
 router.get("/approval", auth, requireManager, getContractsForApproval);
+
+// Service management routes (specific routes before parameterized)
+router.get("/services", auth, getAllServices);
+router.post("/services", auth, requireManager, createService);
+router.get("/services/:serviceId", auth, getServiceById);
+router.put("/services/:serviceId", auth, requireManager, updateService);
+router.delete("/services/:serviceId", auth, requireManager, deleteService);
 router.post("/approve", auth, requireManager, require("../controllers/contractController").approveAndAssign);
 router.post("/from-request/:requestId", auth, requireManager, createContractFromRequest);
 router.get("/customer/:customerId", auth, requireCustomer, async (req, res) => {

@@ -142,7 +142,7 @@ const CustomerProgressTracking = () => {
                     <p><strong>From:</strong> {contract.moveDetails?.fromAddress}</p>
                     <p><strong>To:</strong> {contract.moveDetails?.toAddress}</p>
                     <p><strong>Date:</strong> {new Date(contract.moveDetails?.moveDate).toLocaleDateString()}</p>
-                    <p><strong>Total:</strong> ${contract.pricing?.totalPrice}</p>
+                    <p><strong>Total:</strong> {new Intl.NumberFormat('vi-VN').format(contract.pricing?.totalPrice || 0)} đ</p>
                   </div>
                 </div>
               ))}

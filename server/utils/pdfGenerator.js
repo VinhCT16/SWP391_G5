@@ -51,14 +51,20 @@ const generateContractPDF = async (contract) => {
     
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    doc.text(`Base Price: $${contract.pricing?.basePrice || 0}`, 20, 160);
+    
+    // Format number as VND
+    const formatVND = (amount) => {
+      return new Intl.NumberFormat('vi-VN').format(amount || 0);
+    };
+    
+    doc.text(`Base Price: ${formatVND(contract.pricing?.basePrice)} đ`, 20, 160);
     
     // Additional Services
     if (contract.pricing?.additionalServices && contract.pricing.additionalServices.length > 0) {
       doc.text('Additional Services:', 20, 167);
       let yPos = 174;
       contract.pricing.additionalServices.forEach((service, index) => {
-        doc.text(`  ${service.service}: $${service.price}`, 20, yPos);
+        doc.text(`  ${service.service}: ${formatVND(service.price)} đ`, 20, yPos);
         yPos += 7;
       });
     }
@@ -66,9 +72,9 @@ const generateContractPDF = async (contract) => {
     const totalY = contract.pricing?.additionalServices ? 
       174 + (contract.pricing.additionalServices.length * 7) : 167;
     
-    doc.text(`Total Price: $${contract.pricing?.totalPrice || 0}`, 20, totalY + 7);
-    doc.text(`Deposit: $${contract.pricing?.deposit || 0}`, 20, totalY + 14);
-    doc.text(`Balance Due: $${contract.pricing?.balance || 0}`, 20, totalY + 21);
+    doc.text(`Total Price: ${formatVND(contract.pricing?.totalPrice)} đ`, 20, totalY + 7);
+    doc.text(`Deposit: ${formatVND(contract.pricing?.deposit)} đ`, 20, totalY + 14);
+    doc.text(`Balance Due: ${formatVND(contract.pricing?.balance)} đ`, 20, totalY + 21);
     
     // Payment Method
     doc.setFontSize(14);

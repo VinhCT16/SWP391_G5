@@ -7,26 +7,24 @@ const auth = require("../utils/authMiddleware");
 const router = express.Router();
 
 const COOKIE_NAME = "access_token";
-const TOKEN_EXPIRES_IN = "24h"; // Increased from 15m to 24h for better user experience
+const TOKEN_EXPIRES_IN = "15m";
 
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password, phone, role = "customer" } = req.body;
     if (!name || !email || !password) {
-      return res.status(400).json({ message: "Name, email, and password are required" });
+``      return res.status(400).json({ message: "Tên, email và mật khẩu là bắt buộc" });
     }
 
-    // Public registration only allows customer role
-    // Manager, staff, and admin accounts must be created by admin with proper credentials
-    if (role !== "customer") {
-      return res.status(403).json({ 
-        message: "Only customer accounts can be created through public registration. Other roles must be created by an administrator." 
-      });
+    // Validate role
+    const validRoles = ["customer", "manager", "staff", "admin"];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: "Vai trò không hợp lệ" });
     }
 
     const existing = await User.findOne({ email: email.toLowerCase() });
     if (existing) {
-      return res.status(409).json({ message: "Email already in use" });
+      return res.status(409).json({ message: "Email đã được sử dụng" });
     }
 
     const hashed = await bcrypt.hash(password, 10);
@@ -34,7 +32,7 @@ router.post("/register", async (req, res) => {
       name, 
       email: email.toLowerCase(), 
       password: hashed,
-      role: "customer", // Force customer role for public registration
+      role,
       phone: phone || null
     };
     
@@ -48,15 +46,7 @@ router.post("/register", async (req, res) => {
     };
     return res.status(201).json({ user: safeUser });
   } catch (err) {
-    console.error("Registration error:", err);
-    // Return more specific error messages
-    if (err.name === 'ValidationError') {
-      return res.status(400).json({ message: err.message || "Validation error" });
-    }
-    if (err.code === 11000) {
-      return res.status(409).json({ message: "Email already in use" });
-    }
-    return res.status(500).json({ message: "Server error: " + (err.message || "Unknown error") });
+    return res.status(500).json({ message: "Lỗi máy chủ" });
   }
 });
 
@@ -64,17 +54,17 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password are required" });
+      return res.status(400).json({ message: "Email và mật khẩu là bắt buộc" });
     }
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: "Thông tin đăng nhập không hợp lệ" });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({ message: "Thông tin đăng nhập không hợp lệ" });
     }
 
     const token = jwt.sign({ 
@@ -87,32 +77,11 @@ router.post("/login", async (req, res) => {
     });
 
     const isProd = process.env.NODE_ENV === "production";
-    
-    // Clear any existing cookies first to avoid accumulation
-    res.clearCookie(COOKIE_NAME, { path: '/' });
-    res.clearCookie(COOKIE_NAME, { path: '/', domain: undefined });
-    
-    // Set new cookie with proper settings for development and production
-    const cookieOptions = {
+    res.cookie(COOKIE_NAME, token, {
       httpOnly: true,
-      secure: isProd, // Only use secure cookies in production (HTTPS)
-      sameSite: isProd ? "strict" : "lax", // Lax for development to allow cross-site requests
-      path: '/', // Available for all paths
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds (matches token expiration)
-    };
-    
-    // In development, don't set domain to allow localhost to work
-    if (!isProd) {
-      cookieOptions.domain = undefined; // Don't set domain in development
-    }
-    
-    res.cookie(COOKIE_NAME, token, cookieOptions);
-    
-    console.log('Cookie set successfully', {
-      cookieName: COOKIE_NAME,
-      hasToken: !!token,
-      isProd: isProd,
-      cookieOptions: cookieOptions
+      secure: isProd,
+      sameSite: isProd ? "strict" : "lax",
+      maxAge: 15 * 60 * 1000,
     });
 
     const safeUser = { 
@@ -124,25 +93,23 @@ router.post("/login", async (req, res) => {
     };
     return res.json({ user: safeUser });
   } catch (err) {
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Lỗi máy chủ" });
   }
 });
 
 router.post("/logout", (req, res) => {
   const isProd = process.env.NODE_ENV === "production";
-  // Clear cookie with same options used to set it
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? "strict" : "lax",
-    path: '/'
   });
-  return res.json({ message: "Logged out" });
+  return res.json({ message: "Đã đăng xuất" });
 });
 
 router.get("/me", auth, async (req, res) => {
   const user = await User.findById(req.userId).select("name email role phone");
-  if (!user) return res.status(404).json({ message: "Not found" });
+  if (!user) return res.status(404).json({ message: "Không tìm thấy" });
   return res.json({ 
     user: { 
       id: user._id, 
@@ -161,12 +128,12 @@ router.put("/profile", auth, async (req, res) => {
     const userId = req.userId;
 
     if (!name) {
-      return res.status(400).json({ message: "Name is required" });
+      return res.status(400).json({ message: "Tên là bắt buộc" });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }
 
     // Update user fields
@@ -184,12 +151,12 @@ router.put("/profile", auth, async (req, res) => {
     };
 
     return res.json({ 
-      message: "Profile updated successfully",
+      message: "Cập nhật hồ sơ thành công",
       user: safeUser 
     });
   } catch (err) {
     console.error("Error updating profile:", err);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Lỗi máy chủ" });
   }
 });
 
@@ -200,22 +167,22 @@ router.put("/password", auth, async (req, res) => {
     const userId = req.userId;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Current password and new password are required" });
+      return res.status(400).json({ message: "Cần nhập mật khẩu hiện tại và mật khẩu mới" });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ message: "New password must be at least 6 characters long" });
+      return res.status(400).json({ message: "Mật khẩu mới phải có ít nhất 6 ký tự" });
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
     }
 
     // Verify current password
     const match = await bcrypt.compare(currentPassword, user.password);
     if (!match) {
-      return res.status(401).json({ message: "Current password is incorrect" });
+      return res.status(401).json({ message: "Mật khẩu hiện tại không đúng" });
     }
 
     // Hash new password
@@ -224,15 +191,109 @@ router.put("/password", auth, async (req, res) => {
 
     await user.save();
 
-    return res.json({ message: "Password changed successfully" });
+    return res.json({ message: "Đổi mật khẩu thành công" });
   } catch (err) {
     console.error("Error changing password:", err);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Lỗi máy chủ" });
   }
 });
 
-// Note: Profile creation endpoints removed - role-specific data is now stored directly in User model
-// Profile data should be set during user creation (by admin) or updated via profile update endpoint
+// Create Manager Profile (requires manager role)
+router.post("/create-manager", auth, require("../utils/authMiddleware").requireManager, async (req, res) => {
+  try {
+    const Manager = require("../models/Manager");
+    const { employeeId, department, permissions } = req.body;
+    
+    // Check if manager profile already exists
+    const existingManager = await Manager.findOne({ userId: req.userId });
+    if (existingManager) {
+      return res.status(409).json({ message: "Hồ sơ quản lý đã tồn tại" });
+    }
+    
+    const manager = await Manager.create({
+      userId: req.userId,
+      employeeId,
+      department,
+      permissions: permissions || []
+    });
+    
+    return res.status(201).json({ manager });
+  } catch (err) {
+    return res.status(500).json({ message: "Lỗi máy chủ" });
+  }
+});
+
+// Create Staff Profile (requires staff role)
+router.post("/create-staff", auth, require("../utils/authMiddleware").requireStaff, async (req, res) => {
+  try {
+    const Staff = require("../models/Staff");
+    const { employeeId, role, specialization, availability } = req.body;
+    
+    // Check if staff profile already exists
+    const existingStaff = await Staff.findOne({ userId: req.userId });
+    if (existingStaff) {
+      return res.status(409).json({ message: "Hồ sơ nhân viên đã tồn tại" });
+    }
+    
+    const staff = await Staff.create({
+      userId: req.userId,
+      employeeId,
+      role,
+      specialization: specialization || [],
+      availability: availability || {
+        isAvailable: true,
+        workingHours: { start: "08:00", end: "17:00" },
+        workDays: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+      }
+    });
+    
+    return res.status(201).json({ staff });
+  } catch (err) {
+    return res.status(500).json({ message: "Lỗi máy chủ" });
+  }
+});
+
+// Create Admin Profile (requires admin role)
+router.post("/create-admin", auth, require("../utils/authMiddleware").requireAdmin, async (req, res) => {
+  try {
+    const Admin = require("../models/Admin");
+    const { adminId, department, permissions } = req.body;
+    
+    // Check if admin profile already exists
+    const existingAdmin = await Admin.findOne({ userId: req.userId });
+    if (existingAdmin) {
+      return res.status(409).json({ message: "Hồ sơ quản trị đã tồn tại" });
+    }
+    
+    const admin = await Admin.create({
+      userId: req.userId,
+      adminId,
+      department,
+      permissions: permissions || {
+        userManagement: {
+          canViewUsers: true,
+          canCreateUsers: true,
+          canUpdateUsers: true,
+          canDeleteUsers: true,
+          canLockUnlockUsers: true
+        },
+        staffManagement: {
+          canManageStaff: true,
+          canAssignRoles: true,
+          canViewStaffPerformance: true
+        },
+        systemManagement: {
+          canViewSystemLogs: true,
+          canManageSystemSettings: true
+        }
+      }
+    });
+    
+    return res.status(201).json({ admin });
+  } catch (err) {
+    return res.status(500).json({ message: "Lỗi máy chủ" });
+  }
+});
 
 module.exports = router;
 
