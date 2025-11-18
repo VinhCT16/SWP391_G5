@@ -6,6 +6,8 @@ import { getContractsForApproval, approveContract, rejectContract } from '../../
 import ManagerDashboardTabs from './manager/ManagerDashboardTabs';
 import ApprovalModal from '../../components/dashboard/ApprovalModal';
 import AssignStaffModal from '../../components/dashboard/AssignStaffModal';
+import ProfileModal from '../../components/dashboard/ProfileModal';
+import PasswordModal from '../../components/dashboard/PasswordModal';
 import './ManagerDashboard.css';
 
 export default function ManagerDashboard() {
@@ -21,6 +23,8 @@ export default function ManagerDashboard() {
   const [approvalActionType, setApprovalActionType] = useState('approve');
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [availableStaff, setAvailableStaff] = useState([]);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [activeTab, setActiveTab] = useState('requests');
   const [filters, setFilters] = useState({
     status: '',
@@ -204,12 +208,25 @@ export default function ManagerDashboard() {
           >
             Contracts
           </button>
+          <button 
+            className={activeTab === 'services' ? 'nav-btn active' : 'nav-btn'}
+            onClick={() => setActiveTab('services')}
+          >
+            Services
+          </button>
+          <button 
+            className={activeTab === 'profile' ? 'nav-btn active' : 'nav-btn'}
+            onClick={() => setActiveTab('profile')}
+          >
+            Profile
+          </button>
         </div>
 
         {error && <div className="error-message">{error}</div>}
         
         <ManagerDashboardTabs
           activeTab={activeTab}
+          user={user}
           requests={requests}
           contracts={contracts}
           loading={loading}
@@ -245,6 +262,8 @@ export default function ManagerDashboard() {
               handleContractRejection(contract._id, rejectionReason, notes || '');
             }
           }}
+          onOpenProfileModal={() => setShowProfileModal(true)}
+          onOpenPasswordModal={() => setShowPasswordModal(true)}
         />
       </main>
 
@@ -271,6 +290,24 @@ export default function ManagerDashboard() {
         availableStaff={availableStaff}
         onAssign={handleAssignStaff}
         loading={loading}
+      />
+
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        user={user}
+        onSuccess={() => {
+          // Refresh user data if needed
+          window.location.reload();
+        }}
+      />
+
+      <PasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onSuccess={() => {
+          // Password changed successfully
+        }}
       />
     </div>
   );
