@@ -5,6 +5,7 @@ const cookieParser = require("cookie-parser");
 const dotenv = require("dotenv");
 const { connectDB } = require("./config/db");
 const http = require("http");
+const path = require("path");
 
 
 dotenv.config();
@@ -26,6 +27,9 @@ app.use(cors({
 
 // Cookie parser must be after CORS
 app.use(cookieParser());
+
+// Serve static files from uploads directory
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Middleware to handle cookie size issues - clear if too many cookies
 app.use((req, res, next) => {

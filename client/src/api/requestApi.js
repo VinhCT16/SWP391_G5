@@ -136,6 +136,22 @@ export async function assignStaffToRequest(requestId, data) {
   return responseData;
 }
 
+// Upload images for quote items
+export async function uploadImages(files) {
+  const formData = new FormData();
+  Array.from(files).forEach((file) => {
+    formData.append("images", file);
+  });
+  
+  const res = await fetchWithAuth(`${BASE}/requests/upload-images`, {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || data.message || res.statusText);
+  return data;
+}
+
 // Update request items (for staff review tasks)
 export async function updateRequestItems(requestId, items, taskId, depositPaid = false) {
   const res = await fetchWithAuth(`${BASE}/requests/${requestId}/items`, {

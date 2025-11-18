@@ -1,8 +1,7 @@
 // client/src/pages/quote/QuoteItemsPage.jsx - Màn 1: Thêm đồ dùng
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { fileToBase64 } from "../../utils/toBase64";
-import { updateRequestItems } from "../../api/requestApi";
+import { updateRequestItems, uploadImages } from "../../api/requestApi";
 
 const MAX_IMAGES_PER_ITEM = 4;
 const MAX_FILE_MB = 1.5;
@@ -41,19 +40,40 @@ export default function QuoteItemsPage() {
       return;
     }
 
-    const arr = [];
+    // Validate file sizes
     for (const f of filesList.slice(0, remain)) {
       const sizeMB = f.size / (1024 * 1024);
       if (sizeMB > MAX_FILE_MB) {
         alert(`Ảnh ${f.name} vượt ${MAX_FILE_MB}MB`);
         return;
       }
-      arr.push(await fileToBase64(f));
     }
 
-    setItems(items.map((it, i) => 
-      i === idx ? { ...it, images: [...it.images, ...arr] } : it
-    ));
+    try {
+      // Upload images using multer
+      const filesToUpload = filesList.slice(0, remain);
+      const response = await uploadImages(filesToUpload);
+      const imageUrls = response.imageUrls || [];
+      
+      // Get base URL for images (static files are served from root, not /api)
+      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:3000/api";
+      // Extract base URL without /api for static files
+      const STATIC_BASE = API_BASE.replace(/\/api$/, "") || "http://localhost:3000";
+      const fullImageUrls = imageUrls.map(url => {
+        // If URL already starts with http, use as-is; otherwise prepend static base
+        if (url.startsWith("http")) {
+          return url;
+        }
+        return `${STATIC_BASE}${url}`;
+      });
+
+      setItems(items.map((it, i) => 
+        i === idx ? { ...it, images: [...it.images, ...fullImageUrls] } : it
+      ));
+    } catch (error) {
+      console.error("Error uploading images:", error);
+      alert("❌ Lỗi khi upload ảnh: " + (error.message || "Unknown error"));
+    }
   };
 
   const removeImage = (itemIdx, imgIdx) => {
