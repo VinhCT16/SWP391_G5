@@ -48,6 +48,11 @@ const AdminDashboard = () => {
     category: ''
   });
   const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [customerComplaints, setCustomerComplaints] = useState([]);
+  const [showUserDetails, setShowUserDetails] = useState(false);
+  const [showCustomerDetails, setShowCustomerDetails] = useState(false);
 
   useEffect(() => {
     loadUserStats();
@@ -71,7 +76,14 @@ const AdminDashboard = () => {
       setCustomerStats(response.data);
     } catch (err) {
       console.error('Error loading customer stats:', err);
-      setError('Failed to load customer statistics');
+      console.error('Error details:', {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        url: err.config?.url,
+        message: err.message
+      });
+      // Don't set error for stats, just log it - stats are not critical
+      // setError('Failed to load customer statistics');
     }
   };
 
@@ -260,6 +272,63 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleViewUserDetails = async (userId) => {
+    try {
+      setLoading(true);
+      const response = await adminApi.getUserById(userId);
+      setSelectedUser(response.data);
+      setShowUserDetails(true);
+    } catch (err) {
+      setError('Failed to load user details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (userId) => {
+    const newPassword = prompt('Enter new password (min 6 characters):');
+    if (newPassword && newPassword.length >= 6) {
+      try {
+        setLoading(true);
+        await adminApi.resetUserPassword(userId, newPassword);
+        alert('Password reset successfully');
+      } catch (err) {
+        setError(err?.response?.data?.message || 'Failed to reset password');
+      } finally {
+        setLoading(false);
+      }
+    } else if (newPassword) {
+      alert('Password must be at least 6 characters long');
+    }
+  };
+
+  const handleViewCustomerDetails = async (customerId) => {
+    try {
+      setLoading(true);
+      const response = await adminApi.getCustomerById(customerId);
+      setSelectedCustomer(response.data);
+      setShowCustomerDetails(true);
+    } catch (err) {
+      setError('Failed to load customer details');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewCustomerComplaints = async (customerId) => {
+    try {
+      setLoading(true);
+      const response = await adminApi.getCustomerComplaints(customerId);
+      setCustomerComplaints(response.data.complaints);
+      setSelectedCustomer({ _id: customerId });
+      setShowCustomerDetails(true);
+    } catch (err) {
+      setError('Failed to load customer complaints');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (user?.role !== 'admin') {
     return (
       <div className="admin-dashboard">
@@ -380,6 +449,24 @@ const AdminDashboard = () => {
           onUpdateCustomer={handleUpdateCustomer}
           onAction={handleComplaintAction}
           onAddUser={() => setShowAddUserModal(true)}
+          onViewUserDetails={handleViewUserDetails}
+          onResetPassword={handleResetPassword}
+          onViewCustomerDetails={handleViewCustomerDetails}
+          onViewCustomerComplaints={handleViewCustomerComplaints}
+          selectedUser={selectedUser}
+          selectedCustomer={selectedCustomer}
+          customerComplaints={customerComplaints}
+          showUserDetails={showUserDetails}
+          showCustomerDetails={showCustomerDetails}
+          onCloseUserDetails={() => {
+            setShowUserDetails(false);
+            setSelectedUser(null);
+          }}
+          onCloseCustomerDetails={() => {
+            setShowCustomerDetails(false);
+            setSelectedCustomer(null);
+            setCustomerComplaints([]);
+          }}
         />
       </div>
 

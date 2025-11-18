@@ -12,7 +12,9 @@ export default function UserManagementTab({
   onUpdateRole,
   onToggleStatus,
   onDelete,
-  onAddUser
+  onAddUser,
+  onViewUserDetails,
+  onResetPassword
 }) {
   return (
     <div>
@@ -88,7 +90,21 @@ export default function UserManagementTab({
                   </td>
                   <td>{new Date(user.createdAt).toLocaleDateString()}</td>
                   <td>
-                    <div className="action-buttons">
+                    <div className="action-buttons" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <Button
+                        variant="info"
+                        size="small"
+                        onClick={() => onViewUserDetails(user._id)}
+                      >
+                        View
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={() => onResetPassword(user._id)}
+                      >
+                        Reset Password
+                      </Button>
                       <Button
                         variant={user.isActive ? 'warning' : 'success'}
                         size="small"

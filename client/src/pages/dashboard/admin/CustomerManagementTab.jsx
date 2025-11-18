@@ -11,7 +11,9 @@ export default function CustomerManagementTab({
   onFilterChange,
   onPageChange,
   onToggleStatus,
-  onUpdate
+  onUpdate,
+  onViewCustomerDetails,
+  onViewCustomerComplaints
 }) {
   return (
     <div style={{ background: 'white', borderRadius: '8px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
@@ -77,7 +79,21 @@ export default function CustomerManagementTab({
                   <td>{customer.totalRequests || 0}</td>
                   <td>{new Date(customer.createdAt).toLocaleDateString()}</td>
                   <td>
-                    <div className="action-buttons">
+                    <div className="action-buttons" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <Button
+                        variant="info"
+                        size="small"
+                        onClick={() => onViewCustomerDetails(customer._id)}
+                      >
+                        View Details
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onClick={() => onViewCustomerComplaints(customer._id)}
+                      >
+                        View Complaints
+                      </Button>
                       <Button
                         variant={customer.isActive ? 'warning' : 'success'}
                         size="small"

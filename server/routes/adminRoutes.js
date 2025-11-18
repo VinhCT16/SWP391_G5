@@ -19,10 +19,10 @@ router.delete("/users/:userId", adminController.deleteUser);
 
 // Customer management routes
 router.get("/customers", adminController.getAllCustomers);
-router.get("/customers/stats", adminController.getCustomerStats);
+router.get("/customers/stats", adminController.getCustomerStats); // Must be before /customers/:customerId
+router.get("/customers/:customerId/complaints", adminController.getCustomerComplaints); // Must be before /customers/:customerId
 router.get("/customers/:customerId", adminController.getCustomerById);
 router.put("/customers/:customerId", adminController.updateCustomerAccount);
-router.get("/customers/:customerId/complaints", adminController.getCustomerComplaints);
 
 // Complaint management routes
 router.get("/complaints", adminController.getAllComplaints);
