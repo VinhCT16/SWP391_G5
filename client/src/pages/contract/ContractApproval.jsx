@@ -36,13 +36,21 @@ const ContractApproval = () => {
   const loadContracts = async () => {
     try {
       setLoading(true);
+      setError('');
       const params = viewMode === 'signed' 
         ? { showSigned: true } 
         : { status: 'pending_approval' };
       const response = await getContractsForApproval(params);
-      setContracts(response.data.contracts || []);
+      // Handle both response.contracts and response.data?.contracts
+      const contracts = response.contracts || response.data?.contracts || [];
+      setContracts(contracts);
+      if (contracts.length === 0 && viewMode === 'signed') {
+        console.log('No signed contracts found. Check if contracts have both signatures.');
+      }
     } catch (err) {
-      setError('Failed to load contracts');
+      console.error('Error loading contracts:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load contracts';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

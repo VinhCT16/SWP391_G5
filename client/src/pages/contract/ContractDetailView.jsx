@@ -28,10 +28,25 @@ const ContractDetailView = () => {
   const loadContract = useCallback(async () => {
     try {
       setLoading(true);
+      setError('');
       const response = await getContractById(id);
-      setContract(response.data.contract);
+      // Handle both response.contract and response.data.contract
+      const contract = response.contract || response.data?.contract;
+      if (!contract) {
+        throw new Error('Contract data not found in response');
+      }
+      setContract(contract);
     } catch (err) {
-      setError('Failed to load contract');
+      console.error('Error loading contract:', err);
+      const errorMessage = err.message || err.response?.data?.message || 'Failed to load contract';
+      setError(errorMessage);
+      
+      // If access denied, show more helpful message
+      if (err.response?.status === 403 || err.message?.includes('Access denied')) {
+        setError(err.response?.data?.message || 'Access denied: You do not have permission to view this contract.');
+      } else if (err.response?.status === 401) {
+        setError('Unauthorized: Please login again.');
+      }
     } finally {
       setLoading(false);
     }

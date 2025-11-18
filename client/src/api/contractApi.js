@@ -32,7 +32,11 @@ export async function getCustomerContracts(customerId) {
 export async function getContractById(id) {
   const res = await fetchWithAuth(`${BASE}/contracts/${id}`);
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) {
+    const error = new Error(data.message || data.error || res.statusText);
+    error.response = { status: res.status, data };
+    throw error;
+  }
   return data;
 }
 
@@ -41,7 +45,11 @@ export async function getContractsForApproval(params = {}) {
   const url = queryParams ? `${BASE}/contracts/approval?${queryParams}` : `${BASE}/contracts/approval`;
   const res = await fetchWithAuth(url);
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) {
+    const error = new Error(data.message || data.error || res.statusText);
+    error.response = { status: res.status, data };
+    throw error;
+  }
   return data;
 }
 
@@ -61,7 +69,11 @@ export async function approveContract(contractId, approvalData = {}) {
     body: JSON.stringify(approvalData)
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) {
+    const error = new Error(data.message || data.error || res.statusText);
+    error.response = { status: res.status, data };
+    throw error;
+  }
   return data;
 }
 
@@ -71,7 +83,11 @@ export async function rejectContract(contractId, rejectionData) {
     body: JSON.stringify(rejectionData)
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || res.statusText);
+  if (!res.ok) {
+    const error = new Error(data.message || data.error || res.statusText);
+    error.response = { status: res.status, data };
+    throw error;
+  }
   return data;
 }
 

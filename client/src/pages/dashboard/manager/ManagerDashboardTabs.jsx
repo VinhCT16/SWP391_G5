@@ -1,8 +1,8 @@
 import React from 'react';
 import RequestsTab from './RequestsTab';
 import ContractsTab from './ContractsTab';
-import ProfileTab from './ProfileTab';
 import ServicesTab from './ServicesTab';
+import ProfileTab from './ProfileTab.jsx';
 
 export default function ManagerDashboardTabs({ activeTab, ...props }) {
   switch (activeTab) {

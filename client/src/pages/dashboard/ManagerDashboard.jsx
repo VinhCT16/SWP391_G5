@@ -82,12 +82,15 @@ export default function ManagerDashboard() {
   const handleContractApproval = async (contractId, notes) => {
     try {
       setLoading(true);
-      await approveContract(contractId, { notes });
+      setError(null);
+      const response = await approveContract(contractId, { notes });
       await loadContracts();
       alert('Contract approved successfully!');
     } catch (err) {
       console.error('Error approving contract:', err);
-      setError(err?.response?.data?.message || 'Failed to approve contract');
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to approve contract';
+      setError(errorMessage);
+      alert(`Error: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

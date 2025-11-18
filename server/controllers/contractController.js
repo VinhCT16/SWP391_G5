@@ -546,13 +546,26 @@ const createContractFromRequest = async (req, res) => {
 // Get contracts for approval (manager view)
 const getContractsForApproval = async (req, res) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, showSigned, status } = req.query;
     const skip = (page - 1) * limit;
 
-    // Get contracts that need approval (pending_approval or draft status)
-    const filter = {
-      status: { $in: ['draft', 'pending_approval'] }
-    };
+    let filter = {};
+
+    // If showSigned is true, show contracts signed by both parties
+    if (showSigned === 'true' || showSigned === true) {
+      filter = {
+        'signatures.customerSigned': true,
+        'signatures.managerSigned': true
+      };
+    } else if (status) {
+      // Specific status filter
+      filter.status = status;
+    } else {
+      // Default: Get contracts that need approval (pending_approval or draft status)
+      filter = {
+        status: { $in: ['draft', 'pending_approval', 'approved', 'signed', 'staff_pending', 'active', 'in_progress', 'completed', 'cancelled', 'rejected'] }
+      };
+    }
 
     const contracts = await Contract.find(filter)
       .populate('customerId', 'name email phone role')
@@ -866,6 +879,28 @@ const getContractById = async (req, res) => {
   try {
     const { id } = req.params;
     const role = req.userRole || req.user?.role;
+    const userId = req.userId;
+
+    console.log(`[getContractById] Accessing contract ${id}`, {
+      userId,
+      role,
+      hasUser: !!req.user,
+      userRole: req.user?.role
+    });
+
+    if (!userId) {
+      console.error('[getContractById] No userId found in request');
+      return res.status(401).json({ message: "User ID not found. Please login again." });
+    }
+
+    if (!role) {
+      console.error('[getContractById] No role found in request', {
+        userId,
+        hasUserRole: !!req.userRole,
+        hasUser: !!req.user
+      });
+      return res.status(401).json({ message: "User role not found. Please login again." });
+    }
 
     const contract = await Contract.findById(id)
       .populate('customerId', 'name email phone role')
@@ -882,26 +917,36 @@ const getContractById = async (req, res) => {
     if (role === 'customer') {
       // Customers can only see approved contracts that belong to them
       // Contract.customerId is User ID, so compare directly
-      if (contract.customerId.toString() !== req.userId.toString()) {
+      if (contract.customerId.toString() !== userId.toString()) {
+        console.log(`[getContractById] Customer access denied: contract belongs to ${contract.customerId}, user is ${userId}`);
         return res.status(403).json({ message: "Access denied" });
       }
       if (contract.status !== 'approved') {
+        console.log(`[getContractById] Customer access denied: contract status is ${contract.status}, not approved`);
         return res.status(403).json({ message: "Contract not yet approved" });
       }
     } else if (role === 'staff') {
       // Staff can only see contracts assigned to them
-      const user = await User.findById(req.userId);
+      const user = await User.findById(userId);
       if (!user || user.role !== 'staff') {
+        console.log(`[getContractById] Staff access denied: user not found or not staff`);
         return res.status(403).json({ message: "Access denied" });
       }
       const isAssigned = contract.assignedStaff.some(
         a => a.staffId && a.staffId.toString() === user._id.toString()
       );
       if (!isAssigned) {
+        console.log(`[getContractById] Staff access denied: not assigned to contract`);
         return res.status(403).json({ message: "You are not assigned to this contract" });
       }
+    } else if (role === 'manager' || role === 'admin') {
+      // Managers and admins can see all contracts
+      console.log(`[getContractById] ${role} access granted to contract ${id}`);
+    } else {
+      // Unknown role
+      console.error(`[getContractById] Unknown role: ${role}`);
+      return res.status(403).json({ message: `Access denied: Unknown role "${role}"` });
     }
-    // Managers and admins can see all contracts
 
     res.json({ contract });
   } catch (err) {

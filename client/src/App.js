@@ -79,7 +79,7 @@ export default function App() {
           {/* Customer routes */}
           <Route element={<RoleProtectedRoute allowedRoles={['customer']} />}>
             <Route path="/customer-dashboard" element={<CustomerDashboard />} />
-            <Route path="/contracts/:id" element={<CustomerContractView />} />
+            <Route path="/customer/contracts/:id" element={<CustomerContractView />} />
             <Route path="/requests/new" element={<CreateRequestPage />} />
             <Route path="/my-requests" element={<ManageRequestsPage />} />
             <Route path="/requests/:id/detail" element={<RequestDetailPage />} />
@@ -92,8 +92,12 @@ export default function App() {
             <Route path="/manager-dashboard" element={<ManagerDashboard />} />
             <Route path="/contract-form/:requestId" element={<ContractForm />} />
             <Route path="/contract-approval" element={<ContractApproval />} />
-            <Route path="/contracts/:id" element={<ContractDetailView />} />
             <Route path="/manager/requests/:id/detail" element={<ManagerRequestDetailPage />} />
+          </Route>
+          
+          {/* Shared contract route - accessible by customer, manager, admin, and staff */}
+          <Route element={<RoleProtectedRoute allowedRoles={['customer', 'manager', 'admin', 'staff']} />}>
+            <Route path="/contracts/:id" element={<ContractDetailView />} />
           </Route>
           
           {/* Staff routes */}
