@@ -426,6 +426,20 @@ const createContractFromRequest = async (req, res) => {
     // Use customer user ID directly (Contract model references User, not Customer)
     const customerId = customerUser._id;
 
+    // Get items from request body if provided, otherwise use request items
+    let contractItems = request.items || [];
+    if (req.body.items && Array.isArray(req.body.items) && req.body.items.length > 0) {
+      // Use items from form if provided
+      contractItems = req.body.items.map(item => ({
+        itemId: item.itemId ? new mongoose.Types.ObjectId(item.itemId) : new mongoose.Types.ObjectId(),
+        description: item.description || '',
+        quantity: item.quantity || 1,
+        category: item.category || 'other',
+        estimatedValue: item.estimatedValue || 0,
+        requiresSpecialHandling: item.requiresSpecialHandling || false
+      }));
+    }
+
     // Create contract. If request has assigned staff, carry over
     const contractData = {
       contractId: generateContractId(),
@@ -463,7 +477,7 @@ const createContractFromRequest = async (req, res) => {
         status: 'pending',
         notes: a.notes || ''
       })),
-      items: request.items || [], // Copy items from request
+      items: contractItems, // Use items from form or request
       surveyFee: request.surveyFee || undefined, // Copy survey fee if exists
       status: 'approved',
       approval: {

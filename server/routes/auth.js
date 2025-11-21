@@ -13,7 +13,7 @@ router.post("/register", async (req, res) => {
   try {
     const { name, email, password, phone, role = "customer" } = req.body;
     if (!name || !email || !password) {
-``      return res.status(400).json({ message: "Tên, email và mật khẩu là bắt buộc" });
+      return res.status(400).json({ message: "Tên, email và mật khẩu là bắt buộc" });
     }
 
     // Validate role

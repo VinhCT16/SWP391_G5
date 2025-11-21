@@ -127,7 +127,9 @@ export default function ManagerRequestDetailPage() {
   const statusConfig = getStatusColor(req.status);
   const pickupLoc = toLatLng(req.pickupLocation || req.location);
   const deliveryLoc = toLatLng(req.deliveryLocation || req.location);
-  const canApproveOrDeny = (req.status === 'PENDING' || req.status === 'submitted');
+  // Show approve/reject buttons for requests that need manager approval
+  // This includes UNDER_SURVEY (after staff completed survey), PENDING, and submitted
+  const canApproveOrDeny = (req.status === 'PENDING' || req.status === 'submitted' || req.status === 'UNDER_SURVEY' || req.status === 'PENDING_REVIEW');
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: "auto" }}>
@@ -172,7 +174,7 @@ export default function ManagerRequestDetailPage() {
         </div>
       </div>
 
-      {/* Approval Actions - Only for PENDING requests */}
+      {/* Approval Actions - Show approve/reject for PENDING requests */}
       {canApproveOrDeny && (
         <div style={{ 
           marginBottom: 24, 
@@ -207,6 +209,29 @@ export default function ManagerRequestDetailPage() {
               ❌ Deny Request
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Create Contract Button - Show after request is approved */}
+      {req.status === 'approved' && !req.contractId && (
+        <div style={{ 
+          marginBottom: 24, 
+          padding: 20, 
+          background: "#e8f5e9", 
+          borderRadius: 8, 
+          border: "2px solid #4caf50" 
+        }}>
+          <h3 style={{ marginTop: 0, marginBottom: 16 }}>✅ Request Approved</h3>
+          <p style={{ marginBottom: 16 }}>
+            This request has been approved. You can now create a contract for the customer.
+          </p>
+          <Button 
+            variant="primary" 
+            onClick={() => nav(`/contract-form/${req._id}`)}
+            style={{ padding: "12px 24px", fontSize: "16px" }}
+          >
+            📋 Create Contract
+          </Button>
         </div>
       )}
 

@@ -431,15 +431,18 @@ const updateTaskStatus = async (req, res) => {
 
     await task.save();
 
-    // Special handling for review tasks: when completed, update request status
+    // Special handling for review tasks: when completed, update request status to UNDER_SURVEY
     if (task.taskType === 'Review' && mappedStatus === 'completed') {
       try {
         const request = await Request.findById(task.requestId);
-        if (request && request.status === 'UNDER_SURVEY') {
-          console.log(`[TaskController] Review task ${task._id} completed. Updating request ${request._id} status from UNDER_SURVEY to PENDING`);
-          request.status = 'PENDING';
-          await request.save();
-          console.log(`[TaskController] Request ${request._id} status updated to PENDING - ready for manager approval`);
+        if (request) {
+          // Update request status to UNDER_SURVEY when staff completes survey
+          if (request.status !== 'UNDER_SURVEY') {
+            console.log(`[TaskController] Review task ${task._id} completed. Updating request ${request._id} status to UNDER_SURVEY`);
+            request.status = 'UNDER_SURVEY';
+            await request.save();
+            console.log(`[TaskController] Request ${request._id} status updated to UNDER_SURVEY - ready for manager review`);
+          }
         }
       } catch (requestErr) {
         // Log error but don't fail the task status update
