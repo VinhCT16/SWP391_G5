@@ -212,29 +212,6 @@ export default function ManagerRequestDetailPage() {
         </div>
       )}
 
-      {/* Create Contract Button - Show after request is approved */}
-      {req.status === 'approved' && !req.contractId && (
-        <div style={{ 
-          marginBottom: 24, 
-          padding: 20, 
-          background: "#e8f5e9", 
-          borderRadius: 8, 
-          border: "2px solid #4caf50" 
-        }}>
-          <h3 style={{ marginTop: 0, marginBottom: 16 }}>✅ Request Approved</h3>
-          <p style={{ marginBottom: 16 }}>
-            This request has been approved. You can now create a contract for the customer.
-          </p>
-          <Button 
-            variant="primary" 
-            onClick={() => nav(`/contract-form/${req._id}`)}
-            style={{ padding: "12px 24px", fontSize: "16px" }}
-          >
-            📋 Create Contract
-          </Button>
-        </div>
-      )}
-
       {/* Approval History - Only show if approval data exists and is valid */}
       {req.approval && (req.approval.approved !== undefined || req.approval.reviewedAt) && (
         <div style={{ marginBottom: 24, padding: 16, background: "#f5f5f5", borderRadius: 8 }}>
