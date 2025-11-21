@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { createContractFromRequest, getAllServices } from '../../api/contractApi';
+import { getRequest } from '../../api/requestApi';
 import './ContractForm.css';
 
 const ContractForm = () => {
@@ -11,6 +12,7 @@ const ContractForm = () => {
     pricing: {
       basePrice: 0,
       additionalServices: [],
+      items: [],
       totalPrice: 0,
       deposit: 0,
       balance: 0
@@ -26,13 +28,17 @@ const ContractForm = () => {
     }
   });
   const [services, setServices] = useState([]);
+  const [requestData, setRequestData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Load available services
+    // Load available services and request data
     loadServices();
-  }, []);
+    if (requestId) {
+      loadRequestData();
+    }
+  }, [requestId]);
 
   const loadDefaultServices = () => {
     const mockServices = [
@@ -42,6 +48,35 @@ const ContractForm = () => {
     ];
     setServices(mockServices);
     setError('Failed to load services from server. Using default services. Note: These services may not exist in the database.');
+  };
+
+  const loadRequestData = async () => {
+    try {
+      const response = await getRequest(requestId);
+      const request = response.request || response;
+      setRequestData(request);
+      // Load items from request
+      if (request.items && request.items.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          pricing: {
+            ...prev.pricing,
+            items: request.items.map(item => ({
+              itemId: item.itemId || item._id,
+              description: item.description || '',
+              quantity: item.quantity || 1,
+              category: item.category || 'other',
+              estimatedValue: item.estimatedValue || 0,
+              price: item.estimatedValue || 0, // Use estimatedValue as price
+              requiresSpecialHandling: item.requiresSpecialHandling || false
+            }))
+          }
+        }));
+      }
+    } catch (err) {
+      console.error('Error loading request data:', err);
+      // Don't show error, just continue without request data
+    }
   };
 
   const loadServices = async () => {
@@ -119,7 +154,7 @@ const ContractForm = () => {
     const { name, value } = e.target;
     
     if (name === 'serviceId') {
-      // Auto-fill base price when service is selected
+      // Auto-fill base price when service is selected (read-only after selection)
       const selectedService = services.find(s => s._id === value);
       setFormData(prev => ({
         ...prev,
@@ -129,6 +164,18 @@ const ContractForm = () => {
           basePrice: selectedService ? selectedService.price : prev.pricing.basePrice
         }
       }));
+    } else if (name === 'pricing.basePrice') {
+      // Base price should not be editable when service is selected
+      // Only allow editing if no service is selected
+      if (!formData.serviceId) {
+        setFormData(prev => ({
+          ...prev,
+          pricing: {
+            ...prev.pricing,
+            basePrice: parseFloat(value) || 0
+          }
+        }));
+      }
     } else if (name.includes('.')) {
       const [parent, child] = name.split('.');
       setFormData(prev => ({
@@ -185,13 +232,72 @@ const ContractForm = () => {
     }));
   };
 
-  const calculateTotal = useCallback(() => {
+  const handleItemChange = (index, field, value) => {
+    const newItems = [...(formData.pricing.items || [])];
+    newItems[index] = {
+      ...newItems[index],
+      [field]: field === 'price' || field === 'estimatedValue' || field === 'quantity' 
+        ? (parseFloat(value) || 0) 
+        : value
+    };
+    // Update both price and estimatedValue when price changes
+    if (field === 'price') {
+      newItems[index].estimatedValue = parseFloat(value) || 0;
+    }
+    setFormData(prev => ({
+      ...prev,
+      pricing: {
+        ...prev.pricing,
+        items: newItems
+      }
+    }));
+  };
+
+  const addItem = () => {
+    setFormData(prev => ({
+      ...prev,
+      pricing: {
+        ...prev.pricing,
+        items: [
+          ...(prev.pricing.items || []),
+          {
+            itemId: new Date().getTime().toString(), // Temporary ID
+            description: '',
+            quantity: 1,
+            category: 'other',
+            estimatedValue: 0,
+            price: 0,
+            requiresSpecialHandling: false
+          }
+        ]
+      }
+    }));
+  };
+
+  const removeItem = (index) => {
+    const newItems = (formData.pricing.items || []).filter((_, i) => i !== index);
+    setFormData(prev => ({
+      ...prev,
+      pricing: {
+        ...prev.pricing,
+        items: newItems
+      }
+    }));
+  };
+
+  // Calculate total price whenever pricing data changes
+  useEffect(() => {
     const basePrice = formData.pricing.basePrice || 0;
-    const additionalTotal = formData.pricing.additionalServices.reduce((sum, service) => 
-      sum + (service.price || 0), 0
+    const additionalTotal = (formData.pricing.additionalServices || []).reduce((sum, service) => 
+      sum + (Number(service.price) || 0), 0
     );
-    const total = basePrice + additionalTotal;
-    const balance = total - (formData.pricing.deposit || 0);
+    // Calculate items total price: sum of price for each item (as per requirement)
+    const itemsTotal = (formData.pricing.items || []).reduce((sum, item) => {
+      const itemPrice = Number(item.price) || Number(item.estimatedValue) || 0;
+      return sum + itemPrice;
+    }, 0);
+    const total = basePrice + additionalTotal + itemsTotal;
+    const balance = total - (Number(formData.pricing.deposit) || 0);
     
     setFormData(prev => ({
       ...prev,
@@ -201,11 +307,8 @@ const ContractForm = () => {
         balance: balance
       }
     }));
-  }, [formData.pricing.basePrice, formData.pricing.additionalServices, formData.pricing.deposit]);
+  }, [formData.pricing.basePrice, formData.pricing.additionalServices, formData.pricing.items, formData.pricing.deposit]);
 
-  useEffect(() => {
-    calculateTotal();
-  }, [calculateTotal]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -236,6 +339,14 @@ const ContractForm = () => {
           deposit: Number(formData.pricing.deposit) || 0,
           balance: Number(formData.pricing.balance) || 0
         },
+        items: (formData.pricing.items || []).map(item => ({
+          itemId: item.itemId,
+          description: item.description,
+          quantity: item.quantity || 1,
+          category: item.category || 'other',
+          estimatedValue: item.price || item.estimatedValue || 0,
+          requiresSpecialHandling: item.requiresSpecialHandling || false
+        })),
         paymentMethod: {
           type: formData.paymentMethod.type,
           details: formData.paymentMethod.details || {}
@@ -328,7 +439,7 @@ const ContractForm = () => {
           <h3>Pricing Details</h3>
           
           <div className="form-group">
-            <label htmlFor="pricing.basePrice">Base Price (VND)</label>
+            <label htmlFor="pricing.basePrice">Base Price (VND) *</label>
             <input
               type="number"
               id="pricing.basePrice"
@@ -338,7 +449,140 @@ const ContractForm = () => {
               min="0"
               step="1000"
               required
+              readOnly={!!formData.serviceId}
+              disabled={!!formData.serviceId}
+              style={{ 
+                backgroundColor: formData.serviceId ? '#f5f5f5' : 'white',
+                cursor: formData.serviceId ? 'not-allowed' : 'text',
+                opacity: formData.serviceId ? 0.7 : 1
+              }}
             />
+            {formData.serviceId && (
+              <small style={{ color: '#666', display: 'block', marginTop: '4px' }}>
+                ⚠️ Base price is set by the selected service and cannot be changed. To change the base price, select a different service.
+              </small>
+            )}
+          </div>
+
+          {/* Items List - Fixed Table Format */}
+          <div className="form-group">
+            <h4>Items List</h4>
+            {(formData.pricing.items || []).length > 0 ? (
+              <table style={{ 
+                width: '100%', 
+                borderCollapse: 'collapse', 
+                marginTop: '12px',
+                backgroundColor: '#fff',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
+                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #ddd', fontWeight: '600' }}>#</th>
+                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #ddd', fontWeight: '600' }}>Item Name</th>
+                    <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #ddd', fontWeight: '600' }}>Price (VND)</th>
+                    <th style={{ padding: '12px', textAlign: 'center', borderBottom: '1px solid #ddd', fontWeight: '600', width: '100px' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(formData.pricing.items || []).map((item, index) => (
+                    <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '12px', textAlign: 'center', color: '#666' }}>{index + 1}</td>
+                      <td style={{ padding: '12px' }}>
+                        <input
+                          type="text"
+                          value={item.description || ''}
+                          onChange={(e) => handleItemChange(index, 'description', e.target.value)}
+                          placeholder="Item name"
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            fontSize: '14px',
+                            transition: 'border-color 0.3s'
+                          }}
+                          onFocus={(e) => e.target.style.borderColor = '#2196f3'}
+                          onBlur={(e) => e.target.style.borderColor = '#ddd'}
+                        />
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>
+                        <input
+                          type="number"
+                          value={item.price || item.estimatedValue || 0}
+                          onChange={(e) => handleItemChange(index, 'price', e.target.value)}
+                          min="0"
+                          step="1000"
+                          placeholder="0"
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
+                            fontSize: '14px',
+                            textAlign: 'right',
+                            transition: 'border-color 0.3s'
+                          }}
+                          onFocus={(e) => e.target.style.borderColor = '#2196f3'}
+                          onBlur={(e) => e.target.style.borderColor = '#ddd'}
+                        />
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          className="remove-btn"
+                          style={{
+                            padding: '6px 12px',
+                            backgroundColor: '#f44336',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            transition: 'background-color 0.3s'
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#d32f2f'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = '#f44336'}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div style={{ 
+                padding: '20px', 
+                textAlign: 'center', 
+                backgroundColor: '#f5f5f5', 
+                borderRadius: '4px',
+                marginTop: '12px',
+                color: '#666'
+              }}>
+                No items found. Items will be loaded from the request.
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={addItem}
+              className="add-service-btn"
+              style={{
+                marginTop: '12px',
+                padding: '10px 20px',
+                backgroundColor: '#4caf50',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}
+            >
+              + Add Item
+            </button>
           </div>
 
           {/* Additional Services */}
@@ -395,6 +639,13 @@ const ContractForm = () => {
             <div className="summary-item">
               <span>Base Price:</span>
               <span>{new Intl.NumberFormat('vi-VN').format(formData.pricing.basePrice || 0)} đ</span>
+            </div>
+            <div className="summary-item">
+              <span>Items Total:</span>
+              <span>{new Intl.NumberFormat('vi-VN').format((formData.pricing.items || []).reduce((sum, item) => {
+                const itemPrice = Number(item.price) || Number(item.estimatedValue) || 0;
+                return sum + itemPrice;
+              }, 0))} đ</span>
             </div>
             <div className="summary-item">
               <span>Additional Services:</span>

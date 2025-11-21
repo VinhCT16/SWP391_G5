@@ -620,10 +620,16 @@ const updateRequestStatus = async (req, res) => {
       return res.status(404).json({ message: "Request not found" });
     }
 
-    // Update request status
-    request.status = status;
+    // Update request status - normalize status values
+    let normalizedStatus = status;
+    if (status === 'rejected' || status === 'denied') {
+      normalizedStatus = 'rejected';
+    } else if (status === 'approved' || status === 'APPROVED') {
+      normalizedStatus = 'approved';
+    }
+    request.status = normalizedStatus;
     
-    if (status === 'rejected' && rejectionReason) {
+    if (normalizedStatus === 'rejected' && rejectionReason) {
       request.approval = {
         reviewedBy: managerId,
         reviewedAt: new Date(),
@@ -631,7 +637,7 @@ const updateRequestStatus = async (req, res) => {
         rejectionReason,
         notes: notes || ''
       };
-    } else if (status === 'approved') {
+    } else if (normalizedStatus === 'approved') {
       request.approval = {
         reviewedBy: managerId,
         reviewedAt: new Date(),
@@ -643,7 +649,7 @@ const updateRequestStatus = async (req, res) => {
       request.approval = {
         reviewedBy: managerId,
         reviewedAt: new Date(),
-        approved: status === 'approved',
+        approved: normalizedStatus === 'approved',
         rejectionReason: rejectionReason || '',
         notes: notes || ''
       };

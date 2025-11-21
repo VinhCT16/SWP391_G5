@@ -21,9 +21,12 @@ export default function RequestsTab({
   const [localFilters, setLocalFilters] = useState(filters);
 
   // Group requests by status for display
+  // Show actual status instead of grouping UNDER_SURVEY separately
   const groupedRequests = {
-    pending: requests.filter(r => r.status === 'pending' || r.status === 'PENDING'),
-    under_survey: requests.filter(r => r.status === 'UNDER_SURVEY' || r.status === 'under_survey'),
+    pending: requests.filter(r => r.status === 'pending' || r.status === 'PENDING' || r.status === 'submitted'),
+    waiting_review: requests.filter(r => r.status === 'UNDER_SURVEY' || r.status === 'under_survey' || r.status === 'PENDING_REVIEW'),
+    approved: requests.filter(r => r.status === 'approved' || r.status === 'APPROVED'),
+    rejected: requests.filter(r => r.status === 'rejected' || r.status === 'REJECTED'),
     contract_created: requests.filter(r => r.status === 'contract_created')
   };
 
@@ -39,7 +42,9 @@ export default function RequestsTab({
   };
 
   const filteredPending = applySearchFilter(groupedRequests.pending);
-  const filteredUnderSurvey = applySearchFilter(groupedRequests.under_survey);
+  const filteredWaitingReview = applySearchFilter(groupedRequests.waiting_review);
+  const filteredApproved = applySearchFilter(groupedRequests.approved);
+  const filteredRejected = applySearchFilter(groupedRequests.rejected);
   const filteredContractCreated = applySearchFilter(groupedRequests.contract_created);
 
   return (
@@ -128,12 +133,80 @@ export default function RequestsTab({
             </div>
           )}
 
-          {/* Waiting for Surveyor Section */}
-          {filteredUnderSurvey.length > 0 && (
+          {/* Waiting for Manager Review Section - Show actual status */}
+          {filteredWaitingReview.length > 0 && (
             <div className="request-section">
-              <h3 className="section-title">🔍 Waiting for Surveyor</h3>
+              <h3 className="section-title">🔍 Waiting for Manager Review</h3>
               <div className="requests-grid">
-                {filteredUnderSurvey.map((request) => (
+                {filteredWaitingReview.map((request) => (
+                  <Card key={request._id}>
+                    <CardHeader>
+                      <h3>Request #{request.requestId}</h3>
+                      <StatusBadge status={request.status} />
+                    </CardHeader>
+                    <CardBody>
+                      <div className="request-details">
+                        <div className="detail-row"><strong>Customer:</strong> {request.customerId?.name}</div>
+                        <div className="detail-row"><strong>Email:</strong> {request.customerId?.email}</div>
+                        <div className="detail-row"><strong>Phone:</strong> {request.moveDetails.phone}</div>
+                        <div className="detail-row"><strong>From:</strong> {request.moveDetails.fromAddress}</div>
+                        <div className="detail-row"><strong>To:</strong> {request.moveDetails.toAddress}</div>
+                        <div className="detail-row"><strong>Date:</strong> {new Date(request.moveDetails.moveDate).toLocaleDateString()}</div>
+                        <div className="detail-row"><strong>Service:</strong> {request.moveDetails.serviceType}</div>
+                        <div className="detail-row"><strong>Submitted:</strong> {new Date(request.createdAt).toLocaleDateString()}</div>
+                      </div>
+                    </CardBody>
+                    <CardActions>
+                      <Button variant="info" onClick={() => navigate(`/manager/requests/${request._id}/detail`)}>
+                        📋 View Details
+                      </Button>
+                    </CardActions>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Approved Requests Section */}
+          {filteredApproved.length > 0 && (
+            <div className="request-section">
+              <h3 className="section-title">✅ Approved Requests</h3>
+              <div className="requests-grid">
+                {filteredApproved.map((request) => (
+                  <Card key={request._id}>
+                    <CardHeader>
+                      <h3>Request #{request.requestId}</h3>
+                      <StatusBadge status={request.status} />
+                    </CardHeader>
+                    <CardBody>
+                      <div className="request-details">
+                        <div className="detail-row"><strong>Customer:</strong> {request.customerId?.name}</div>
+                        <div className="detail-row"><strong>Email:</strong> {request.customerId?.email}</div>
+                        <div className="detail-row"><strong>Phone:</strong> {request.moveDetails.phone}</div>
+                        <div className="detail-row"><strong>From:</strong> {request.moveDetails.fromAddress}</div>
+                        <div className="detail-row"><strong>To:</strong> {request.moveDetails.toAddress}</div>
+                        <div className="detail-row"><strong>Date:</strong> {new Date(request.moveDetails.moveDate).toLocaleDateString()}</div>
+                        <div className="detail-row"><strong>Service:</strong> {request.moveDetails.serviceType}</div>
+                        <div className="detail-row"><strong>Submitted:</strong> {new Date(request.createdAt).toLocaleDateString()}</div>
+                      </div>
+                    </CardBody>
+                    <CardActions>
+                      <Button variant="info" onClick={() => navigate(`/manager/requests/${request._id}/detail`)}>
+                        📋 View Details
+                      </Button>
+                    </CardActions>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Rejected Requests Section */}
+          {filteredRejected.length > 0 && (
+            <div className="request-section">
+              <h3 className="section-title">❌ Rejected Requests</h3>
+              <div className="requests-grid">
+                {filteredRejected.map((request) => (
                   <Card key={request._id}>
                     <CardHeader>
                       <h3>Request #{request.requestId}</h3>
@@ -200,7 +273,7 @@ export default function RequestsTab({
           )}
 
           {/* Empty state */}
-          {filteredPending.length === 0 && filteredUnderSurvey.length === 0 && filteredContractCreated.length === 0 && !loading && (
+          {filteredPending.length === 0 && filteredWaitingReview.length === 0 && filteredApproved.length === 0 && filteredRejected.length === 0 && filteredContractCreated.length === 0 && !loading && (
             <div className="empty-state">
               <h3>No requests found</h3>
               <p>No requests match your current filters.</p>
