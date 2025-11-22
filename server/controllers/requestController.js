@@ -5,7 +5,7 @@ const User = require("../models/User");
 const Contract = require("../models/Contract");
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
-const { autoCreateContractFromRequest } = require("./contractController");
+// Contract creation is now manual - removed autoCreateContractFromRequest import
 const { sendApprovalEmail, sendRejectionEmail } = require("../utils/emailService");
 const { generateContractPDFBuffer } = require("../utils/pdfGenerator");
 // Role-based assignment temporarily disabled
@@ -656,56 +656,21 @@ const updateRequestStatus = async (req, res) => {
     const customerEmail = customer?.email;
     const customerName = customer?.name || request.customerName || 'Customer';
     
-    // Automatically create contract when request is approved
+    // Note: Contract creation is now manual - manager will create contract after approval
+    // This allows manager to fill in contract details (pricing, terms, etc.) before creating
     if (status === 'approved') {
-      try {
-        console.log('Request approved, automatically creating contract...');
-        const contract = await autoCreateContractFromRequest(request._id, managerId);
-        console.log('Contract created automatically:', contract._id);
-        
-        // Populate contract with request data for PDF generation
-        const populatedContract = await Contract.findById(contract._id)
-          .populate('customerId', 'name email phone')
-          .populate('managerId', 'name email phone')
-          .populate({
-            path: 'requestId',
-            select: 'requestId customerId customerName customerPhone moveDetails contractId status createdAt items'
-          });
-        
-        // Ensure request items are available
-        if (populatedContract.requestId && !populatedContract.requestId.items) {
-          const requestWithItems = await Request.findById(populatedContract.requestId._id).select('items');
-          if (requestWithItems) {
-            populatedContract.requestId.items = requestWithItems.items;
-          }
-        }
-        
-        // Generate PDF with items list
-        let pdfBuffer;
+      // Send approval notification email (without contract PDF)
+      if (customerEmail) {
         try {
-          pdfBuffer = await generateContractPDFBuffer(populatedContract);
-          console.log('✅ PDF generated successfully');
-        } catch (pdfErr) {
-          console.error('❌ Error generating PDF:', pdfErr);
-          pdfBuffer = null; // Continue without PDF if generation fails
+          // Simple approval notification without contract
+          console.log('✅ Request approved, sending notification email');
+          // You can add a simple approval email function here if needed
+        } catch (emailErr) {
+          console.error('❌ Error sending approval email:', emailErr);
+          // Don't fail the approval if email fails
         }
-        
-        // Send approval email with PDF attachment
-        if (customerEmail) {
-          try {
-            await sendApprovalEmail(customerEmail, customerName, request, populatedContract, pdfBuffer);
-            console.log('✅ Approval email sent successfully');
-          } catch (emailErr) {
-            console.error('❌ Error sending approval email:', emailErr);
-            // Don't fail the approval if email fails
-          }
-        } else {
-          console.warn('⚠️ Customer email not found, skipping email notification');
-        }
-      } catch (contractErr) {
-        // Log error but don't fail the request approval
-        console.error('Error automatically creating contract:', contractErr);
-        // Contract creation can be done manually later if automatic creation fails
+      } else {
+        console.warn('⚠️ Customer email not found, skipping email notification');
       }
     } else if (status === 'rejected' || status === 'denied') {
       // Send rejection email

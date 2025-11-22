@@ -55,6 +55,7 @@ const ContractForm = () => {
       const response = await getRequest(requestId);
       const request = response.request || response;
       setRequestData(request);
+      
       // Load items from request
       if (request.items && request.items.length > 0) {
         setFormData(prev => ({
@@ -67,9 +68,20 @@ const ContractForm = () => {
               quantity: item.quantity || 1,
               category: item.category || 'other',
               estimatedValue: item.estimatedValue || 0,
-              price: item.estimatedValue || 0, // Use estimatedValue as price
+              price: item.estimatedValue || 0, // Initialize with estimatedValue, can be edited
               requiresSpecialHandling: item.requiresSpecialHandling || false
             }))
+          }
+        }));
+      }
+      
+      // Load additionalTerms from request approval notes if available
+      if (request.approval?.notes) {
+        setFormData(prev => ({
+          ...prev,
+          terms: {
+            ...prev.terms,
+            additionalTerms: request.approval.notes || prev.terms.additionalTerms
           }
         }));
       }

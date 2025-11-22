@@ -753,23 +753,31 @@ const getCustomerContracts = async (req, res) => {
 const exportContractPDF = async (req, res) => {
   try {
     const { id } = req.params;
+    const { generateContractPDFBuffer } = require("../utils/pdfGenerator");
     
     const contract = await Contract.findById(id)
       .populate('customerId', 'name email phone role')
       .populate('managerId', 'name email phone role employeeId department')
-      .populate('serviceId', 'name price');
+      .populate('serviceId', 'name price')
+      .populate({
+        path: 'requestId',
+        select: 'requestId items',
+        populate: {
+          path: 'items',
+          select: 'description quantity category estimatedValue requiresSpecialHandling'
+        }
+      });
 
     if (!contract) {
       return res.status(404).json({ message: "Contract not found" });
     }
 
-    // TODO: Implement PDF generation
-    // For now, return a placeholder
-    const pdfBuffer = Buffer.from('PDF placeholder - implement PDF generation');
+    // Generate PDF buffer
+    const pdfBuffer = await generateContractPDFBuffer(contract);
     
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="contract-${contract.contractId}.pdf"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
+    res.setHeader('Content-Length', pdfBuffer.byteLength || pdfBuffer.length);
     
     res.send(Buffer.from(pdfBuffer));
   } catch (err) {
@@ -851,7 +859,14 @@ const getContractByIdPublic = async (req, res) => {
       .populate('managerId', 'name email phone role')
       .populate('serviceId', 'name price')
       .populate('assignedStaff.staffId', 'name email phone role')
-      .populate('requestId');
+      .populate({
+        path: 'requestId',
+        select: 'requestId items',
+        populate: {
+          path: 'items',
+          select: 'description quantity category estimatedValue requiresSpecialHandling'
+        }
+      });
 
     if (!contract) {
       console.log(`[getContractByIdPublic] Contract ${id} not found`);
@@ -892,18 +907,40 @@ const getContractByIdPublic = async (req, res) => {
 const getContractById = async (req, res) => {
   try {
     const { id } = req.params;
-    const role = req.userRole || req.user?.role;
+    let role = req.userRole || req.user?.role;
     const userId = req.userId;
+    
+    // Fallback: If role is not set, try to get it from database
+    if (!role && userId) {
+      try {
+        const user = await User.findById(userId).select('role');
+        if (user) {
+          role = user.role;
+          console.log(`[getContractById] Role retrieved from database: ${role}`);
+        }
+      } catch (dbErr) {
+        console.error('[getContractById] Error fetching user from database:', dbErr);
+      }
+    }
 
     console.log(`[getContractById] Accessing contract ${id}`, {
       userId,
       role,
+      roleType: typeof role,
       hasUser: !!req.user,
-      userRole: req.user?.role
+      userRole: req.user?.role,
+      reqUserRole: req.userRole,
+      url: req.url,
+      method: req.method
     });
 
     if (!userId) {
-      console.error('[getContractById] No userId found in request');
+      console.error('[getContractById] No userId found in request', {
+        url: req.url,
+        method: req.method,
+        hasCookies: !!req.cookies,
+        cookieNames: req.cookies ? Object.keys(req.cookies) : []
+      });
       return res.status(401).json({ message: "User ID not found. Please login again." });
     }
 
@@ -911,7 +948,11 @@ const getContractById = async (req, res) => {
       console.error('[getContractById] No role found in request', {
         userId,
         hasUserRole: !!req.userRole,
-        hasUser: !!req.user
+        hasUser: !!req.user,
+        reqUserRole: req.userRole,
+        userRole: req.user?.role,
+        url: req.url,
+        method: req.method
       });
       return res.status(401).json({ message: "User role not found. Please login again." });
     }
@@ -921,45 +962,101 @@ const getContractById = async (req, res) => {
       .populate('managerId', 'name email phone role')
       .populate('serviceId', 'name price')
       .populate('assignedStaff.staffId', 'name email phone role')
-      .populate('requestId');
+      .populate({
+        path: 'requestId',
+        select: 'requestId items',
+        populate: {
+          path: 'items',
+          select: 'description quantity category estimatedValue requiresSpecialHandling'
+        }
+      });
 
     if (!contract) {
       return res.status(404).json({ message: "Contract not found" });
     }
 
+    // Log contract details for debugging
+    console.log(`[getContractById] Contract found:`, {
+      contractId: contract.contractId,
+      status: contract.status,
+      customerId: contract.customerId?._id || contract.customerId,
+      customerIdType: typeof contract.customerId,
+      hasAssignedStaff: contract.assignedStaff && contract.assignedStaff.length > 0,
+      assignedStaffCount: contract.assignedStaff?.length || 0
+    });
+
     // Role-based access control
-    if (role === 'customer') {
-      // Customers can only see approved contracts that belong to them
-      // Contract.customerId is User ID, so compare directly
-      if (contract.customerId.toString() !== userId.toString()) {
-        console.log(`[getContractById] Customer access denied: contract belongs to ${contract.customerId}, user is ${userId}`);
-        return res.status(403).json({ message: "Access denied" });
+    // Ensure role is a string and convert to lowercase for comparison
+    const roleStr = String(role || '').toLowerCase().trim();
+    
+    console.log(`[getContractById] Access control check:`, {
+      role: role,
+      roleStr: roleStr,
+      userId: userId,
+      contractStatus: contract.status
+    });
+    
+    if (roleStr === 'customer') {
+      // Customers can only see contracts that belong to them
+      // customerId can be ObjectId or populated User object
+      const customerIdValue = contract.customerId._id || contract.customerId;
+      if (customerIdValue.toString() !== userId.toString()) {
+        console.log(`[getContractById] Customer access denied: contract belongs to ${customerIdValue}, user is ${userId}`, {
+          customerIdType: typeof contract.customerId,
+          customerId: contract.customerId,
+          userId: userId
+        });
+        return res.status(403).json({ message: "Access denied: This contract does not belong to you" });
       }
-      if (contract.status !== 'approved') {
-        console.log(`[getContractById] Customer access denied: contract status is ${contract.status}, not approved`);
-        return res.status(403).json({ message: "Contract not yet approved" });
+      // Allow customers to view contracts that are:
+      // - pending_approval: to view and sign after manager approval
+      // - approved: to view and sign
+      // - signed, active, in_progress, completed: to view status
+      // - staff_pending: to view when staff is assigned
+      const allowedStatuses = ['pending_approval', 'approved', 'signed', 'staff_pending', 'active', 'in_progress', 'completed'];
+      if (!allowedStatuses.includes(contract.status)) {
+        console.log(`[getContractById] Customer access denied: contract status is ${contract.status}, not in allowed statuses`, {
+          contractStatus: contract.status,
+          allowedStatuses: allowedStatuses
+        });
+        return res.status(403).json({ message: `Contract not yet available for viewing. Current status: ${contract.status}` });
       }
-    } else if (role === 'staff') {
+      console.log(`[getContractById] Customer access granted: contract belongs to customer and status is allowed`);
+    } else if (roleStr === 'staff') {
       // Staff can only see contracts assigned to them
       const user = await User.findById(userId);
       if (!user || user.role !== 'staff') {
         console.log(`[getContractById] Staff access denied: user not found or not staff`);
         return res.status(403).json({ message: "Access denied" });
       }
-      const isAssigned = contract.assignedStaff.some(
-        a => a.staffId && a.staffId.toString() === user._id.toString()
-      );
+      // Check if staff is assigned to this contract
+      // staffId can be ObjectId or populated User object
+      const isAssigned = contract.assignedStaff && contract.assignedStaff.some(assignment => {
+        if (!assignment.staffId) return false;
+        // Handle both ObjectId and populated User object
+        const staffIdValue = assignment.staffId._id || assignment.staffId;
+        return staffIdValue.toString() === user._id.toString();
+      });
       if (!isAssigned) {
-        console.log(`[getContractById] Staff access denied: not assigned to contract`);
+        console.log(`[getContractById] Staff access denied: not assigned to contract`, {
+          userId: user._id.toString(),
+          assignedStaff: contract.assignedStaff?.map(a => ({
+            staffId: a.staffId?._id || a.staffId,
+            staffIdType: typeof a.staffId
+          }))
+        });
         return res.status(403).json({ message: "You are not assigned to this contract" });
       }
-    } else if (role === 'manager' || role === 'admin') {
-      // Managers and admins can see all contracts
-      console.log(`[getContractById] ${role} access granted to contract ${id}`);
+      console.log(`[getContractById] Staff access granted: staff is assigned to contract`);
+    } else if (roleStr === 'manager' || roleStr === 'admin') {
+      // Managers and admins can see all contracts (including pending_approval)
+      console.log(`[getContractById] ${roleStr} access granted to contract ${id}, status: ${contract.status}`);
     } else {
-      // Unknown role
-      console.error(`[getContractById] Unknown role: ${role}`);
-      return res.status(403).json({ message: `Access denied: Unknown role "${role}"` });
+      // Unknown role or empty role
+      console.error(`[getContractById] Unknown or empty role: "${role}" (type: ${typeof role}, processed: "${roleStr}")`);
+      return res.status(403).json({ 
+        message: `Access denied: Invalid role "${role || 'undefined'}". Please contact support or try logging in again.` 
+      });
     }
 
     res.json({ contract });
@@ -1430,6 +1527,14 @@ const customerSignContract = async (req, res) => {
     // Check if already signed by customer
     if (contract.signatures.customerSigned) {
       return res.status(400).json({ message: "Contract already signed by customer" });
+    }
+
+    // Check if contract is in a status that allows customer to sign
+    // Customer can sign when contract is approved or pending_approval
+    if (contract.status !== 'approved' && contract.status !== 'pending_approval') {
+      return res.status(400).json({ 
+        message: `Contract cannot be signed. Current status: ${contract.status}. Contract must be approved first.` 
+      });
     }
 
     // Update customer signature

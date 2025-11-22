@@ -115,15 +115,19 @@ const ContractApproval = () => {
       
       // Load contract details with assigned staff
       const response = await getContractById(contract._id);
-      setContractDetails(response.data.contract);
+      setContractDetails(response.data?.contract || response.contract);
       
       // Load available staff
       const staffResponse = await getAvailableStaff(contract._id);
-      setAvailableStaff(staffResponse.data.availableStaff || []);
+      setAvailableStaff(staffResponse.data?.availableStaff || staffResponse.availableStaff || []);
       
       setShowAssignStaffModal(true);
     } catch (err) {
-      setError('Failed to load staff information');
+      console.error('Error loading contract details:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load staff information';
+      setError(errorMessage);
+      // Don't open modal if we can't load contract details
+      setShowAssignStaffModal(false);
     }
   };
 
@@ -270,6 +274,57 @@ const ContractApproval = () => {
                   <h4>Payment Method</h4>
                   <p><strong>Type:</strong> {contract.paymentMethod?.type}</p>
                 </div>
+
+                {/* Items List */}
+                {contract.items && contract.items.length > 0 && (
+                  <div className="detail-section">
+                    <h4>Items for Transportation</h4>
+                    <div style={{ marginTop: '10px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
+                            <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>#</th>
+                            <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Description</th>
+                            <th style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Qty</th>
+                            <th style={{ padding: '8px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Category</th>
+                            <th style={{ padding: '8px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Value (VND)</th>
+                            {contract.items.some(item => item.requiresSpecialHandling) && (
+                              <th style={{ padding: '8px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Special</th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {contract.items.map((item, index) => (
+                            <tr key={item.itemId || index} style={{ borderBottom: '1px solid #eee' }}>
+                              <td style={{ padding: '8px', textAlign: 'center' }}>{index + 1}</td>
+                              <td style={{ padding: '8px' }}>{item.description || 'N/A'}</td>
+                              <td style={{ padding: '8px', textAlign: 'center' }}>{item.quantity || 1}</td>
+                              <td style={{ padding: '8px', textTransform: 'capitalize' }}>{item.category || 'other'}</td>
+                              <td style={{ padding: '8px', textAlign: 'right' }}>
+                                {item.estimatedValue ? new Intl.NumberFormat('vi-VN').format(item.estimatedValue) : 'N/A'}
+                              </td>
+                              {contract.items.some(i => i.requiresSpecialHandling) && (
+                                <td style={{ padding: '8px', textAlign: 'center' }}>
+                                  {item.requiresSpecialHandling ? '⚠️ Yes' : '-'}
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Additional Terms */}
+                {contract.terms?.additionalTerms && (
+                  <div className="detail-section">
+                    <h4>Additional Terms</h4>
+                    <p style={{ whiteSpace: 'pre-wrap', marginTop: '10px', padding: '10px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+                      {contract.terms.additionalTerms}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Signatures Status */}

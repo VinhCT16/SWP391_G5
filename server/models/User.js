@@ -156,11 +156,11 @@ userSchema.pre('save', function(next) {
     return next();
   }
 
-  // For existing users or non-customer roles, validate role-specific fields
-  // Only validate if role-specific fields are present (allows partial updates)
+  // For new users with non-customer roles, validate required fields
+  // For existing users, only validate if role-specific fields are being modified
   if (this.role === 'manager') {
-    // Only validate if manager-specific fields are being set/modified
-    if (this.isModified('employeeId') || this.isModified('department') || !this.isNew) {
+    // For new managers, always validate. For existing, only if fields are modified
+    if (this.isNew || this.isModified('employeeId') || this.isModified('department')) {
       if (this.employeeId === undefined || this.employeeId === null || this.employeeId === '') {
         return next(new Error('Employee ID is required for managers'));
       }
@@ -175,8 +175,8 @@ userSchema.pre('save', function(next) {
   }
 
   if (this.role === 'staff') {
-    // Only validate if staff-specific fields are being set/modified
-    if (this.isModified('employeeId') || this.isModified('staffRole') || !this.isNew) {
+    // For new staff, always validate. For existing, only if fields are modified
+    if (this.isNew || this.isModified('employeeId') || this.isModified('staffRole')) {
       if (this.employeeId === undefined || this.employeeId === null || this.employeeId === '') {
         return next(new Error('Employee ID is required for staff'));
       }
@@ -187,8 +187,8 @@ userSchema.pre('save', function(next) {
   }
 
   if (this.role === 'admin') {
-    // Only validate if admin-specific fields are being set/modified
-    if (this.isModified('adminId') || this.isModified('department') || !this.isNew) {
+    // For new admins, always validate. For existing, only if fields are modified
+    if (this.isNew || this.isModified('adminId') || this.isModified('department')) {
       if (this.adminId === undefined || this.adminId === null || this.adminId === '') {
         return next(new Error('Admin ID is required for admins'));
       }

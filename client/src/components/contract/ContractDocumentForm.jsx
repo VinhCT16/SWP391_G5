@@ -132,6 +132,47 @@ const ContractDocumentForm = ({ contract, onManagerSign, onCustomerSign, userRol
           </div>
         </div>
 
+        {/* Items List */}
+        {contract.items && contract.items.length > 0 && (
+          <div className="contract-section">
+            <h2 className="section-title">ITEMS FOR TRANSPORTATION</h2>
+            <div className="items-table">
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '15px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
+                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>#</th>
+                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Description</th>
+                    <th style={{ padding: '12px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Quantity</th>
+                    <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Category</th>
+                    <th style={{ padding: '12px', textAlign: 'right', borderBottom: '1px solid #ddd' }}>Value (VND)</th>
+                    {contract.items.some(item => item.requiresSpecialHandling) && (
+                      <th style={{ padding: '12px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Special Handling</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {contract.items.map((item, index) => (
+                    <tr key={item.itemId || index} style={{ borderBottom: '1px solid #eee' }}>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>{index + 1}</td>
+                      <td style={{ padding: '12px' }}>{item.description || 'N/A'}</td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>{item.quantity || 1}</td>
+                      <td style={{ padding: '12px', textTransform: 'capitalize' }}>{item.category || 'other'}</td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>
+                        {item.estimatedValue ? formatCurrency(item.estimatedValue) : 'N/A'}
+                      </td>
+                      {contract.items.some(i => i.requiresSpecialHandling) && (
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          {item.requiresSpecialHandling ? '⚠️ Yes' : '-'}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Payment Method */}
         <div className="contract-section">
           <h2 className="section-title">PAYMENT METHOD</h2>

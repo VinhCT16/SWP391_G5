@@ -103,32 +103,32 @@ export default function OverviewTab({ userStats, customerStats, complaintStats }
         <div className="loading-state">Loading complaint statistics...</div>
       )}
 
-      {userStats?.roleStats && (
+      {userStats?.roleStats && Array.isArray(userStats.roleStats) && userStats.roleStats.length > 0 && (
         <div style={{ marginBottom: '30px' }}>
           <h3 style={{ color: '#333', marginBottom: '15px' }}>Users by Role</h3>
           <div className="role-grid">
             {userStats.roleStats.map(role => (
-              <div key={role._id} className="role-card">
-                <h4>{role._id.charAt(0).toUpperCase() + role._id.slice(1)}</h4>
-                <p>{role.count} users</p>
+              <div key={role._id || role.role} className="role-card">
+                <h4>{(role._id || role.role || '').charAt(0).toUpperCase() + (role._id || role.role || '').slice(1)}</h4>
+                <p>{role.count || 0} users</p>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {userStats?.recentUsers && (
+      {userStats?.recentUsers && Array.isArray(userStats.recentUsers) && userStats.recentUsers.length > 0 && (
         <div style={{ background: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
           <h3 style={{ color: '#333', marginBottom: '15px' }}>Recent Users</h3>
           <div className="recent-list">
             {userStats.recentUsers.map(user => (
-              <div key={user._id} className="recent-item">
+              <div key={user._id || user.id} className="recent-item">
                 <div>
-                  <strong style={{ color: '#333' }}>{user.name}</strong>
-                  <span className="user-role">{user.role}</span>
+                  <strong style={{ color: '#333' }}>{user.name || 'N/A'}</strong>
+                  <span className="user-role">{user.role || ''}</span>
                 </div>
                 <span style={{ color: '#666', fontSize: '14px' }}>
-                  {new Date(user.createdAt).toLocaleDateString()}
+                  {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
                 </span>
               </div>
             ))}

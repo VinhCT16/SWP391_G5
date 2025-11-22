@@ -46,6 +46,18 @@ router.post("/register", async (req, res) => {
     };
     return res.status(201).json({ user: safeUser });
   } catch (err) {
+    console.error("Registration error:", err);
+    // Return specific error message if it's a validation error
+    if (err.message && (err.message.includes('required') || err.message.includes('must be one of'))) {
+      return res.status(400).json({ message: err.message });
+    }
+    // Check for duplicate key errors
+    if (err.code === 11000) {
+      const field = Object.keys(err.keyPattern)[0];
+      return res.status(409).json({ 
+        message: `${field === 'email' ? 'Email' : field === 'employeeId' ? 'Mã nhân viên' : 'Mã quản trị'} đã được sử dụng` 
+      });
+    }
     return res.status(500).json({ message: "Lỗi máy chủ" });
   }
 });

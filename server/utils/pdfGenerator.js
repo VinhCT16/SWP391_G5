@@ -85,9 +85,15 @@ const generateContractPDF = async (contract) => {
     doc.setFont(undefined, 'normal');
     doc.text(`Type: ${contract.paymentMethod?.type?.replace('_', ' ').toUpperCase() || 'N/A'}`, 20, totalY + 45);
     
-    // Items List (from request)
+    // Items List (from contract.items first, fallback to requestId.items)
     let itemsY = totalY + 60;
-    if (contract.requestId && contract.requestId.items && contract.requestId.items.length > 0) {
+    const items = (contract.items && contract.items.length > 0) 
+      ? contract.items 
+      : (contract.requestId && contract.requestId.items && contract.requestId.items.length > 0)
+        ? contract.requestId.items
+        : [];
+    
+    if (items.length > 0) {
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
       doc.text('ITEMS FOR TRANSPORTATION', 20, itemsY);
@@ -96,7 +102,7 @@ const generateContractPDF = async (contract) => {
       doc.setFont(undefined, 'normal');
       itemsY += 10;
       
-      contract.requestId.items.forEach((item, index) => {
+      items.forEach((item, index) => {
         // Check if we need a new page
         if (itemsY > 250) {
           doc.addPage();
@@ -114,6 +120,10 @@ const generateContractPDF = async (contract) => {
         }
         if (item.category) {
           doc.text(`   Category: ${item.category}`, 25, itemsY);
+          itemsY += 7;
+        }
+        if (item.estimatedValue) {
+          doc.text(`   Estimated Value: ${new Intl.NumberFormat('vi-VN').format(item.estimatedValue)} VND`, 25, itemsY);
           itemsY += 7;
         }
         if (item.dimensions) {
