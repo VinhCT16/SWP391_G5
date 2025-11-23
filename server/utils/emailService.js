@@ -13,6 +13,14 @@ const createTransporter = () => {
     auth: {
       user: process.env.SMTP_USER || process.env.EMAIL_USER,
       pass: process.env.SMTP_PASS || process.env.EMAIL_PASS
+    },
+    tls: {
+      // Bỏ qua xác thực chứng chỉ tự ký để tránh lỗi "self-signed certificate in certificate chain"
+      // Có thể điều khiển qua biến môi trường SMTP_TLS_REJECT_UNAUTHORIZED
+      // Mặc định: false (bỏ qua) cho development, true cho production
+      // Lưu ý: Trong production, nên sử dụng chứng chỉ hợp lệ từ CA được tin cậy
+      rejectUnauthorized: process.env.SMTP_TLS_REJECT_UNAUTHORIZED === 'true' || 
+                          (process.env.SMTP_TLS_REJECT_UNAUTHORIZED !== 'false' && process.env.NODE_ENV === 'production')
     }
   });
 

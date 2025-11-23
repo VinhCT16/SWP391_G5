@@ -317,7 +317,7 @@ const ContractForm = () => {
             <option value="">Select a service</option>
             {services.map(service => (
               <option key={service._id} value={service._id}>
-                {service.name} - ${service.price}
+                {service.name} - {service.price.toLocaleString('vi-VN')} VND
               </option>
             ))}
           </select>
@@ -328,7 +328,7 @@ const ContractForm = () => {
           <h3>Pricing Details</h3>
           
           <div className="form-group">
-            <label htmlFor="pricing.basePrice">Base Price ($)</label>
+            <label htmlFor="pricing.basePrice">Base Price (VND)</label>
             <input
               type="number"
               id="pricing.basePrice"
@@ -379,7 +379,7 @@ const ContractForm = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="pricing.deposit">Deposit ($)</label>
+            <label htmlFor="pricing.deposit">Deposit (VND)</label>
             <input
               type="number"
               id="pricing.deposit"
@@ -394,23 +394,23 @@ const ContractForm = () => {
           <div className="pricing-summary">
             <div className="summary-item">
               <span>Base Price:</span>
-              <span>${formData.pricing.basePrice}</span>
+              <span>{formData.pricing.basePrice.toLocaleString('vi-VN')} VND</span>
             </div>
             <div className="summary-item">
               <span>Additional Services:</span>
-              <span>${formData.pricing.additionalServices.reduce((sum, service) => sum + (service.price || 0), 0)}</span>
+              <span>{formData.pricing.additionalServices.reduce((sum, service) => sum + (service.price || 0), 0).toLocaleString('vi-VN')} VND</span>
             </div>
             <div className="summary-item total">
               <span>Total:</span>
-              <span>${formData.pricing.totalPrice}</span>
+              <span>{formData.pricing.totalPrice.toLocaleString('vi-VN')} VND</span>
             </div>
             <div className="summary-item">
               <span>Deposit:</span>
-              <span>${formData.pricing.deposit}</span>
+              <span>{formData.pricing.deposit.toLocaleString('vi-VN')} VND</span>
             </div>
             <div className="summary-item balance">
               <span>Balance:</span>
-              <span>${formData.pricing.balance}</span>
+              <span>{formData.pricing.balance.toLocaleString('vi-VN')} VND</span>
             </div>
           </div>
         </div>

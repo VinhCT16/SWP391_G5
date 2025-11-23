@@ -158,7 +158,7 @@ const autoCreateContractFromRequest = async (requestId, managerUserId) => {
 
     // Calculate pricing - use request estimated price if available, otherwise use service price
     const estimatedPrice = request.estimatedPrice || {};
-    const basePrice = Number(estimatedPrice.basePrice) || Number(service.price) || 500;
+    const basePrice = Number(estimatedPrice.basePrice) || Number(service.price) || 7000000;
     const additionalServices = estimatedPrice.additionalServices || [];
     const additionalTotal = additionalServices.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
     const totalPrice = Number(estimatedPrice.totalPrice) || (basePrice + additionalTotal);

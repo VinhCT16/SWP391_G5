@@ -124,7 +124,7 @@ const ContractDetailView = () => {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount || 0);
   };
 
   if (loading) {

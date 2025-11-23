@@ -252,10 +252,10 @@ const ContractApproval = () => {
 
                 <div className="detail-section">
                   <h4>Pricing</h4>
-                  <p><strong>Base Price:</strong> ${contract.pricing?.basePrice}</p>
-                  <p><strong>Total Price:</strong> ${contract.pricing?.totalPrice}</p>
-                  <p><strong>Deposit:</strong> ${contract.pricing?.deposit}</p>
-                  <p><strong>Balance:</strong> ${contract.pricing?.balance}</p>
+                  <p><strong>Base Price:</strong> {contract.pricing?.basePrice?.toLocaleString('vi-VN') || 0} VND</p>
+                  <p><strong>Total Price:</strong> {contract.pricing?.totalPrice?.toLocaleString('vi-VN') || 0} VND</p>
+                  <p><strong>Deposit:</strong> {contract.pricing?.deposit?.toLocaleString('vi-VN') || 0} VND</p>
+                  <p><strong>Balance:</strong> {contract.pricing?.balance?.toLocaleString('vi-VN') || 0} VND</p>
                 </div>
 
                 <div className="detail-section">
