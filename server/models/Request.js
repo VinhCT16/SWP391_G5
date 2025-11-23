@@ -71,7 +71,7 @@ const requestSchema = new mongoose.Schema({
   // Request Status
   status: { 
     type: String, 
-    enum: ["draft", "submitted", "under_review", "approved", "rejected", "contract_created", "in_progress", "completed", "cancelled", "UNDER_SURVEY", "PENDING", "PENDING_CONFIRMATION", "WAITING_PAYMENT", "IN_PROGRESS", "DONE", "CANCELLED", "REJECTED", "PENDING_REVIEW"], 
+    enum: ["draft", "submitted", "under_review", "pending_contract", "approved", "rejected", "contract_created", "in_progress", "completed", "cancelled", "UNDER_SURVEY", "PENDING", "PENDING_CONFIRMATION", "WAITING_PAYMENT", "IN_PROGRESS", "DONE", "CANCELLED", "REJECTED", "PENDING_REVIEW"], 
     default: "draft" 
   },
   

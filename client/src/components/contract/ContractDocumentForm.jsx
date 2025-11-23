@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import './ContractDocumentForm.css';
 
 const ContractDocumentForm = ({ contract, onManagerSign, onCustomerSign, userRole }) => {
@@ -17,6 +17,28 @@ const ContractDocumentForm = ({ contract, onManagerSign, onCustomerSign, userRol
       currency: 'VND'
     }).format(amount || 0);
   };
+
+  // Calculate total item value
+  const totalItemValue = useMemo(() => {
+    if (!contract.items || !Array.isArray(contract.items) || contract.items.length === 0) {
+      return 0;
+    }
+    return contract.items.reduce((sum, item) => {
+      const itemValue = Number(item.estimatedValue) || 0;
+      const quantity = Number(item.quantity) || 1;
+      return sum + (itemValue * quantity);
+    }, 0);
+  }, [contract.items]);
+
+  // Calculate grand total: Base Price + Additional Services + Item List Surcharge
+  const grandTotal = useMemo(() => {
+    const basePrice = Number(contract.pricing?.basePrice) || 0;
+    const additionalServicesTotal = (contract.pricing?.additionalServices || []).reduce(
+      (sum, service) => sum + (Number(service.price) || 0),
+      0
+    );
+    return basePrice + additionalServicesTotal + totalItemValue;
+  }, [contract.pricing?.basePrice, contract.pricing?.additionalServices, totalItemValue]);
 
   const managerName = contract.managerId?.userId?.name || 'Manager Name';
   const customerName = contract.customerId?.name || 'Customer Name';
@@ -81,6 +103,48 @@ const ContractDocumentForm = ({ contract, onManagerSign, onCustomerSign, userRol
           </div>
         </div>
 
+        {/* Item List Details */}
+        {contract.items && Array.isArray(contract.items) && contract.items.length > 0 && (
+          <div className="contract-section">
+            <h2 className="section-title">ITEM LIST DETAILS</h2>
+            <div className="items-table-container">
+              <table className="items-table">
+                <thead>
+                  <tr>
+                    <th>Item Name</th>
+                    <th>Description</th>
+                    <th>Quantity</th>
+                    <th>Price/Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {contract.items.map((item, index) => (
+                    <tr key={item.itemId || index}>
+                      <td>{item.description || 'N/A'}</td>
+                      <td>
+                        {item.category && (
+                          <span className="item-category">{item.category}</span>
+                        )}
+                        {item.requiresSpecialHandling && (
+                          <span className="special-handling-badge">⚠️ Special Handling</span>
+                        )}
+                      </td>
+                      <td>{item.quantity || 1}</td>
+                      <td className="item-value">{formatCurrency((Number(item.estimatedValue) || 0) * (Number(item.quantity) || 1))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="items-total-row">
+                    <td colSpan="3" className="total-label">Total Item List Value:</td>
+                    <td className="total-value">{formatCurrency(totalItemValue)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Move Details */}
         <div className="contract-section">
           <h2 className="section-title">MOVE DETAILS</h2>
@@ -115,9 +179,15 @@ const ContractDocumentForm = ({ contract, onManagerSign, onCustomerSign, userRol
                 ))}
               </>
             )}
+            {totalItemValue > 0 && (
+              <div className="pricing-row">
+                <span className="pricing-label">Item List Surcharge:</span>
+                <span className="pricing-value">{formatCurrency(totalItemValue)}</span>
+              </div>
+            )}
             <div className="pricing-row total">
               <span className="pricing-label">Total Price:</span>
-              <span className="pricing-value">{formatCurrency(contract.pricing?.totalPrice)}</span>
+              <span className="pricing-value">{formatCurrency(grandTotal)}</span>
             </div>
             <div className="pricing-row">
               <span className="pricing-label">Deposit:</span>

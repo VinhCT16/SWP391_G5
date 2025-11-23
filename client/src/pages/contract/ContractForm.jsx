@@ -49,28 +49,28 @@ const ContractForm = () => {
       console.log('Loading services from API...');
       const response = await getAllServices();
       console.log('Services API response:', response);
-      console.log('Services data:', response?.data);
       
-      if (response && response.data) {
-        if (response.data.services && Array.isArray(response.data.services)) {
-          if (response.data.services.length > 0) {
-            setServices(response.data.services);
-            console.log(`✅ Loaded ${response.data.services.length} services from server`);
-            // Clear error if successful
-            setError('');
-            return;
-          } else {
-            console.warn('No services found in database, using default services');
-            loadDefaultServices();
-            return;
-          }
+      // Backend returns { services: [...] } directly
+      if (response && response.services && Array.isArray(response.services)) {
+        if (response.services.length > 0) {
+          // Map to match expected format with _id
+          const formattedServices = response.services.map(s => ({
+            _id: s.id || s._id,
+            name: s.name,
+            price: s.price
+          }));
+          setServices(formattedServices);
+          console.log(`✅ Loaded ${formattedServices.length} services from server`);
+          // Clear error if successful
+          setError('');
+          return;
         } else {
-          console.warn('Invalid response format - services is not an array:', response.data);
+          console.warn('No services found in database, using default services');
           loadDefaultServices();
           return;
         }
       } else {
-        console.warn('Invalid response format - no data property:', response);
+        console.warn('Invalid response format - services is not an array:', response);
         loadDefaultServices();
         return;
       }
@@ -328,7 +328,7 @@ const ContractForm = () => {
           <h3>Pricing Details</h3>
           
           <div className="form-group">
-            <label htmlFor="pricing.basePrice">Base Price (VND)</label>
+            <label htmlFor="pricing.basePrice">Base Price (VND) *</label>
             <input
               type="number"
               id="pricing.basePrice"
@@ -338,7 +338,26 @@ const ContractForm = () => {
               min="0"
               step="0.01"
               required
+              readOnly={!!formData.serviceId}
+              disabled={!formData.serviceId}
+              style={{
+                backgroundColor: formData.serviceId ? '#f5f5f5' : '#fff',
+                cursor: formData.serviceId ? 'not-allowed' : 'text',
+                opacity: formData.serviceId ? 0.7 : 1
+              }}
+              title={formData.serviceId 
+                ? "Base price is automatically set from selected service and cannot be changed" 
+                : "Please select a service first"}
             />
+            {formData.serviceId ? (
+              <small style={{ color: '#666', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+                Base price is automatically set from the selected service and cannot be changed
+              </small>
+            ) : (
+              <small style={{ color: '#999', fontSize: '12px', display: 'block', marginTop: '4px' }}>
+                Select a service to automatically set the base price
+              </small>
+            )}
           </div>
 
           {/* Additional Services */}

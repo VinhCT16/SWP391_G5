@@ -223,9 +223,84 @@ const sendRejectionEmail = async (customerEmail, customerName, request, rejectio
   }
 };
 
+// Send simple approval notification (without contract - contract will be sent separately)
+const sendSimpleApprovalEmail = async (customerEmail, customerName, request) => {
+  try {
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: `"Moving Service" <${process.env.SMTP_USER || process.env.EMAIL_USER || 'noreply@movingservice.com'}>`,
+      to: customerEmail,
+      subject: `✅ Request Approved - Request #${request.requestId}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .info-box { background: white; padding: 15px; margin: 15px 0; border-radius: 5px; border-left: 4px solid #4caf50; }
+            .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>✅ Request Approved!</h1>
+            </div>
+            <div class="content">
+              <p>Dear ${customerName},</p>
+              
+              <p>We are pleased to inform you that your moving request <strong>#${request.requestId}</strong> has been <strong>approved</strong>!</p>
+              
+              <div class="info-box">
+                <h3>📋 Request Details</h3>
+                <p><strong>Request ID:</strong> ${request.requestId}</p>
+                <p><strong>From:</strong> ${request.moveDetails?.fromAddress || 'N/A'}</p>
+                <p><strong>To:</strong> ${request.moveDetails?.toAddress || 'N/A'}</p>
+                <p><strong>Move Date:</strong> ${new Date(request.moveDetails?.moveDate).toLocaleDateString()}</p>
+              </div>
+              
+              <p><strong>Next Steps:</strong></p>
+              <p>Our team is preparing your contract with detailed pricing and service information. You will receive a separate email with your contract document once it's ready for review.</p>
+              
+              <div class="info-box">
+                <h3>📞 Contact Information</h3>
+                <p><strong>Phone:</strong> ${process.env.SUPPORT_PHONE || '1900-XXXX'}</p>
+                <p><strong>Email:</strong> ${process.env.SUPPORT_EMAIL || 'support@movingservice.com'}</p>
+                <p><strong>Business Hours:</strong> Monday - Friday, 8:00 AM - 6:00 PM</p>
+              </div>
+              
+              <p>Thank you for choosing our moving service!</p>
+              
+              <p>Best regards,<br>
+              Moving Service Team</p>
+            </div>
+            <div class="footer">
+              <p>This is an automated email. Please do not reply to this message.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Simple approval email sent:', info.messageId);
+    return info;
+  } catch (error) {
+    console.error('❌ Error sending simple approval email:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   sendApprovalEmail,
   sendRejectionEmail,
+  sendSimpleApprovalEmail,
   createTransporter
 };
 

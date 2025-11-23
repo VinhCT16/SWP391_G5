@@ -620,8 +620,15 @@ const updateRequestStatus = async (req, res) => {
       return res.status(404).json({ message: "Request not found" });
     }
 
-    // Update request status
-    request.status = status;
+    // When manager approves, set status to 'pending_contract' (not 'approved' yet)
+    // Request will only be truly 'approved' after contract is created
+    let actualStatus = status;
+    if (status === 'approved') {
+      actualStatus = 'pending_contract';
+      console.log('Manager approved request. Status set to pending_contract. Contract must be created to finalize approval.');
+    }
+    
+    request.status = actualStatus;
     
     if (status === 'rejected' && rejectionReason) {
       request.approval = {
@@ -632,11 +639,12 @@ const updateRequestStatus = async (req, res) => {
         notes: notes || ''
       };
     } else if (status === 'approved') {
+      // When manager clicks approve, mark as reviewed but not fully approved yet
       request.approval = {
         reviewedBy: managerId,
         reviewedAt: new Date(),
-        approved: true,
-        notes: notes || ''
+        approved: true, // Manager has approved, but waiting for contract
+        notes: notes || 'Approved by manager. Waiting for contract creation to finalize.'
       };
     } else {
       // For other statuses, update approval if provided
@@ -656,56 +664,22 @@ const updateRequestStatus = async (req, res) => {
     const customerEmail = customer?.email;
     const customerName = customer?.name || request.customerName || 'Customer';
     
-    // Automatically create contract when request is approved
+    // Send email notification when manager approves (status = pending_contract)
+    // This is email #1 - notification that request is being processed
     if (status === 'approved') {
-      try {
-        console.log('Request approved, automatically creating contract...');
-        const contract = await autoCreateContractFromRequest(request._id, managerId);
-        console.log('Contract created automatically:', contract._id);
-        
-        // Populate contract with request data for PDF generation
-        const populatedContract = await Contract.findById(contract._id)
-          .populate('customerId', 'name email phone')
-          .populate('managerId', 'name email phone')
-          .populate({
-            path: 'requestId',
-            select: 'requestId customerId customerName customerPhone moveDetails contractId status createdAt items'
-          });
-        
-        // Ensure request items are available
-        if (populatedContract.requestId && !populatedContract.requestId.items) {
-          const requestWithItems = await Request.findById(populatedContract.requestId._id).select('items');
-          if (requestWithItems) {
-            populatedContract.requestId.items = requestWithItems.items;
-          }
-        }
-        
-        // Generate PDF with items list
-        let pdfBuffer;
+      console.log('Request approved by manager. Status: pending_contract. Sending notification email (email #1).');
+      if (customerEmail) {
         try {
-          pdfBuffer = await generateContractPDFBuffer(populatedContract);
-          console.log('✅ PDF generated successfully');
-        } catch (pdfErr) {
-          console.error('❌ Error generating PDF:', pdfErr);
-          pdfBuffer = null; // Continue without PDF if generation fails
+          // Send simple approval notification (email #1)
+          const { sendSimpleApprovalEmail } = require("../utils/emailService");
+          await sendSimpleApprovalEmail(customerEmail, customerName, request);
+          console.log('✅ Approval notification email sent successfully (email #1)');
+        } catch (emailErr) {
+          console.error('❌ Error sending approval email:', emailErr);
+          // Don't fail the approval if email fails
         }
-        
-        // Send approval email with PDF attachment
-        if (customerEmail) {
-          try {
-            await sendApprovalEmail(customerEmail, customerName, request, populatedContract, pdfBuffer);
-            console.log('✅ Approval email sent successfully');
-          } catch (emailErr) {
-            console.error('❌ Error sending approval email:', emailErr);
-            // Don't fail the approval if email fails
-          }
-        } else {
-          console.warn('⚠️ Customer email not found, skipping email notification');
-        }
-      } catch (contractErr) {
-        // Log error but don't fail the request approval
-        console.error('Error automatically creating contract:', contractErr);
-        // Contract creation can be done manually later if automatic creation fails
+      } else {
+        console.warn('⚠️ Customer email not found, skipping email notification');
       }
     } else if (status === 'rejected' || status === 'denied') {
       // Send rejection email

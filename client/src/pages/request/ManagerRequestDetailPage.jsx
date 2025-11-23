@@ -210,6 +210,52 @@ export default function ManagerRequestDetailPage() {
         </div>
       )}
 
+      {/* Create Contract Button - Show when request is pending_contract (manager approved but contract not created) */}
+      {req.status === 'pending_contract' && !req.contractId && (
+        <div style={{ 
+          marginBottom: 24, 
+          padding: 16, 
+          background: "#e8f5e9", 
+          borderRadius: 8, 
+          border: "2px solid #4caf50" 
+        }}>
+          <h3 style={{ marginTop: 0, marginBottom: 16 }}>📝 Create Contract</h3>
+          <p style={{ marginBottom: 16 }}>
+            This request has been approved. Please create a contract with pricing and service details.
+          </p>
+          <Button 
+            variant="success" 
+            onClick={() => nav(`/contract-form/${req._id}`)}
+            style={{ padding: "12px 24px", fontSize: "16px" }}
+          >
+            ➕ Create Contract
+          </Button>
+        </div>
+      )}
+
+      {/* Contract Link - Show when contract already exists */}
+      {req.contractId && (
+        <div style={{ 
+          marginBottom: 24, 
+          padding: 16, 
+          background: "#e3f2fd", 
+          borderRadius: 8, 
+          border: "2px solid #2196f3" 
+        }}>
+          <h3 style={{ marginTop: 0, marginBottom: 16 }}>📄 Contract Created</h3>
+          <p style={{ marginBottom: 16 }}>
+            A contract has been created for this request.
+          </p>
+          <Button 
+            variant="info" 
+            onClick={() => nav(`/contracts/${req.contractId}`)}
+            style={{ padding: "12px 24px", fontSize: "16px" }}
+          >
+            👁️ View Contract
+          </Button>
+        </div>
+      )}
+
       {/* Approval History - Only show if approval data exists and is valid */}
       {req.approval && (req.approval.approved !== undefined || req.approval.reviewedAt) && (
         <div style={{ marginBottom: 24, padding: 16, background: "#f5f5f5", borderRadius: 8 }}>

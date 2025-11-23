@@ -24,7 +24,8 @@ export default function RequestsTab({
   const groupedRequests = {
     pending: requests.filter(r => r.status === 'pending' || r.status === 'PENDING'),
     under_survey: requests.filter(r => r.status === 'UNDER_SURVEY' || r.status === 'under_survey'),
-    contract_created: requests.filter(r => r.status === 'contract_created')
+    pending_contract: requests.filter(r => r.status === 'pending_contract'),
+    contract_created: requests.filter(r => r.status === 'contract_created' || r.status === 'approved')
   };
 
   // Apply search filter to all groups
@@ -40,6 +41,7 @@ export default function RequestsTab({
 
   const filteredPending = applySearchFilter(groupedRequests.pending);
   const filteredUnderSurvey = applySearchFilter(groupedRequests.under_survey);
+  const filteredPendingContract = applySearchFilter(groupedRequests.pending_contract);
   const filteredContractCreated = applySearchFilter(groupedRequests.contract_created);
 
   return (
@@ -73,6 +75,7 @@ export default function RequestsTab({
           <option value="PENDING">Pending</option>
           <option value="UNDER_SURVEY">Under Survey</option>
           <option value="under_review">Under Review</option>
+          <option value="pending_contract">Pending Contract</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
         </select>
@@ -155,6 +158,45 @@ export default function RequestsTab({
                       <Button variant="info" onClick={() => navigate(`/manager/requests/${request._id}/detail`)}>
                         📋 View Details
                       </Button>
+                    </CardActions>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pending Contract Section - Manager approved but contract not created yet */}
+          {filteredPendingContract.length > 0 && (
+            <div className="request-section">
+              <h3 className="section-title">📝 Pending Contract Creation</h3>
+              <div className="requests-grid">
+                {filteredPendingContract.map((request) => (
+                  <Card key={request._id}>
+                    <CardHeader>
+                      <h3>Request #{request.requestId}</h3>
+                      <StatusBadge status={request.status} />
+                    </CardHeader>
+                    <CardBody>
+                      <div className="request-details">
+                        <div className="detail-row"><strong>Customer:</strong> {request.customerId?.name}</div>
+                        <div className="detail-row"><strong>Email:</strong> {request.customerId?.email}</div>
+                        <div className="detail-row"><strong>Phone:</strong> {request.moveDetails.phone}</div>
+                        <div className="detail-row"><strong>From:</strong> {request.moveDetails.fromAddress}</div>
+                        <div className="detail-row"><strong>To:</strong> {request.moveDetails.toAddress}</div>
+                        <div className="detail-row"><strong>Date:</strong> {new Date(request.moveDetails.moveDate).toLocaleDateString()}</div>
+                        <div className="detail-row"><strong>Service:</strong> {request.moveDetails.serviceType}</div>
+                        <div className="detail-row"><strong>Approved:</strong> {new Date(request.approval?.reviewedAt).toLocaleDateString()}</div>
+                      </div>
+                    </CardBody>
+                    <CardActions>
+                      <Button variant="info" onClick={() => navigate(`/manager/requests/${request._id}/detail`)}>
+                        📋 View Details
+                      </Button>
+                      {onCreateContract && (
+                        <Button variant="success" onClick={() => onCreateContract(request)}>
+                          ➕ Create Contract
+                        </Button>
+                      )}
                     </CardActions>
                   </Card>
                 ))}

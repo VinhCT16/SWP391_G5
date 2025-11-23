@@ -369,9 +369,12 @@ const createContractFromRequest = async (req, res) => {
       return res.status(404).json({ message: "Request not found" });
     }
 
-    // Check if request is approved
-    if (request.status !== 'approved') {
-      return res.status(400).json({ message: "Request must be approved before creating contract" });
+    // Check if request is pending_contract (manager has approved but contract not created yet)
+    // or already approved (for backward compatibility)
+    if (request.status !== 'pending_contract' && request.status !== 'approved') {
+      return res.status(400).json({ 
+        message: "Request must be approved by manager (pending_contract status) before creating contract" 
+      });
     }
 
     // Check if contract already exists
@@ -485,21 +488,64 @@ const createContractFromRequest = async (req, res) => {
     const contract = await Contract.create(contractData);
     console.log('Contract created successfully:', { contractId: contract._id, contractIdStr: contract.contractId });
 
-    // Update request with contract reference
+    // Update request: Now truly approved and contract created
     request.contractId = contract._id;
-    request.status = 'contract_created';
+    request.status = 'approved'; // Request is now truly approved
     await request.save();
-    console.log('Request updated with contract reference');
+    console.log('Request updated: status changed to approved, contract reference added');
 
-    // Populate contract details
+    // Populate contract details for email
     await contract.populate([
       { path: 'customerId', select: 'name email phone role' },
       { path: 'managerId', select: 'name email phone role' },
-      { path: 'serviceId', select: 'name price' }
+      { path: 'serviceId', select: 'name price' },
+      {
+        path: 'requestId',
+        select: 'requestId customerId customerName customerPhone moveDetails contractId status createdAt items'
+      }
     ]);
 
+    // Ensure request items are available in contract for PDF
+    if (contract.requestId && !contract.requestId.items) {
+      const requestWithItems = await Request.findById(contract.requestId._id).select('items');
+      if (requestWithItems) {
+        contract.requestId.items = requestWithItems.items;
+      }
+    }
+
+    // Send email #2: Contract created with PDF attachment
+    const customer = await User.findById(request.customerId).select('email name');
+    const customerEmail = customer?.email;
+    const customerName = customer?.name || request.customerName || 'Customer';
+
+    if (customerEmail) {
+      try {
+        const { sendApprovalEmail } = require("../utils/emailService");
+        const { generateContractPDFBuffer } = require("../utils/pdfGenerator");
+        
+        // Generate PDF with items list
+        let pdfBuffer;
+        try {
+          pdfBuffer = await generateContractPDFBuffer(contract);
+          console.log('✅ PDF generated successfully for email #2');
+        } catch (pdfErr) {
+          console.error('❌ Error generating PDF:', pdfErr);
+          pdfBuffer = null; // Continue without PDF if generation fails
+        }
+
+        // Send approval email with contract PDF (email #2)
+        await sendApprovalEmail(customerEmail, customerName, request, contract, pdfBuffer);
+        console.log('✅ Contract email sent successfully (email #2) with PDF attachment');
+      } catch (emailErr) {
+        console.error('❌ Error sending contract email:', emailErr);
+        // Don't fail contract creation if email fails
+      }
+    } else {
+      console.warn('⚠️ Customer email not found, skipping contract email');
+    }
+
     res.status(201).json({
-      message: "Contract created successfully",
+      message: "Contract created successfully. Request is now approved. Email with contract PDF has been sent to customer.",
       contract: contract
     });
   } catch (err) {
